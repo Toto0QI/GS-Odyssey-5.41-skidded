@@ -153,7 +153,6 @@ namespace Functions
 
 				int32 RandomRarity = GetRandomRarity(RarityAndWeight);
 
-				// 0 = Destroy
 				if (RandomRarity == 0)
 				{
 					VendingMachine->K2_DestroyActor();

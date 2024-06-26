@@ -214,22 +214,62 @@ namespace Hooks
 
 			if (GetAsyncKeyState(VK_F4) & 0x1)
 			{
-				/*AFortPlayerController* PlayerController = (AFortPlayerController*)Globals::GetGameplayStatics()->GetPlayerController(Globals::GetWorld(), 0);
+				UAthenaSeasonItemDefinition* Season5 = StaticLoadObject<UAthenaSeasonItemDefinition>(L"/Game/Athena/Items/Seasons/AthenaSeason5.AthenaSeason5");
 
-				if (!PlayerController)
-					return;
-
-				UFortKismetLibrary::GetPlayerInfoFromUniqueID(PlayerController, FUniqueNetIdRepl());*/
-
-				
-				FPlayerBuildableClassContainer PlayerBuildableClasses0 = Globals::GetGameState()->PlayerBuildableClasses[0x0];
-
-				for (int i = 0; i < PlayerBuildableClasses0.BuildingClasses.Num(); i++)
+				if (Season5)
 				{
-					TSubclassOf<ABuildingSMActor> BuildingClasse = PlayerBuildableClasses0.BuildingClasses[i];
-					if (!BuildingClasse.Get()) continue;
+					FN_LOG(LogHooks, Debug, "SeasonNumber: %i", Season5->SeasonNumber);
+					FN_LOG(LogHooks, Debug, "NumSeasonLevels: %i", Season5->NumSeasonLevels);
+					FN_LOG(LogHooks, Debug, "NumBookLevels: %i", Season5->NumBookLevels);
+					FN_LOG(LogHooks, Debug, "SeasonStorefront: %s", Season5->SeasonStorefront.ToString().c_str());
+					FN_LOG(LogHooks, Debug, "FreeLevelsThatNavigateToBattlePass: %i", Season5->FreeLevelsThatNavigateToBattlePass.Num());
+					FN_LOG(LogHooks, Debug, "FreeLevelsThatAutoOpenTheAboutScreen: %i", Season5->FreeLevelsThatAutoOpenTheAboutScreen.Num());
 
-					FN_LOG(LogHooks, Error, "[%i] - BuildingClasse (0x0) : %s", i, BuildingClasse.Get()->GetName().c_str());
+					TArray<FAthenaRewardScheduleLevel> BookXpScheduleFrees = Season5->BookXpScheduleFree.Levels;
+
+					for (int32 i = 0; i < BookXpScheduleFrees.Num(); i++)
+					{
+						FAthenaRewardScheduleLevel BookXpScheduleFree = BookXpScheduleFrees[i];
+
+						for (int32 j = 0; j < BookXpScheduleFree.Rewards.Num(); j++)
+						{
+							FAthenaRewardItemReference Reward = BookXpScheduleFree.Rewards[j];
+
+							if (!Reward.ItemDefinition.Get())
+								continue;
+
+							FN_LOG(LogHooks, Debug, "[%i] - BookXpScheduleFrees - ItemDefinition: %s, Quantity: %i", i, Reward.ItemDefinition.Get()->GetName().c_str(), Reward.Quantity);
+						}
+					}
+
+					TArray<FAthenaRewardScheduleLevel> BookXpSchedulePaids = Season5->BookXpSchedulePaid.Levels;
+
+					for (int32 i = 0; i < BookXpSchedulePaids.Num(); i++)
+					{
+						FAthenaRewardScheduleLevel BookXpSchedulePaid = BookXpSchedulePaids[i];
+
+						for (int32 j = 0; j < BookXpSchedulePaid.Rewards.Num(); j++)
+						{
+							FAthenaRewardItemReference Reward = BookXpSchedulePaid.Rewards[j];
+
+							if (!Reward.ItemDefinition.Get())
+								continue;
+
+							FN_LOG(LogHooks, Debug, "[%i] - BookXpSchedulePaids - ItemDefinition: %s, Quantity: %i", i, Reward.ItemDefinition.Get()->GetName().c_str(), Reward.Quantity);
+						}
+					}
+
+					TArray<FAthenaRewardItemReference> SeasonGrantsToEveryones = Season5->SeasonGrantsToEveryone.Rewards;
+
+					for (int32 i = 0; i < SeasonGrantsToEveryones.Num(); i++)
+					{
+						FAthenaRewardItemReference SeasonGrantsToEveryone = SeasonGrantsToEveryones[i];
+
+						if (!SeasonGrantsToEveryone.ItemDefinition.Get())
+							continue;
+
+						FN_LOG(LogHooks, Debug, "[%i] - BookXpSchedulePaids - ItemDefinition: %s, Quantity: %i, i", i, SeasonGrantsToEveryone.ItemDefinition.Get()->GetName().c_str(), SeasonGrantsToEveryone.Quantity);
+					}
 				}
 			}
 
