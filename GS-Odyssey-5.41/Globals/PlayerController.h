@@ -911,6 +911,29 @@ namespace PlayerController
 				PlayerController->ClientSendEndBattleRoyaleMatchForPlayer(true, EndOfMatchResults);
 				PlayerController->ClientSendTeamStatsForPlayer(TeamStats);
 
+				float Idk01 = *(float*)(__int64(PlayerController) + 0x6C2);
+
+				//Functions::SpectatePlayer(PlayerController, KillerPawn);
+
+				FN_LOG(LogPlayerController, Debug, "[AFortPlayerControllerZone::ClientOnPawnDied] Idk01: %.2f", Idk01);
+
+				/*FFortSpectatorAthenaItem SpectatorAthenaItem;
+				SpectatorAthenaItem.PlayerState = PlayerState;
+
+				PlayerState->Spectators.SpectatorArray.Add(SpectatorAthenaItem);
+				PlayerState->Spectators.MarkItemDirty(SpectatorAthenaItem);
+				PlayerState->Spectators.ArrayReplicationKey++;
+				PlayerState->Spectators.OwningState = PlayerState;
+				PlayerState->Spectators.MarkArrayDirty();*/
+
+				AFortGameModeAthena* GameMode = Globals::GetGameMode();
+
+				if (GameMode && GameMode->bAllowSpectateAfterDeath)
+				{
+					
+				}
+
+
 				/*FAthenaMatchStats Stats;
 				Stats.StatBucket;
 				Stats.MatchID;

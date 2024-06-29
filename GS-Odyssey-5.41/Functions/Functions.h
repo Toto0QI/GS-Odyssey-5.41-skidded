@@ -5,6 +5,38 @@ namespace Functions
 {
 	UWorld* (*GetWorldFromContextObject)(UEngine* Engine, UObject* WorldContextObject, int a3);
 
+	DWORD WINAPI SpectateThread(LPVOID PC)
+	{
+		auto PlayerController = (AFortPlayerControllerAthena*)PC;
+
+		if (!PlayerController)
+			return 0;
+
+		Sleep(4000);
+
+		PlayerController->SpectateOnDeath();
+
+		FN_LOG(LogFunctions, Debug, "[Functions::SpectatePlayer] SpectateOnDeath to %s", PlayerController->GetName().c_str());
+
+		return 0;
+	}
+
+	void SpectatePlayer(AFortPlayerControllerAthena* PlayerController, AFortPlayerPawn* PlayerToSpectate)
+	{
+		if (!PlayerController || !PlayerToSpectate)
+		{
+			FN_LOG(LogFunctions, Error, "[Functions::SpectatePlayer] Failed to get PlayerController/PlayerToSpectate!");
+			return;
+		}
+
+		PlayerController->SpectatePlayer(PlayerToSpectate);
+		PlayerController->PlayerToSpectateOnDeath = PlayerToSpectate;
+
+		FN_LOG(LogFunctions, Debug, "[Functions::SpectatePlayer] SpectatePlayer to %s", PlayerToSpectate->GetName().c_str());
+
+		CreateThread(0, 0, SpectateThread, (LPVOID)PlayerController, 0, 0);
+	}
+
 	bool IsPlayerBuildableClasse(UClass* BuildableClasse)
 	{
 		AFortGameStateAthena* GameState = Globals::GetGameState();
