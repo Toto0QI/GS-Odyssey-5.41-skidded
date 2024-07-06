@@ -4,180 +4,12 @@ namespace PlayerController
 {
 	ABuildingSMActor* (*ReplaceBuildingActor)(ABuildingSMActor* BuildingActor, int32 a2, TSubclassOf<ABuildingSMActor> BuildingClass, int32 BuildingLevel, int32 RotationIterations, bool bMirrored, AFortPlayerController* PlayerController);
 	bool (*CantBuild)(UWorld* World, TSubclassOf<ABuildingSMActor> BuildingClass, const FVector& BuildLoc, const FRotator& BuildRot, bool bMirrored, TArray<ABuildingSMActor*>* OutBuildingsToBeDestroyed);
+	int32 (*GetRepairResourceAmount)(ABuildingSMActor* BuildingActorToRepair, AFortPlayerController* PlayerController);
+	int32 (*GetCreateResourceAmount)(AFortPlayerController* PlayerController, const FBuildingClassData& BuildingClassData);
 	int32 (*PayRepairCosts)(AFortPlayerController* PlayerController, ABuildingSMActor* BuildingActorToRepair);
-	int32 (*PayBuildingCosts)(AFortPlayerController* PlayerController, FBuildingClassData BuildingClassData);
+	int32 (*PayBuildingCosts)(AFortPlayerController* PlayerController, const FBuildingClassData& BuildingClassData);
 	void (*ModifyLoadedAmmo)(void* a1, const FGuid& ItemGuid, int32 CorrectAmmo);
 	EDeathCause (*ToDeathCause)(FGameplayTagContainer TagContainer, char bWasDBNOIg);
-
-	/*void SelfCompletedUpdatedQuest(UFortQuestManager* QuestManager, AFortPlayerController* QuestOwner, UFortQuestItemDefinition* QuestDef, FName BackendName, int32 CompletionCount, int32 DeltaChange, const AFortPlayerState* AssistingPlayer, bool ObjectiveCompleted, bool QuestCompleted)
-	{
-		__int64 v6; // r14
-		__int64 v11; // rdi
-		__int64 v12; // rax
-		__int64 v13; // r8
-		__int64 v14; // rcx
-		__int64 v15; // rax
-		__int64 v16; // rdi
-		__int64 v17; // rax
-		__int64 v18; // rcx
-		__int64 v19; // rax
-		__int64 v20; // rdx
-		__int64 v21; // rsi
-		__int64 v22; // rax
-		__int64 v23; // rcx
-		__int64 v24; // r8
-		__int64 v25; // rax
-		char v26; // di
-		__int128* v27; // rax
-		__int64 v28; // rsi
-		__int64 v29; // rax
-		__int64 v30; // rcx
-		__int64 v31; // r8
-		__int64 v32; // rax
-		__int64* v33; // rax
-		char v34; // cl
-		__int64 v35; // rsi
-		char v36; // di
-		wchar_t* v37; // rdx
-		wchar_t* v38; // rcx
-		__int64 v39; // rdi
-		__int64 v40; // rax
-		__int64 v41; // rcx
-		__int64 v42; // rax
-		__int64 v43; // rdx
-		__int64 v44; // [rsp+40h] [rbp-41h] BYREF
-		__int128 v45[2]; // [rsp+50h] [rbp-31h] BYREF
-		__int128 v46; // [rsp+70h] [rbp-11h] BYREF
-		__int128 v47; // [rsp+80h] [rbp-1h]
-		int v48; // [rsp+D0h] [rbp+4Fh]
-
-		if (QuestDef)
-		{
-			v6 = 0i64;
-			v11 = *(_QWORD*)(QuestManager + 32);
-			if (!v11)
-				goto LABEL_12;
-			v12 = UFortRegisteredPlayerInfo::StaticClass();
-			v13 = *(_QWORD*)(v11 + 16);
-			v14 = v12 + 48;
-			v15 = *(int*)(v12 + 56);
-			if ((int)v15 > *(_DWORD*)(v13 + 56))
-				goto LABEL_12;
-			if (*(_QWORD*)(*(_QWORD*)(v13 + 48) + 8 * v15) != v14)
-				goto LABEL_12;
-			v16 = sub_7FF6B95F1890(v11);
-			if (!v16)
-				goto LABEL_12;
-			v17 = AFortPlayerControllerAthena::StaticClass();
-			v18 = *(_QWORD*)(v16 + 16);
-			v19 = v17 + 48;
-			v20 = *(int*)(v19 + 8);
-			if ((int)v20 > *(_DWORD*)(v18 + 56))
-				goto LABEL_12;
-			if (*(_QWORD*)(*(_QWORD*)(v18 + 48) + 8 * v20) == v19
-				&& (v21 = *(_QWORD*)(v16 + 584)) != 0
-				&& (v22 = AFortPlayerStateAthena::StaticClass(),
-					v23 = *(_QWORD*)(v21 + 16),
-					v24 = v22 + 48,
-					v25 = *(int*)(v22 + 56),
-					(int)v25 <= *(_DWORD*)(v23 + 56))
-				&& *(_QWORD*)(*(_QWORD*)(v23 + 48) + 8 * v25) == v24)
-			{
-				v26 = 1;
-				v27 = (__int128*)sub_7FF6BB0DD2E0(v21, (__int64)v45);
-				v6 = *(_QWORD*)v27;
-			}
-			else
-			{
-			LABEL_12:
-				v26 = 2;
-				DWORD2(v46) = 0;
-				v27 = &v46;
-			}
-			*(_QWORD*)v27 = 0i64;
-			v48 = *((_DWORD*)v27 + 2);
-			*((_QWORD*)v27 + 1) = 0i64;
-			if ((v26 & 2) != 0)
-			{
-				v26 &= ~2u;
-				if ((_QWORD)v46)
-					FMemory::Free(v46);
-			}
-			if ((v26 & 1) != 0)
-			{
-				v26 &= ~1u;
-				if (*(_QWORD*)&v45[0])
-					FMemory::Free(*(__int64*)&v45[0]);
-			}
-			v28 = *(_QWORD*)(QuestOwner + 584);
-			if (v28
-				&& (v29 = AFortPlayerStateAthena::StaticClass(),
-					v30 = *(_QWORD*)(v28 + 16),
-					v31 = v29 + 48,
-					v32 = *(int*)(v29 + 56),
-					(int)v32 <= *(_DWORD*)(v30 + 56))
-				&& *(_QWORD*)(*(_QWORD*)(v30 + 48) + 8 * v32) == v31)
-			{
-				v33 = (__int64*)sub_7FF6BB0DD2E0(v28, (__int64)v45);
-				v34 = 4;
-				v35 = *v33;
-			}
-			else
-			{
-				v33 = (__int64*)&v46;
-				v35 = 0i64;
-				v34 = 8;
-			}
-			v36 = v34 | v26;
-			*v33 = 0i64;
-			v33[1] = 0i64;
-			if ((v36 & 8) != 0)
-			{
-				v36 &= ~8u;
-				if ((_QWORD)v46)
-					FMemory::Free(v46);
-			}
-			if ((v36 & 4) != 0 && *(_QWORD*)&v45[0])
-				FMemory::Free(*(__int64*)&v45[0]);
-			if ((unsigned __int8)byte_7FF6BDB3AD40 >= 6u)
-			{
-				v44 = *(_QWORD*)(QuestDef + 24);
-				sub_7FF6B9F4C3D0(&v44, &v46);
-				v37 = &Str1;
-				v38 = &Str1;
-				*(_QWORD*)&v45[0] = qword_7FF6BDB3AD44;
-				if (DWORD2(v46))
-					v38 = (wchar_t*)v46;
-				if (v48)
-					v37 = (wchar_t*)v6;
-				UELog(0i64, 0, (__int64)v45, 6i64, (__int64)L"%s updated their own quest %s", v37, v38);
-				if ((_QWORD)v46)
-					FMemory::Free(v46);
-			}
-			v39 = sub_7FF6B99E1B30(QuestManager, QuestDef);
-			if (v39)
-			{
-				v40 = AFortPlayerControllerAthena::StaticClass();
-				v41 = *(_QWORD*)(QuestOwner + 16);
-				v42 = v40 + 48;
-				v43 = *(int*)(v42 + 8);
-				if ((int)v43 <= *(_DWORD*)(v41 + 56) && *(_QWORD*)(*(_QWORD*)(v41 + 48) + 8 * v43) == v42)
-				{
-					*(_QWORD*)&v47 = __PAIR64__(DeltaChange, CompletionCount);
-					DWORD2(v47) = *(_DWORD*)(v39 + 368);
-					*(_QWORD*)&v46 = QuestDef;
-					*((_QWORD*)&v46 + 1) = BackendName;
-					v45[1] = v47;
-					v45[0] = v46;
-					sub_7FF6B9D4B650(QuestOwner, v45);
-				}
-			}
-			if (v35)
-				FMemory::Free(v35);
-			if (v6)
-				FMemory::Free(v6);
-		}
-	}*/
 
 	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms)
 	{
@@ -220,7 +52,24 @@ namespace PlayerController
 			// Setup Inventory
 			Inventory::SetupInventory(PlayerController, PickaxeDefinition);
 
-			FN_LOG(LogPlayerController, Debug, "ServerReadyToStartMatch called!");
+#ifdef CHEATS
+			UGameplayStatics* GameplayStatics = Globals::GetGameplayStatics();
+
+			if (GameplayStatics && !PlayerController->CheatManager)
+				PlayerController->CheatManager = (UCheatManager*)GameplayStatics->SpawnObject(UCheatManager::StaticClass(), PlayerController);
+
+			// UFortCheatManager
+
+#ifdef DEBUGS
+			UCheatManager* CheatManager = PlayerController->CheatManager;
+
+			if (CheatManager)
+			{
+				//CheatManager->ChangeSize(100.f);
+			}
+#endif // DEBUGS
+
+#endif // CHEATS
 		}
 		else if (FunctionName.contains("ServerAttemptAircraftJump"))
 		{
@@ -270,22 +119,6 @@ namespace PlayerController
 
 					Inventory::RemoveAllItemsFromInventory(PlayerController);
 					Inventory::UpdateInventory(PlayerController->WorldInventory);
-
-					/*FFortAthenaLoadout CustomizationLoadout = PlayerController->CustomizationLoadout;
-					UAthenaPickaxeItemDefinition* Pickaxe = CustomizationLoadout.Pickaxe;
-
-					UFortWeaponMeleeItemDefinition* PickaxeDefinition = nullptr;
-
-					if (!Pickaxe)
-						PickaxeDefinition = FindObjectFast<UFortWeaponMeleeItemDefinition>("/Game/Athena/Items/Weapons/WID_Harvest_Pickaxe_Athena_C_T01.WID_Harvest_Pickaxe_Athena_C_T01");
-
-					if (!Pickaxe->WeaponDefinition && !PickaxeDefinition)
-						PickaxeDefinition = FindObjectFast<UFortWeaponMeleeItemDefinition>("/Game/Athena/Items/Weapons/WID_Harvest_Pickaxe_Athena_C_T01.WID_Harvest_Pickaxe_Athena_C_T01");
-
-					if (Pickaxe->WeaponDefinition)
-						PickaxeDefinition = Pickaxe->WeaponDefinition;
-
-					Inventory::SetupInventory(PlayerController, PickaxeDefinition);*/
 				}
 
 				PlayerController->SetControlRotation(Params->ClientRotation);
@@ -424,41 +257,7 @@ namespace PlayerController
 
 			if (ReceivingActor->HasAuthority())
 			{
-				if (ReceivingActor->IsA(ABuildingContainer::StaticClass()))
-				{
-					if (ReceivingActor->bAlreadySearched)
-						return;
-
-					FName LootTierGroup;
-					BuildingActor::PickLootTierGroupAthena(ReceivingActor, &LootTierGroup, ReceivingActor->SearchLootTierGroup);
-
-					if (LootTierGroup.IsValid())
-					{
-						bool bSuccess;
-						std::vector<FFortItemEntry> LootToDrops = Loots::ChooseLootToDrops(LootTierGroup, ReceivingActor->GetLootTier(), &bSuccess);
-
-						if (!bSuccess)
-						{
-							FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerAttemptInteract] Failed to get LootToDrops!");
-							return;
-						}
-
-						FFortSearchBounceData* SearchBounceData = &ReceivingActor->SearchBounceData;
-						SearchBounceData->SearchAnimationCount++;
-
-						const FVector& LootToDropLocation = ReceivingActor->K2_GetActorLocation() + ReceivingActor->GetActorForwardVector() * ReceivingActor->LootSpawnLocation_Athena.X + ReceivingActor->GetActorRightVector() * ReceivingActor->LootSpawnLocation_Athena.Y + ReceivingActor->GetActorUpVector() * ReceivingActor->LootSpawnLocation_Athena.Z;
-
-						for (auto& LootToDrop : LootToDrops)
-						{
-							Inventory::SpawnPickup(nullptr, &LootToDrop, LootToDropLocation, true);
-						}
-					}
-
-					ReceivingActor->bAlreadySearched = true;
-					ReceivingActor->OnRep_bAlreadySearched();
-					ReceivingActor->BounceContainer();
-				}
-				else if (ReceivingActor->IsA(AFortAthenaSupplyDrop::StaticClass()))
+				if (ReceivingActor->IsA(AFortAthenaSupplyDrop::StaticClass()))
 				{
 					static UClass* AthenaSupplyDropLlamaClass = FindObjectFast<UClass>("/Game/Athena/SupplyDrops/Llama/AthenaSupplyDrop_Llama.AthenaSupplyDrop_Llama_C");
 					static UClass* AthenaSupplyDropClass = FindObjectFast<UClass>("/Game/Athena/SupplyDrops/AthenaSupplyDrop.AthenaSupplyDrop_C");
@@ -534,6 +333,11 @@ namespace PlayerController
 
 						int32 InputCost = (InputCostXY * InputCount.Value);
 
+#ifdef CHEATS
+						if (PlayerController->bBuildFree)
+							InputCost = 0;
+#endif // CHEATS
+
 						if (InputCost > ItemInstance->GetNumInStack())
 						{
 							FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerAttemptInteract] the price of %s is %i while it only has %i",
@@ -573,19 +377,14 @@ namespace PlayerController
 			AFortPlayerController* PlayerController = (AFortPlayerController*)Object;
 			auto Params = (Params::FortPlayerController_ServerCreateBuildingActor*)Parms;
 
-			if (!PlayerController)
+			if (!PlayerController || !PlayerController->MyFortPawn || !PlayerController->PlayerState)
 			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerCreateBuildingActor] Failed to get PlayerController!");
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerCreateBuildingActor] Failed to get PlayerController/Pawn/PlayerState!");
 				return;
 			}
 
-			AFortPlayerState* PlayerState = (AFortPlayerState*)PlayerController->PlayerState;
-
-			if (!PlayerState)
-			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerCreateBuildingActor] Failed to get PlayerState!");
-				return;
-			}
+			AFortPlayerPawn* MyFortPawn = PlayerController->MyFortPawn;
+			AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
 
 			const FBuildingClassData& BuildingClassData = Params->BuildingClassData;
 
@@ -600,12 +399,6 @@ namespace PlayerController
 				return;
 			}
 
-			// 7FF66F7EB6F0
-			/*bool (*sub_7FF66F7EB6F0)(AFortPlayerController* PlayerController, UClass* BuildingClass, const FVector& BuildLoc, const FRotator& BuildRot, bool bMirrored, TArray<ABuildingSMActor*>* OutBuildingsToBeDestroyed) = decltype(sub_7FF66F7EB6F0)(0xC99640 + uintptr_t(GetModuleHandle(0)));
-
-			TArray<ABuildingSMActor*> RealBuildingsToBeDestroyed;
-			bool bRealCantBuild = sub_7FF66F7EB6F0(PlayerController, BuildingClass.Get(), BuildLoc, BuildRot, Params->bMirrored, &RealBuildingsToBeDestroyed);*/
-
 			TArray<ABuildingSMActor*> BuildingsToBeDestroyed;
 			bool bCanBuild = !CantBuild(Globals::GetWorld(), BuildingClass, BuildLoc, BuildRot, Params->bMirrored, &BuildingsToBeDestroyed);
 
@@ -619,26 +412,41 @@ namespace PlayerController
 					return;
 				}
 
-				UFortWorldItem* ItemInstance = Inventory::GetItemInstance(PlayerController, UFortKismetLibrary::K2_GetResourceItemDefinition(BuildingActor->ResourceType));
+				float Distance = MyFortPawn->GetDistanceTo(BuildingActor);
 
-				if (!ItemInstance)
+				// Ban Def
+				if (Distance > 1750)
 				{
-					BuildingActor->K2_DestroyActor();
+					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerCreateBuildingActor] Maximum distance is 1750, your distance is %.2f.", Distance);
+					BuildingActor->SilentDie();
 					return;
 				}
 
-				// 7FF66F7EA9E0
-				int32 (*GetResourceAmount)(AFortPlayerController* PlayerController, const FBuildingClassData& BuildingClassData) = decltype(GetResourceAmount)(0x119A9E0 + uintptr_t(GetModuleHandle(0)));
-				int32 ResourceAmount = GetResourceAmount(PlayerController, BuildingClassData);
-
-				if (ResourceAmount > ItemInstance->GetNumInStack())
+#ifdef CHEATS
+				if (!PlayerController->bBuildFree)
+#endif // CHEATS
 				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerCreateBuildingActor] Failed to create BuildingActor, resource amount [%i] while player only has [%i]", ResourceAmount, ItemInstance->GetNumInStack());
-					BuildingActor->K2_DestroyActor();
-					return;
+					UFortWorldItem* ItemInstance = Inventory::GetItemInstance(PlayerController, UFortKismetLibrary::K2_GetResourceItemDefinition(BuildingActor->ResourceType));
+
+					// Ban Def
+					if (!ItemInstance)
+					{
+						BuildingActor->SilentDie();
+						return;
+					}
+
+					int32 ResourceAmount = GetCreateResourceAmount(PlayerController, BuildingClassData);
+
+					// Ban Def
+					if (ResourceAmount > ItemInstance->GetNumInStack())
+					{
+						FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerCreateBuildingActor] Failed to create BuildingActor, resource amount [%i] while player only has [%i]", ResourceAmount, ItemInstance->GetNumInStack());
+						BuildingActor->SilentDie();
+						return;
+					}
 				}
 
-				for (int i = 0; i < BuildingsToBeDestroyed.Num(); i++)
+				for (int32 i = 0; i < BuildingsToBeDestroyed.Num(); i++)
 				{
 					ABuildingSMActor* BuildingToBeDestroyed = BuildingsToBeDestroyed[i];
 					if (!BuildingToBeDestroyed) continue;
@@ -648,28 +456,23 @@ namespace PlayerController
 
 				BuildingActor->CurrentBuildingLevel = BuildingClassData.UpgradeLevel;
 
-
 				// 7FF66F2E9640
 				void (*IdkButItsCool)(ABuildingSMActor* BuildingActor, int a2, int32 WorldPlayerId) = decltype(IdkButItsCool)(0xC99640 + uintptr_t(GetModuleHandle(0)));
-
 				IdkButItsCool(BuildingActor, 1, PlayerState->WorldPlayerId);
 
 				// 7FF66F2F6670
 				void (*IdkButItsCool2)(ABuildingSMActor* BuildingActor, bool a2) = decltype(IdkButItsCool2)(0xCA6670 + uintptr_t(GetModuleHandle(0)));
-
 				IdkButItsCool2(BuildingActor, true);
 
 				// 7FF66F494630
-				void (*IdkButItsCool3)(AFortGameMode* GameMode, AFortPlayerController* PlayerController, ABuildingSMActor* BuildingActor) = decltype(IdkButItsCool3)(0xE44630 + uintptr_t(GetModuleHandle(0)));
-
+				void (*IdkButItsCool3)(AFortGameMode* GameMode, AFortPlayerController * PlayerController, ABuildingSMActor * BuildingActor) = decltype(IdkButItsCool3)(0xE44630 + uintptr_t(GetModuleHandle(0)));
 				IdkButItsCool3(Globals::GetGameMode(), PlayerController, BuildingActor);
-
 
 				PayBuildingCosts(PlayerController, BuildingClassData);
 				BuildingActor->InitializeKismetSpawnedBuildingActor(BuildingActor, PlayerController, true);
 
 				BuildingActor->bPlayerPlaced = true;
-				BuildingActor->Team = ((AFortPlayerStateAthena*)PlayerController->PlayerState)->TeamIndex;
+				BuildingActor->Team = PlayerState->TeamIndex;
 
 				if (BuildingsToBeDestroyed.Num() > 0)
 					BuildingsToBeDestroyed.Free();
@@ -682,20 +485,56 @@ namespace PlayerController
 
 			ABuildingSMActor* BuildingActorToRepair = Params->BuildingActorToRepair;
 
-			if (!PlayerController || !BuildingActorToRepair || !PlayerController->PlayerState)
+			if (!PlayerController || !PlayerController->MyFortPawn || !BuildingActorToRepair || !PlayerController->PlayerState)
 			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] Failed to get PlayerController/BuildingActorToRepair/PlayerState!");
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] Failed to get PlayerController/Pawn/BuildingActorToRepair/PlayerState!");
 				return;
 			}
 
+			AFortPlayerPawn* MyFortPawn = PlayerController->MyFortPawn;
+			AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
+
 			if (BuildingActorToRepair->HasAuthority())
 			{
+				// Ban Def
 				if (!UFortKismetLibrary::OnSameTeam(PlayerController, BuildingActorToRepair))
 				{
 					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] PlayerController (team: [%i]) and BuildingActorToRepair (team [%i]) is not on the same team!",
-						((AFortPlayerStateAthena*)PlayerController->PlayerState)->TeamIndex, BuildingActorToRepair->Team);
+						PlayerState->TeamIndex, BuildingActorToRepair->Team);
 
 					return;
+				}
+
+				float Distance = MyFortPawn->GetDistanceTo(BuildingActorToRepair);
+
+				// Ban Def
+				if (Distance > 1000)
+				{
+					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] Maximum distance is 1000, your distance is %.2f.", Distance);
+					return;
+				}
+
+#ifdef CHEATS
+				if (!PlayerController->bBuildFree)
+#endif // CHEATS
+				{
+					UFortWorldItem* ItemInstance = Inventory::GetItemInstance(PlayerController, UFortKismetLibrary::K2_GetResourceItemDefinition(BuildingActorToRepair->ResourceType));
+
+					// Ban Def
+					if (!ItemInstance)
+					{
+						FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] Failed to get Resource Item Definition!");
+						return;
+					}
+
+					int32 ResourceAmount = GetRepairResourceAmount(BuildingActorToRepair, PlayerController);
+
+					// Ban Def
+					if (ResourceAmount > ItemInstance->GetNumInStack())
+					{
+						FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] Failed to repair BuildingActor, resource amount [%i] while player only has [%i]", ResourceAmount, ItemInstance->GetNumInStack());
+						return;
+					}
 				}
 
 				int32 ResourcesSpent = PayRepairCosts(PlayerController, BuildingActorToRepair);
@@ -715,12 +554,16 @@ namespace PlayerController
 				return;
 			}
 
+			AFortPlayerPawn* MyFortPawn = PlayerController->MyFortPawn;
+			AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
+
 			if (BuildingActorToEdit->HasAuthority())
 			{
+				// Ban Def
 				if (!UFortKismetLibrary::OnSameTeam(PlayerController, BuildingActorToEdit))
 				{
 					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerBeginEditingBuildingActor] PlayerController (team: [%i]) and BuildingActorToEdit (team [%i]) is not on the same team!",
-						((AFortPlayerStateAthena*)PlayerController->PlayerState)->TeamIndex, BuildingActorToEdit->Team);
+						PlayerState->TeamIndex, BuildingActorToEdit->Team);
 
 					return;
 				}
@@ -741,7 +584,7 @@ namespace PlayerController
 					return;
 				}
 
-				AFortWeap_EditingTool* EditTool = (AFortWeap_EditingTool*)PlayerController->MyFortPawn->EquipWeaponDefinition(EditToolDefinition, ItemInstance->GetItemGuid());
+				AFortWeap_EditingTool* EditTool = (AFortWeap_EditingTool*)MyFortPawn->EquipWeaponDefinition(EditToolDefinition, ItemInstance->GetItemGuid());
 
 				if (!EditTool)
 				{
@@ -760,28 +603,54 @@ namespace PlayerController
 
 			ABuildingSMActor* BuildingActorToEdit = Params->BuildingActorToEdit;
 
-			if (!PlayerController || !BuildingActorToEdit || !PlayerController->PlayerState)
+			if (!PlayerController || !PlayerController->MyFortPawn || !BuildingActorToEdit || !PlayerController->PlayerState)
 			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] Failed to get PlayerController/BuildingActorToEdit/PlayerState!");
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] Failed to get PlayerController/Pawn/BuildingActorToEdit/PlayerState!");
 				return;
 			}
 
+			AFortPlayerPawn* MyFortPawn = PlayerController->MyFortPawn;
+			AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
+
 			if (BuildingActorToEdit->HasAuthority())
 			{
+				// Ban Def
 				if (!UFortKismetLibrary::OnSameTeam(PlayerController, BuildingActorToEdit))
 				{
 					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] PlayerController (team: [%i]) and BuildingActorToEdit (team [%i]) is not on the same team!",
-						((AFortPlayerStateAthena*)PlayerController->PlayerState)->TeamIndex, BuildingActorToEdit->Team);
+						PlayerState->TeamIndex, BuildingActorToEdit->Team);
 
+					return;
+				}
+
+				float Distance = MyFortPawn->GetDistanceTo(BuildingActorToEdit);
+
+				// Ban Def
+				if (Distance > 1000)
+				{
+					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] Maximum distance is 1000, your distance is %.2f.", Distance);
+					return;
+				}
+
+				// Ban Def
+				if (!Functions::IsPlayerBuildableClasse(Params->NewBuildingClass.Get()))
+				{
+					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] Failed to get BuildingClass or is not the player buildable classe!");
+					return;
+				}
+
+				if (!MyFortPawn->CurrentWeapon || !MyFortPawn->CurrentWeapon->IsA(AFortWeap_EditingTool::StaticClass()))
+				{
+					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] Failed to get CurrentWeapon or is not the Editing Tool!");
 					return;
 				}
 
 				ABuildingSMActor* BuildingActor = ReplaceBuildingActor(BuildingActorToEdit, 1, Params->NewBuildingClass, BuildingActorToEdit->CurrentBuildingLevel, Params->RotationIterations, Params->bMirrored, PlayerController);
 
-				if (!BuildingActor)
+				if (BuildingActor)
 				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] Failed to replace BuildingActor: [%s]", BuildingActorToEdit->GetName().c_str());
-					return;
+					BuildingActor->bPlayerPlaced = true;
+					BuildingActor->Team = PlayerState->TeamIndex;
 				}
 			}
 		}
@@ -798,12 +667,15 @@ namespace PlayerController
 				return;
 			}
 
+			AFortPlayerPawn* MyFortPawn = PlayerController->MyFortPawn;
+			AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
+
 			if (BuildingActorToStopEditing->HasAuthority())
 			{
 				if (!UFortKismetLibrary::OnSameTeam(PlayerController, BuildingActorToStopEditing))
 				{
 					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEndEditingBuildingActor] PlayerController (team: [%i]) and BuildingActorToStopEditing (team [%i]) is not on the same team!",
-						((AFortPlayerStateAthena*)PlayerController->PlayerState)->TeamIndex, BuildingActorToStopEditing->Team);
+						PlayerState->TeamIndex, BuildingActorToStopEditing->Team);
 
 					return;
 				}
@@ -816,7 +688,7 @@ namespace PlayerController
 					return;
 				}
 
-				AFortWeap_EditingTool* EditTool = (AFortWeap_EditingTool*)PlayerController->MyFortPawn->CurrentWeapon;
+				AFortWeap_EditingTool* EditTool = (AFortWeap_EditingTool*)MyFortPawn->CurrentWeapon;
 
 				if (!EditTool)
 				{
@@ -872,8 +744,6 @@ namespace PlayerController
 
 				PlayerState->PawnDeathLocation = DeathInfo.DeathLocation;
 			}
-
-			
 
 			PlayerState->DeathInfo = DeathInfo;
 			PlayerState->OnRep_DeathInfo();
@@ -1072,11 +942,18 @@ namespace PlayerController
 	{
 		AFortPlayerController* PlayerController = (AFortPlayerController*)(__int64(a1) - IdkOffset);
 
+		AFortWeapon;
+
 		if (!PlayerController)
 		{
 			FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ModifyLoadedAmmo] Failed to get PlayerController!");
 			return;
 		}
+
+		uintptr_t Offset = uintptr_t(_ReturnAddress()) - InSDKUtils::GetImageBase();
+		uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
+
+		//FN_LOG(LogMinHook, Log, "Function Exec [ModifyLoadedAmmoHook] successfully hooked with Offset [0x%llx], IdaAddress [%p]", (unsigned long long)Offset, IdaAddress);
 
 		Inventory::ModifyLoadedAmmoItem(PlayerController, ItemGuid, CorrectAmmo);
 		Inventory::UpdateInventory(PlayerController->WorldInventory);
@@ -1084,29 +961,21 @@ namespace PlayerController
 		ModifyLoadedAmmo(a1, ItemGuid, CorrectAmmo);
 	}
 
-	void TestFunc01Hook()
+	// 7FF66F979AF0
+	/*void (*TestFunc)(AFortWeapon* Weapon, int a2);
+	void TestFuncHook(AFortWeapon* Weapon, int a2)
 	{
-		FN_LOG(LogPlayerController, Debug, "TestFunc01Hook func called!");
-	}
+		if (!Weapon)
+			return;
 
-	void TestFunc02Hook()
-	{
-		FN_LOG(LogPlayerController, Debug, "TestFunc02Hook func called!");
-	}
+		int IdkButItsCool = (*(int*)(__int64(Weapon) + 0x9DC));
 
-	void (*TestFunc03)(void* a1, __int64* a2, char a3);
-	void TestFunc03Hook(void* a1, __int64* a2, char a3)
-	{
-		FN_LOG(LogPlayerController, Debug, "TestFunc03Hook func called!");
+		FN_LOG(LogMinHook, Log, "Weapon: %s, a2: %i", Weapon->GetName().c_str(), a2);
 
-		TestFunc03(a1, a2, a3);
-	}
-
-	void TestFunc04Hook()
-	{
-		FN_LOG(LogPlayerController, Debug, "TestFunc04Hook func called!");
-
-	}
+		FN_LOG(LogMinHook, Log, "IdkButItsCool 1: %i", IdkButItsCool);
+		TestFunc(Weapon, a2);
+		FN_LOG(LogMinHook, Log, "IdkButItsCool 2: %i", IdkButItsCool);
+	}*/
 
 	void InitPlayerController()
 	{
@@ -1121,8 +990,10 @@ namespace PlayerController
 
 		uintptr_t AddressRemoveInventoryItem = MinHook::FindPattern(Patterns::RemoveInventoryItem);
 		uintptr_t AddressModifyLoadedAmmo = MinHook::FindPattern(Patterns::ModifyLoadedAmmo);
-		uintptr_t AddressPayBuildingCosts = MinHook::FindPattern(Patterns::PayBuildingCosts);
+		uintptr_t AddressGetRepairResourceAmount = MinHook::FindPattern(Patterns::GetRepairResourceAmount);
+		uintptr_t AddressGetCreateResourceAmount = MinHook::FindPattern(Patterns::GetCreateResourceAmount);
 		uintptr_t AddressPayRepairCosts = MinHook::FindPattern(Patterns::PayRepairCosts);
+		uintptr_t AddressPayBuildingCosts = MinHook::FindPattern(Patterns::PayBuildingCosts);
 		uintptr_t AddressCantBuild = MinHook::FindPattern(Patterns::CantBuild);
 		uintptr_t AddressReplaceBuildingActor = MinHook::FindPattern(Patterns::ReplaceBuildingActor);
 		uintptr_t AddressToDeathCause = MinHook::FindPattern(Patterns::ToDeathCause);
@@ -1132,8 +1003,13 @@ namespace PlayerController
 		MH_CreateHook((LPVOID)(AddressModifyLoadedAmmo), ModifyLoadedAmmoHook, (LPVOID*)(&ModifyLoadedAmmo));
 		MH_EnableHook((LPVOID)(AddressModifyLoadedAmmo));
 
-		PayBuildingCosts = decltype(PayBuildingCosts)(AddressPayBuildingCosts);
+		/*MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x1329AF0), TestFuncHook, (LPVOID*)(&TestFunc));
+		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x1329AF0));*/
+
+		GetRepairResourceAmount = decltype(GetRepairResourceAmount)(AddressGetRepairResourceAmount);
+		GetCreateResourceAmount = decltype(GetCreateResourceAmount)(AddressGetCreateResourceAmount);
 		PayRepairCosts = decltype(PayRepairCosts)(AddressPayRepairCosts);
+		PayBuildingCosts = decltype(PayBuildingCosts)(AddressPayBuildingCosts);
 		CantBuild = decltype(CantBuild)(AddressCantBuild);
 		ReplaceBuildingActor = decltype(ReplaceBuildingActor)(AddressReplaceBuildingActor);
 		ToDeathCause = decltype(ToDeathCause)(AddressToDeathCause);

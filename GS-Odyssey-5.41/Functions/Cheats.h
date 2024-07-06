@@ -29,7 +29,6 @@ namespace Cheats
 
         if (FunctionName.contains("ServerCheat"))
         {
-#ifdef CHEATS
             AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)Object;
             auto Params = (Params::FortPlayerController_ServerCheat*)Parms;
 
@@ -47,6 +46,41 @@ namespace Cheats
 
                     FString Message = L"Unknown Command";
 
+                    UCheatManager* CheatManager = PlayerController->CheatManager;
+
+                    if (Action == "listplayers")
+                    {
+                        AFortGameModeAthena* GameMode = Globals::GetGameMode();
+
+                        if (GameMode)
+                        {
+                            TArray<AFortPlayerController*> AllFortPlayerController = Globals::GetKismetLibrary()->GetAllFortPlayerControllers(GameMode, true, false);
+
+                            int32 NumPlayers = 0;
+
+                            for (int32 i = 0; i < AllFortPlayerController.Num(); i++)
+                            {
+                                AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)AllFortPlayerController[i];
+                                if (!PlayerController) continue;
+
+                                if (!PlayerController->PlayerState || PlayerController->PlayerState->bIsABot)
+                                    continue;
+
+                                NumPlayers++;
+
+                                std::string LootMessage = "[" + std::to_string(NumPlayers) + "] - PlayerName: " + PlayerController->PlayerState->GetPlayerName().ToString();
+                                FString FLootMessage = std::wstring(LootMessage.begin(), LootMessage.end()).c_str();
+                                PlayerController->ClientMessage(FLootMessage, FName(), 1);
+
+                                Message = L"null";
+                            }
+                        }
+                        else
+                        {
+                            Message = L"GameMode not found!";
+                        }
+                    }
+#ifdef CHEATS
                     if (Action == "buildfree")
                     {
                         PlayerController->bBuildFree = PlayerController->bBuildFree ? false : true;
@@ -57,33 +91,316 @@ namespace Cheats
                         PlayerController->bInfiniteAmmo = PlayerController->bInfiniteAmmo ? false : true;
                         Message = PlayerController->bInfiniteAmmo ? L"InfiniteAmmo on" : L"InfiniteAmmo off";
                     }
-                    else if (Action == "godmode" && Pawn)
+                    else if (Action == "pausesafezone")
                     {
-                        Pawn->bIsInvulnerable = Pawn->bIsInvulnerable ? false : true;
-                        Message = Pawn->bIsInvulnerable ? L"GodMode on" : L"GodMode off";
+                        UKismetSystemLibrary::ExecuteConsoleCommand(Globals::GetWorld(), L"pausesafezone", nullptr);
+                        Message = L"PauseSafeZone command executed successfully!";
                     }
-                    else if (Action == "tpto" && ParsedCommand.size() >= 4 && Pawn)
+                    else if (Action == "startaircraft")
                     {
-                        bool bIsNumberToPosX = std::all_of(ParsedCommand[1].begin(), ParsedCommand[1].end(), ::isdigit);
-                        bool bIsNumberToPosY = std::all_of(ParsedCommand[2].begin(), ParsedCommand[2].end(), ::isdigit);
-                        bool bIsNumberToPosZ = std::all_of(ParsedCommand[3].begin(), ParsedCommand[3].end(), ::isdigit);
-
-                        if (bIsNumberToPosX && bIsNumberToPosY && bIsNumberToPosZ)
+                        UKismetSystemLibrary::ExecuteConsoleCommand(Globals::GetWorld(), L"startaircraft", nullptr);
+                        Message = L"PauseSafeZone command executed successfully!";
+                    }
+                    else if (Action == "sethealth" && ParsedCommand.size() >= 2)
+                    {
+                        if (Pawn)
                         {
-                            FVector Vector;
-                            Vector.X = std::stoi(ParsedCommand[1]);
-                            Vector.Y = std::stoi(ParsedCommand[2]);
-                            Vector.Z = std::stoi(ParsedCommand[3]);
+                            try
+                            {
+                                float NewHealthVal = std::stof(ParsedCommand[1]);
 
-                            Pawn->K2_TeleportTo(Vector, FRotator());
-
-                            Message = L"Pawn successful teleport!";
+                                Pawn->SetHealth(NewHealthVal);
+                                Message = L"SetHealth command executed successfully!";
+                            }
+                            catch (const std::invalid_argument& e)
+                            {
+                                Message = L"Invalid NewHealthVal provided!";
+                            }
+                            catch (const std::out_of_range& e)
+                            {
+                                Message = L"NewHealthVal out of range!";
+                            }
                         }
                         else
                         {
-                            Message = L"Invalid location!";
+                            Message = L"Pawn not found!";
                         }
                     }
+                    else if (Action == "setshield" && ParsedCommand.size() >= 2)
+                    {
+                        if (Pawn)
+                        {
+                            try
+                            {
+                                float NewShieldVal = std::stof(ParsedCommand[1]);
+
+                                // 7FF66F7BC760 (Je suis sévèrement autiste)
+                                void (*SetShield)(AFortPawn* Pawn, float NewShieldValue) = decltype(SetShield)(0x116C760 + uintptr_t(GetModuleHandle(0)));
+                                SetShield(Pawn, NewShieldVal);
+                                Message = L"SetShield command executed successfully!";
+                            }
+                            catch (const std::invalid_argument& e)
+                            {
+                                Message = L"Invalid NewShieldVal provided!";
+                            }
+                            catch (const std::out_of_range& e)
+                            {
+                                Message = L"NewShieldVal out of range!";
+                            }
+                        }
+                        else
+                        {
+                            Message = L"Pawn not found!";
+                        }
+                    }
+                    else if (Action == "setmaxhealth" && ParsedCommand.size() >= 2)
+                    {
+                        if (Pawn)
+                        {
+                            try
+                            {
+                                float NewHealthVal = std::stof(ParsedCommand[1]);
+
+                                Pawn->SetMaxHealth(NewHealthVal);
+                                Message = L"SetMaxHealth command executed successfully!";
+                            }
+                            catch (const std::invalid_argument& e)
+                            {
+                                Message = L"Invalid NewHealthVal provided!";
+                            }
+                            catch (const std::out_of_range& e)
+                            {
+                                Message = L"NewHealthVal out of range!";
+                            }
+                        }
+                        else
+                        {
+                            Message = L"Pawn not found!";
+                        }
+                    }
+                    else if (Action == "setmaxshield" && ParsedCommand.size() >= 2)
+                    {
+                        if (Pawn)
+                        {
+                            try
+                            {
+                                float NewShieldVal = std::stof(ParsedCommand[1]);
+
+                                Pawn->SetMaxShield(NewShieldVal);
+                                Message = L"SetMaxShield command executed successfully!";
+                            }
+                            catch (const std::invalid_argument& e)
+                            {
+                                Message = L"Invalid NewShieldVal provided!";
+                            }
+                            catch (const std::out_of_range& e)
+                            {
+                                Message = L"NewShieldVal out of range!";
+                            }
+                        }
+                        else
+                        {
+                            Message = L"Pawn not found!";
+                        }
+                    }
+                    else if (Action == "god")
+                    {
+                        if (CheatManager)
+                        {
+                            CheatManager->God();
+                            Message = L"null";
+                        }
+                        else
+                        {
+                            Message = L"CheatManager not found!";
+                        }
+                    }
+                    else if (Action == "destroytarget")
+                    {
+                        if (CheatManager)
+                        {
+                            CheatManager->DestroyTarget();
+                            Message = L"Target successfully destroyed!";
+                        }
+                        else
+                        {
+                            Message = L"CheatManager not found!";
+                        }
+                    }
+                    else if (Action == "tp")
+                    {
+                        if (CheatManager)
+                        {
+                            CheatManager->Teleport();
+                            Message = L"Teleportation successful!";
+                        }
+                        else
+                        {
+                            Message = L"CheatManager not found!";
+                        }
+                    }
+                    else if (Action == "tpw")
+                    {
+                        AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
+                        //LocalWorldMapMarker
+
+                        if (PlayerState)
+                        {
+                            PlayerState->LocalWorldMapMarker->MarkerPosition2D;
+                        }
+                        if (CheatManager)
+                        {
+                            CheatManager->Teleport();
+                            Message = L"Teleportation successful!";
+                        }
+                        else
+                        {
+                            Message = L"CheatManager not found!";
+                        }
+                    }
+                    else if (Action == "changesize" && ParsedCommand.size() >= 2)
+                    {
+                        if (CheatManager)
+                        {
+                            try
+                            {
+                                float NewSize = std::stof(ParsedCommand[1]);
+
+                                CheatManager->ChangeSize(NewSize);
+                                Message = L"ChangeSize command executed successfully!";
+                            }
+                            catch (const std::invalid_argument& e)
+                            {
+                                Message = L"Invalid NewSize provided!";
+                            }
+                            catch (const std::out_of_range& e)
+                            {
+                                Message = L"NewSize out of range!";
+                            }
+                        }
+                        else
+                        {
+                            Message = L"CheatManager not found!";
+                        }
+                    }
+                    else if (Action == "bugitgo" && ParsedCommand.size() >= 4)
+                    {
+                        if (CheatManager)
+                        {
+                            try
+                            {
+                                float X = std::stof(ParsedCommand[1]);
+                                float Y = std::stof(ParsedCommand[2]);
+                                float Z = std::stof(ParsedCommand[3]);
+
+                                CheatManager->BugItGo(X, Y, Z, 0.f, 0.f, 0.f);
+                                Message = L"BugItGo command executed successfully!";
+                            }
+                            catch (const std::invalid_argument& e)
+                            {
+                                Message = L"Invalid coordinates provided!";
+                            }
+                            catch (const std::out_of_range& e)
+                            {
+                                Message = L"Coordinates out of range!";
+                            }
+                        }
+                        else
+                        {
+                            Message = L"CheatManager not found!";
+                        }
+                    }
+                    else if (Action == "launchpawn" && ParsedCommand.size() >= 4)
+                    {
+                        if (Pawn)
+                        {
+                            try
+                            {
+                                float X = std::stof(ParsedCommand[1]);
+                                float Y = std::stof(ParsedCommand[2]);
+                                float Z = std::stof(ParsedCommand[3]);
+
+                                Pawn->LaunchPawn(FVector(X, Y, Z), false, false);
+                                Message = L"LaunchPawn command executed successfully!";
+                            }
+                            catch (const std::invalid_argument& e)
+                            {
+                                Message = L"Invalid coordinates provided!";
+                            }
+                            catch (const std::out_of_range& e)
+                            {
+                                Message = L"Coordinates out of range!";
+                            }
+                        }
+                        else
+                        {
+                            Message = L"Pawn not found!";
+                        }
+                    }
+                    else if (Action == "summon" && ParsedCommand.size() >= 2)
+                    {
+                        if (CheatManager)
+                        {
+                            std::string& ClassName = ParsedCommand[1];
+
+                            CheatManager->Summon(std::wstring(ClassName.begin(), ClassName.end()).c_str());
+
+                            Message = L"Summon successful!";
+                        }
+                        else
+                        {
+                            Message = L"CheatManager not found!";
+                        }
+                    }
+#ifdef DEBUGS
+                    else if (Action == "simulateloot" && ParsedCommand.size() >= 3)
+                    {
+                        std::string& LootTierGroup = ParsedCommand[1];
+                        int32 LootTier = 0;
+
+                        bool bIsLootTierInt = std::all_of(ParsedCommand[2].begin(), ParsedCommand[2].end(), ::isdigit);
+
+                        if (CheatManager && bIsLootTierInt)
+                        {
+                            FName TierGroup = Globals::GetStringLibrary()->Conv_StringToName(std::wstring(LootTierGroup.begin(), LootTierGroup.end()).c_str());
+
+                            LootTier = std::stoi(ParsedCommand[2]);
+
+                            bool bSuccess;
+                            std::vector<FFortItemEntry> LootToDrops = Loots::ChooseLootToDrops(TierGroup, LootTier, &bSuccess);
+
+                            if (bSuccess)
+                            {
+                                for (auto& LootToDrop : LootToDrops)
+                                {
+                                    if (!LootToDrop.ItemDefinition)
+                                        continue;
+
+                                    std::string LootMessage = "SimulateLoot | ItemDefinition: [" + LootToDrop.ItemDefinition->GetName() + "] - Count: [" + std::to_string(LootToDrop.Count) + "]";
+                                    FString FLootMessage = std::wstring(LootMessage.begin(), LootMessage.end()).c_str();
+                                    PlayerController->ClientMessage(FLootMessage, FName(), 1);
+                                }
+
+                                Message = L"SimulateLoot success!";
+                            }
+                            else
+                            {
+                                Message = L"Failed SimulateLoot!";
+                            }
+                        }
+                        else
+                        {
+                            if (!CheatManager)
+                            {
+                                Message = L"CheatManager not found!";
+                            }
+                            else if (!bIsLootTierInt)
+                            {
+                                Message = L"Invalid LootTier provided!";
+                            }
+                        }
+                    }
+#endif // DEBUGS
                     else if (Action == "spawnloot" && ParsedCommand.size() >= 2)
                     {
                         std::string& LootTierGroup = ParsedCommand[1];
@@ -91,7 +408,7 @@ namespace Cheats
                         FName SearchLootTierGroup = Globals::GetStringLibrary()->Conv_StringToName(std::wstring(LootTierGroup.begin(), LootTierGroup.end()).c_str());
 
                         bool bSuccess;
-                        std::vector<FFortItemEntry> LootToDrops = Loots::ChooseLootToDrops(SearchLootTierGroup, 0 , &bSuccess);
+                        std::vector<FFortItemEntry> LootToDrops = Loots::ChooseLootToDrops(SearchLootTierGroup, 0, &bSuccess);
 
                         if (bSuccess && Pawn)
                         {
@@ -104,10 +421,17 @@ namespace Cheats
                         }
                         else
                         {
-                            Message = L"Failed to find this LootTierGroup!";
+                            if (!Pawn)
+                            {
+                                Message = L"Pawn not found!";
+                            }
+                            else
+                            {
+                                Message = L"Failed to find this LootTierGroup!";
+                            }
                         }
                     }
-                    else if (Action == "spawnpickup" && ParsedCommand.size() >= 3 && Pawn)
+                    else if (Action == "spawnpickup" && ParsedCommand.size() >= 3)
                     {
                         std::string ItemDefinitionName = ParsedCommand[1];
 
@@ -118,56 +442,100 @@ namespace Cheats
 
                         bool bIsNumberToSpawnInt = std::all_of(ParsedCommand[2].begin(), ParsedCommand[2].end(), ::isdigit);
 
-                        if (bIsNumberToSpawnInt)
-                            NumberToSpawn = std::stoi(ParsedCommand[2]);
-
                         TArray<UFortWorldItemDefinition*> AllItems = Functions::GetAllItems();
 
-                        for (int i = 0; i < AllItems.Num(); i++)
+                        bool bItemFound = false;
+
+                        if (Pawn && bIsNumberToSpawnInt)
                         {
-                            UFortWorldItemDefinition* ItemDefinition = AllItems[i];
+                            NumberToSpawn = std::stoi(ParsedCommand[2]);
 
-                            if (!ItemDefinition)
-                                continue;
+                            if (NumberToSpawn <= 10000 && NumberToSpawn > 0)
+                            {
+                                for (int32 i = 0; i < AllItems.Num(); i++)
+                                {
+                                    UFortWorldItemDefinition* ItemDefinition = AllItems[i];
 
-                            std::string ItemDefinitionName2 = ItemDefinition->GetName();
+                                    if (!ItemDefinition)
+                                        continue;
 
-                            std::transform(ItemDefinitionName2.begin(), ItemDefinitionName2.end(), ItemDefinitionName2.begin(),
-                                [](unsigned char c) { return std::tolower(c); });
+                                    std::string ItemDefinitionName2 = ItemDefinition->GetName();
 
-                            if (ItemDefinitionName2 != ItemDefinitionName)
-                                continue;
+                                    std::transform(ItemDefinitionName2.begin(), ItemDefinitionName2.end(), ItemDefinitionName2.begin(),
+                                        [](unsigned char c) { return std::tolower(c); });
 
-                            UFortKismetLibrary::K2_SpawnPickupInWorld(PlayerController, ItemDefinition, NumberToSpawn, Pawn->K2_GetActorLocation(), FVector(), 0, true, true, false);
-                            break;
+                                    if (ItemDefinitionName2 != ItemDefinitionName)
+                                        continue;
+
+                                    UFortKismetLibrary::K2_SpawnPickupInWorld(PlayerController, ItemDefinition, NumberToSpawn, Pawn->K2_GetActorLocation(), FVector(), 0, true, true, false);
+                                    bItemFound = true;
+                                    break;
+                                }
+
+                                if (bItemFound)
+                                {
+                                    Message = L"Pickup successfully spawned!";
+                                }
+                                else
+                                {
+                                    Message = L"Item definition not found!";
+                                }
+                            }
+                            else
+                            {
+                                Message = L"Invalid number to spawn (NumberToSpawn <= 10000 && NumberToSpawn > 0)";
+                            }
                         }
-
-                        Message = L"Pickup success spawn!";
+                        else
+                        {
+                            if (!Pawn)
+                            {
+                                Message = L"Pawn not found!";
+                            }
+                            else if (!bIsNumberToSpawnInt)
+                            {
+                                Message = L"Invalid number to spawn!";
+                            }
+                        }
                     }
-                    else if (Action == "rtx" && ParsedCommand.size() >= 1 && Pawn)
+                    else if (Action == "rtx D è-" && ParsedCommand.size() >= 1)
                     {
                         TArray<UFortWorldItemDefinition*> AllItems = Functions::GetAllItems(true);
 
-                        for (int i = 0; i < AllItems.Num(); i++)
+                        if (AllItems.Num() > 0 && Pawn)
                         {
-                            UFortWorldItemDefinition* ItemDefinition = AllItems[i];
+                            for (int i = 0; i < AllItems.Num(); i++)
+                            {
+                                UFortWorldItemDefinition* ItemDefinition = AllItems[i];
 
-                            if (!ItemDefinition)
-                                continue;
+                                if (!ItemDefinition)
+                                    continue;
 
-                            if (ItemDefinition->Rarity != EFortRarity::Fine)
-                                continue;
+                                if (ItemDefinition->Rarity != EFortRarity::Fine)
+                                    continue;
 
-                            UFortKismetLibrary::K2_SpawnPickupInWorld(PlayerController, ItemDefinition, 1, Pawn->K2_GetActorLocation(), FVector(), 0, true, true, false);
+                                UFortKismetLibrary::K2_SpawnPickupInWorld(PlayerController, ItemDefinition, 1, Pawn->K2_GetActorLocation(), FVector(), 0, true, true, false);
+                            }
+
+                            Message = L"TEUPAIIII!";
                         }
-
-                        Message = L"TEUPAIIII!";
+                        else
+                        {
+                            if (!Pawn)
+                            {
+                                Message = L"Pawn not found!";
+                            }
+                            else
+                            {
+                                Message = L"No items found to spawn!";
+                            }
+                        }
                     }
-
-                    PlayerController->ClientMessage(Message, FName(), 1);
+#endif // CHEATS
+                    if (Message != L"null")
+                        PlayerController->ClientMessage(Message, FName(), 1);
                 }
             }
-#endif // CHEATS
         }
     }
 

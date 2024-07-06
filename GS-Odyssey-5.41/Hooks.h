@@ -11,6 +11,7 @@ enum ENetMode
 
 namespace Hooks
 {
+	ABuildingTrap* (*ServerSpawnDeco)(AFortDecoTool* DecoTool, UClass* Class, const FVector& Location, const FRotator& Rotation, ABuildingSMActor* AttachedActor, EBuildingAttachmentType InBuildingAttachmentType);
 	void (*GetPlayerViewPoint)(AFortPlayerController* PlayerController, FVector& out_Location, FRotator& out_Rotation);
 	void (*ProcessEvent)(UObject* Object, UFunction* Function, void* Parms);
 	void (*DispatchRequest)(__int64 a1, __int64* a2);
@@ -171,34 +172,28 @@ namespace Hooks
 
 			if (GetAsyncKeyState(VK_F2) & 0x1)
 			{
-				AFortPlayerController* PlayerController = (AFortPlayerController*)Globals::GetGameplayStatics()->GetPlayerController(Globals::GetWorld(), 0);
+				uintptr_t Offset = uintptr_t(ABuildingActor::GetDefaultObj()->VTable[0x1B9]) - InSDKUtils::GetImageBase();
+				uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
 
-				if (!PlayerController)
-					return;
+				UFortEngine;
 
-				AFortPlayerPawn* Pawn = PlayerController->MyFortPawn;
-
-				if (!Pawn)
-					return;
-
-				static auto ItemDefinition = FindObjectFast<UFortWeaponRangedItemDefinition>("/Game/Athena/Items/Weapons/WID_Pistol_SemiAuto_Athena_R_Ore_T03.WID_Pistol_SemiAuto_Athena_R_Ore_T03");
-
-				UFortKismetLibrary::K2_RemoveItemFromAllPlayers(PlayerController, ItemDefinition, 1);
+				FN_LOG(LogMinHook, Log, "Function [Test] successfully hooked with Offset [0x%llx], IdaAddress [%p]", (unsigned long long)Offset, IdaAddress);
 			}
 
 			if (GetAsyncKeyState(VK_F3) & 0x1)
 			{
-				AFortPlayerController* PlayerController = (AFortPlayerController*)Globals::GetGameplayStatics()->GetPlayerController(Globals::GetWorld(), 0);
+				AFortGameStateAthena* GameState = Globals::GetGameState();
 
-				if (!PlayerController)
-					return;
+				if (GameState && GameState->WorldManager)
+				{
+					auto WorldManager =  GameState->WorldManager;
 
-				AFortPlayerPawn* Pawn = PlayerController->MyFortPawn;
 
-				if (!Pawn)
-					return;
-
-				UFortKismetLibrary::K2_GiveBuildingResource(PlayerController, EFortResourceType::Wood, 100);
+					FN_LOG(LogHooks, Debug, "WorldManager: %s", WorldManager->GetName().c_str());
+					FN_LOG(LogHooks, Debug, "CurrentZoneIndex: %i", WorldManager->CurrentZoneIndex);
+					FN_LOG(LogHooks, Debug, "CurrentWorldRecord: %s", WorldManager->CurrentWorldRecord->GetName().c_str());
+					FN_LOG(LogHooks, Debug, "CurrentZoneRecord: %s", WorldManager->CurrentZoneRecord->GetName().c_str());
+				}
 
 				// 7FF66F6694B0
 				/*char (*Restart)(AFortGameSessionDedicated* GameSession) = decltype(Restart)(0x10194B0 + uintptr_t(GetModuleHandle(0)));
@@ -395,7 +390,6 @@ namespace Hooks
 		ProcessEvent(Object, Function, Parms);
 	}
 
-	ABuildingTrap* (*ServerSpawnDeco)(AFortDecoTool* DecoTool, UClass* Class, const FVector& Location, const FRotator& Rotation, ABuildingSMActor* AttachedActor, EBuildingAttachmentType InBuildingAttachmentType);
 	ABuildingTrap* ServerSpawnDecoHook(AFortDecoTool* DecoTool, UClass* Class, const FVector& Location, const FRotator& Rotation, ABuildingSMActor* AttachedActor, EBuildingAttachmentType InBuildingAttachmentType)
 	{
 		ABuildingTrap* Result = ServerSpawnDeco(DecoTool, Class, Location, Rotation, AttachedActor, InBuildingAttachmentType);
@@ -408,7 +402,7 @@ namespace Hooks
 
 			if (!PlayerController)
 			{
-				FN_LOG(LogPlayerController, Error, "[AFortDecoTool::ServerSpawnDeco] Failed to get PlayerController!");
+				FN_LOG(LogHooks, Error, "[AFortDecoTool::ServerSpawnDeco] Failed to get PlayerController!");
 				return Result;
 			}
 
@@ -416,16 +410,25 @@ namespace Hooks
 
 			if (!PlayerState)
 			{
-				FN_LOG(LogPlayerController, Error, "[AFortDecoTool::ServerSpawnDeco] Failed to get PlayerState!");
+				FN_LOG(LogHooks, Error, "[AFortDecoTool::ServerSpawnDeco] Failed to get PlayerState!");
 				return Result;
 			}
 
 			Result->bPlayerPlaced = true;
 			Result->Team = PlayerState->TeamIndex;
-
-			FN_LOG(LogHooks, Debug, "ServerSpawnDeco - DecoTool: %s, Class: %s, Location: [X: %.2f Y: %.2f Z: %.2f], AttachedActor: %s, Result: %s", 
-				DecoTool->GetName().c_str(), Class->GetName().c_str(), Location.X, Location.Y, Location.Z, AttachedActor->GetName().c_str(), Result->GetName().c_str());
 		}
+
+		return Result;
+	}
+
+	char (*sub_7FF66F803900)(__int64* a1, __int64 a2);
+	char sub_7FF66F803900Hook(__int64* a1, __int64 a2)
+	{
+		FN_LOG(LogPlayerController, Debug, "sub_7FF66F803900Hook func called!");
+
+		char Result = sub_7FF66F803900(a1, a2);
+		
+		FN_LOG(LogPlayerController, Debug, "a1: %i, a2: %i, Result: %i", a1, a2, Result);
 
 		return Result;
 	}
@@ -441,6 +444,7 @@ namespace Hooks
 		uintptr_t AddressPickupDelay = MinHook::FindPattern(Patterns::PickupDelay);
 		uintptr_t AddressDispatchRequest = MinHook::FindPattern(Patterns::DispatchRequest);
 		uintptr_t AddressGetPlayerViewPoint = MinHook::FindPattern(Patterns::GetPlayerViewPoint);
+		uintptr_t AddressServerSpawnDeco = MinHook::FindPattern(Patterns::ServerSpawnDeco);
 
 		MH_CreateHook((LPVOID)(AddressLocalSpawnPlayActor), LocalSpawnPlayActorHook, nullptr);
 		MH_EnableHook((LPVOID)(AddressLocalSpawnPlayActor));
@@ -460,17 +464,14 @@ namespace Hooks
 		MH_EnableHook((LPVOID)(AddressDispatchRequest));
 		MH_CreateHook((LPVOID)(AddressGetPlayerViewPoint), GetPlayerViewPointHook, (LPVOID*)(&GetPlayerViewPoint));
 		MH_EnableHook((LPVOID)(AddressGetPlayerViewPoint));
+		MH_CreateHook((LPVOID)(AddressServerSpawnDeco), ServerSpawnDecoHook, (LPVOID*)(&ServerSpawnDeco));
+		MH_EnableHook((LPVOID)(AddressServerSpawnDeco));
+
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8960), CollectGarbageInternalHook, nullptr);
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8960));
 
-		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x133A960), ServerSpawnDecoHook, (LPVOID*)(&ServerSpawnDeco));
-		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x133A960));
-
-		/*  
-			OdysseyLog: LogHook: Info: Function Call [RealSpawnActorHook], Class: [Trap_Floor_BouncePad_C] successfully get with Offset [0x133ad00], IdaAddress [00007FF66F98AD00]
-			OdysseyLog: LogHook: Info: Function Call [RealSpawnActorHook2], Class: [Trap_Floor_BouncePad_C] successfully get with Offset [0x25d4de6], IdaAddress [00007FF670C24DE6]
-
-		*/
+		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x11B3900), sub_7FF66F803900Hook, (LPVOID*)(&sub_7FF66F803900));
+		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x11B3900));
 
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + Offsets::ProcessEvent), ProcessEventHook, (LPVOID*)(&ProcessEvent));
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + Offsets::ProcessEvent));

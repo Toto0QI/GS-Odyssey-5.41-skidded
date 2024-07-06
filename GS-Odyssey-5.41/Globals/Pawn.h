@@ -2,7 +2,7 @@
 
 namespace Pawn
 {
-	void (*HandlePickup)(AFortPickup* Pickup, AFortPlayerPawn* Pawn, float InFlyTime, const FVector& InStartDirection);
+	void (*SetPickupTarget)(AFortPickup* Pickup, AFortPlayerPawn* Pawn, float InFlyTime, const FVector& InStartDirection);
 
 	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms)
 	{
@@ -32,7 +32,7 @@ namespace Pawn
 			if (Params->Pickup->bPickedUp)
 				return;
 
-			HandlePickup(Params->Pickup, Pawn, Globals::GetMathLibrary()->RandomFloatInRange(0.40f, 0.54f), FVector());
+			SetPickupTarget(Params->Pickup, Pawn, Globals::GetMathLibrary()->RandomFloatInRange(0.40f, 0.54f), FVector());
 
 			FFortPickupLocationData* PickupLocationData = &Params->Pickup->PickupLocationData;
 			PickupLocationData->PickupGuid = Pawn->CurrentWeapon ? Pawn->CurrentWeapon->ItemEntryGuid : FGuid();
@@ -97,9 +97,9 @@ namespace Pawn
 	{
 		static auto FortPlayerPawnAthenaDefault = FindObjectFast<AFortPlayerPawnAthena>("/Script/FortniteGame.Default__FortPlayerPawnAthena");
 
-		uintptr_t PatternHandlePickup = MinHook::FindPattern(Patterns::HandlePickup);
+		uintptr_t PatternSetPickupTarget = MinHook::FindPattern(Patterns::SetPickupTarget);
 
-		HandlePickup = decltype(HandlePickup)(PatternHandlePickup);
+		SetPickupTarget = decltype(SetPickupTarget)(PatternSetPickupTarget);
 
 		FN_LOG(LogInit, Log, "InitPawn Success!");
 	}

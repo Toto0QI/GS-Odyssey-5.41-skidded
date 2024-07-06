@@ -44,23 +44,18 @@ namespace Functions
 		if (!BuildableClasse || !GameState)
 			return false;
 
-		FPlayerBuildableClassContainer* PlayerBuildableClasses = &GameState->PlayerBuildableClasses[0x0];
+		TArray<TSubclassOf<ABuildingActor>> BuildingActorClasses = GameState->BuildingActorClasses;
 
-		if (!PlayerBuildableClasses)
-			return false;
-
-		TArray<TSubclassOf<ABuildingSMActor>> BuildingClasses = PlayerBuildableClasses->BuildingClasses;
-
-		if (BuildingClasses.IsValid())
+		if (BuildingActorClasses.IsValid())
 		{
-			/*for (int32 i = 0; i < BuildingClasses.Num(); i++)
+			for (int32 i = 0; i < BuildingActorClasses.Num(); i++)
 			{
-				TSubclassOf<ABuildingSMActor> BuildingClasse = BuildingClasses[i];
-				if (!BuildingClasse.Get()) continue;
+				TSubclassOf<ABuildingActor> BuildingActorClasse = BuildingActorClasses[i];
+				if (!BuildingActorClasse.Get()) continue;
 
-				if (BuildingClasse.Get() == BuildableClasse)
+				if (BuildingActorClasse.Get() == BuildableClasse)
 					return true;
-			}*/
+			}
 
 			return true;
 		}
@@ -212,6 +207,8 @@ namespace Functions
 					UFortWorldItemDefinition* InputItem = ItemCollection.InputItem;
 					if (!InputItem) continue;
 
+					Retry:
+
 					bool bSuccess;
 					std::vector<FFortItemEntry> LootToDrops = Loots::ChooseLootToDrops(LootTierGroup, RandomRarity, &bSuccess);
 
@@ -219,6 +216,26 @@ namespace Functions
 					{
 						FN_LOG(LogFunctions, Error, "Failed to get loot to drops at %i", j);
 						continue;
+					}
+
+					for (int32 k = j; k >= 0; k--)
+					{
+						FColletorUnitInfo ItemCollectionCheck = ItemCollections[k];
+
+						UFortWorldItemDefinition* InputItemCheck = ItemCollectionCheck.InputItem;
+						if (!InputItemCheck) continue;
+
+						if (!ItemCollections[j].OutputItemEntry.IsValid())
+							continue;
+
+						UFortItemDefinition* ItemDefinitionCheck = ItemCollections[j].OutputItemEntry[0].ItemDefinition;
+						if (!ItemDefinitionCheck || !LootToDrops[0].ItemDefinition) continue;
+
+						if (ItemDefinitionCheck == LootToDrops[0].ItemDefinition)
+						{
+							LootToDrops.clear();
+							goto Retry;
+						}
 					}
 
 					if (ItemCollections[j].OutputItemEntry.Num() > 0)
@@ -348,6 +365,8 @@ namespace Functions
 
 			int32 Recurcives = 0;
 
+			QuantityNumToSpawn = 50000;
+
 			for (int32 i = 0; i < QuantityNumToSpawn; i++)
 			{
 				FVector Location = FVector(0, 0, 10000);
@@ -366,7 +385,7 @@ namespace Functions
 
 				if (FinalLocation.Z == 10000 || FinalLocation.Z <= 0)
 				{
-					if (Recurcives > 100)
+					if (Recurcives > 500)
 						break;
 
 					Recurcives++;

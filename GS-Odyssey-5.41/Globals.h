@@ -3,6 +3,7 @@
 uintptr_t IdkOffset = 0x680;
 
 #define CHEATS
+#define DEBUGS
 
 namespace Globals
 {

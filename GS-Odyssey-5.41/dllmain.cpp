@@ -17,7 +17,6 @@
 #include "Patterns.h"
 #include "Util.h"
 
-#include "Functions/Beacon.h"
 #include "Functions/Abilities.h"
 #include "Functions/Inventory.h"
 #include "Functions/Loots.h"
@@ -30,6 +29,8 @@
 #include "Globals/PlayerController.h"
 #include "Globals/Pawn.h"
 #include "Globals/FortKismetLibrary.h"
+
+#include "Functions/Beacon.h"
 
 #include <fstream>
 #include "Hooks.h"
@@ -51,25 +52,16 @@ DWORD WINAPI MainThread(LPVOID)
 
     if (true)
     {
-        UFortEngine* FortEngine = Globals::GetFortEngine();
-        UGameplayStatics* GameplayStatics = Globals::GetGameplayStatics();
         APlayerController* PlayerController = Globals::GetServerPlayerController();
 
-        if (FortEngine && GameplayStatics && PlayerController)
+        if (PlayerController)
         {
-            UFortConsole* NewConsole = (UFortConsole*)GameplayStatics->SpawnObject(UFortConsole::StaticClass(), FortEngine->GameViewport);
-
-            if (NewConsole)
-                FortEngine->GameViewport->ViewportConsole = NewConsole;
-
             InitFunc::InitializeAll();
 
             PlayerController->SwitchLevel(L"Athena_Terrain");
 
             Hooks::InitHook();
         }
-
-        //InitFunc::InitializeAll();
 
         *(bool*)Hooks::GIsClient() = false;
         *(bool*)Hooks::GIsServer() = true;

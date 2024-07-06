@@ -90,7 +90,7 @@ namespace FortKismetLibrary
 					return;
 				}
 
-				Pawn::HandlePickup(Pickup, PlayerController->MyFortPawn, -1.0f, FVector());
+				Pawn::SetPickupTarget(Pickup, PlayerController->MyFortPawn, -1.0f, FVector());
 			}
 			else
 			{
@@ -143,18 +143,15 @@ namespace FortKismetLibrary
 
 			UFortWorldItem* ItemInstance = Inventory::GetItemInstance(PlayerController, ItemGuid);
 
-			if (!ItemInstance)
+			if (ItemInstance)
 			{
-				FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::K2_RemoveItemFromPlayer] failed to get ItemInstance!");
-				return;
+				int32 AmountToRemove = Params->AmountToRemove;
+
+				bool bSuccess = Inventory::RemoveInventoryItem(PlayerController, ItemInstance->GetItemGuid(), AmountToRemove);
+
+				if (bSuccess)
+					Inventory::UpdateInventory(PlayerController->WorldInventory);
 			}
-
-			int32 AmountToRemove = Params->AmountToRemove;
-
-			bool bSuccess = Inventory::RemoveInventoryItem(PlayerController, ItemInstance->GetItemGuid(), AmountToRemove);
-			
-			if (bSuccess)
-				Inventory::UpdateInventory(PlayerController->WorldInventory);
 		}
 		else if (FunctionName.contains("K2_RemoveItemFromPlayer"))
 		{
@@ -171,18 +168,15 @@ namespace FortKismetLibrary
 
 			UFortWorldItem* ItemInstance = Inventory::GetItemInstance(PlayerController, ItemDefinition);
 
-			if (!ItemInstance)
+			if (ItemInstance)
 			{
-				FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::K2_RemoveItemFromPlayer] failed to get ItemInstance!");
-				return;
+				int32 AmountToRemove = Params->AmountToRemove;
+
+				bool bSuccess = Inventory::RemoveInventoryItem(PlayerController, ItemInstance->GetItemGuid(), AmountToRemove);
+
+				if (bSuccess)
+					Inventory::UpdateInventory(PlayerController->WorldInventory);
 			}
-
-			int32 AmountToRemove = Params->AmountToRemove;
-
-			bool bSuccess = Inventory::RemoveInventoryItem(PlayerController, ItemInstance->GetItemGuid(), AmountToRemove);
-
-			if (bSuccess)
-				Inventory::UpdateInventory(PlayerController->WorldInventory);
 		}
 		else if (FunctionName.contains("K2_SpawnPickupInWorld"))
 		{
@@ -209,7 +203,7 @@ namespace FortKismetLibrary
 
 			if (!Pickup)
 			{
-				FN_LOG(LogInventory, Error, "[UFortKismetLibrary::K2_SpawnPickupInWorld] failed to spawn Pickup!");
+				FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::K2_SpawnPickupInWorld] failed to spawn Pickup!");
 				return;
 			}
 
@@ -225,9 +219,23 @@ namespace FortKismetLibrary
 		}
 	}
 
+	int32 (*K2_RemoveItemFromPlayerByGuid)(UObject* Context, void* Stack, void* Ret);
+	int32 K2_RemoveItemFromPlayerByGuidHook(UObject* Context, void* Stack, void* Ret)
+	{
+
+		FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::K2_RemoveItemFromPlayerByGuid] called!");
+
+		return K2_RemoveItemFromPlayerByGuid(Context, Stack, Ret);
+	}
+
 	void InitFortKismetLibrary()
 	{
 		static auto FortKismetLibraryDefault = FindObjectFast<UFortKismetLibrary>("/Script/FortniteGame.Default__FortKismetLibrary");
+
+		static auto regererg = FindObjectFast<UFunction>("/Script/FortniteGame.FortKismetLibrary.GiveItemToInventoryOwner");
+
+		MinHook::HookFunctionExec(regererg, K2_RemoveItemFromPlayerByGuidHook, (LPVOID*)(&K2_RemoveItemFromPlayerByGuid));
+
 
 		FN_LOG(LogInit, Log, "InitFortKismetLibrary Success!");
 	}

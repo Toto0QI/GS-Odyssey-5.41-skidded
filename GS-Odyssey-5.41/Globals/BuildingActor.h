@@ -2,7 +2,7 @@
 
 namespace BuildingActor
 {
-    FName (*PickLootTierGroupAthena)(ABuildingContainer* BuildingContainer, FName* OutLootTierGroup, FName LootTierGroup);
+    FName (*PickLootTierGroupAthena)(ABuildingContainer* BuildingContainer, FName* OutLootTierGroup, FName SearchLootTierGroup);
 
 	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms)
 	{
@@ -98,11 +98,61 @@ namespace BuildingActor
 		}
 	}
 
+    bool SpawnLoot(ABuildingContainer* BuildingContainer, AFortPlayerPawn* PlayerPawn)
+    {
+        if (!BuildingContainer || !PlayerPawn)
+            return false;
+
+        if (BuildingContainer->HasAuthority())
+        {
+            if (BuildingContainer->bAlreadySearched)
+                return false;
+
+            FName LootTierGroup;
+            PickLootTierGroupAthena(BuildingContainer, &LootTierGroup, BuildingContainer->SearchLootTierGroup);
+
+            if (!LootTierGroup.IsValid())
+                return false;
+
+            bool bSuccess;
+            std::vector<FFortItemEntry> LootToDrops = Loots::ChooseLootToDrops(LootTierGroup, BuildingContainer->GetLootTier(), &bSuccess);
+
+            if (!bSuccess)
+            {
+                FN_LOG(LogPlayerController, Error, "[ABuildingContainer::SpawnLoot] Failed to get LootToDrops!");
+                return false;
+            }
+
+            const FVector& LootToDropLocation = BuildingContainer->K2_GetActorLocation() + BuildingContainer->GetActorForwardVector() * BuildingContainer->LootSpawnLocation_Athena.X + BuildingContainer->GetActorRightVector() * BuildingContainer->LootSpawnLocation_Athena.Y + BuildingContainer->GetActorUpVector() * BuildingContainer->LootSpawnLocation_Athena.Z;
+
+            for (auto& LootToDrop : LootToDrops)
+                Inventory::SpawnPickup(nullptr, &LootToDrop, LootToDropLocation, true);
+
+            FFortSearchBounceData* SearchBounceData = &BuildingContainer->SearchBounceData;
+
+            if (SearchBounceData)
+            {
+                SearchBounceData->SearchAnimationCount++;
+                BuildingContainer->BounceContainer();
+            }
+
+            BuildingContainer->bAlreadySearched = true;
+            BuildingContainer->OnRep_bAlreadySearched();
+            BuildingContainer->ForceNetUpdate();
+        }
+
+        return true;
+    }
+
 	void InitBuildingActor()
 	{
+        static auto BuildingContainerDefault = ABuildingContainer::GetDefaultObj();
+
         uintptr_t AddressPickLootTierGroupAthena = MinHook::FindPattern(Patterns::PickLootTierGroupAthena);
 
         PickLootTierGroupAthena = decltype(PickLootTierGroupAthena)(AddressPickLootTierGroupAthena);
+
+        MinHook::HookVTable(BuildingContainerDefault, 0x1B9, SpawnLoot, nullptr, "SpawnLoot");
 
 		FN_LOG(LogInit, Log, "InitBuildingActor Success!");
 	}

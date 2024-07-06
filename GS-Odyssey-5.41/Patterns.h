@@ -9,6 +9,7 @@ namespace Patterns
 
 	// BuildingActor
 	constexpr const char* PickLootTierGroupAthena = "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 20 65 48 8B 04 25 ? ? ? ? 48 8B F2 8B 0D ? ? ? ? 49 8B D8";
+	constexpr const char* ServerOnAttemptInteract = "40 55 53 56 57 41 56 48 8B EC 48 83 EC 70 48 8D B9 ? ? ? ? 48 8B D9 48 8B 07";
 
 	// FortPickup
 	constexpr const char* PickupDelay = "40 53 56 57 48 83 EC 30 4C 89 6C 24 ? 48 8B F1";
@@ -19,11 +20,13 @@ namespace Patterns
 	constexpr const char* RemoveFromAlivePlayers = "4C 89 4C 24 ? 4C 89 44 24 ? 55 41 54 41 55 41 56 41 57 48 8D 6C 24 ?";
 
 	// Pawn
-	constexpr const char* HandlePickup = "40 55 53 56 41 54 48 8D 6C 24 B8";
+	constexpr const char* SetPickupTarget = "40 55 53 56 41 54 48 8D 6C 24 B8";
 
 	// PlayerController
 	constexpr const char* RemoveInventoryItem = "48 83 EC 48 80 B9 ? ? ? ? ? 74 22 0F 10 02 0F B6 44 24 ?";
 	constexpr const char* ModifyLoadedAmmo = "40 53 48 83 EC 30 80 B9 ? ? ? ? ? 41 8B D8 75 3F"; // (1.7.2 - 12.10)
+	constexpr const char* GetRepairResourceAmount = "40 55 53 57 41 56 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 01 4C 8B F2 48 8B F9";
+	constexpr const char* GetCreateResourceAmount = "41 54 41 56 48 83 EC 38 48 83 3A 00 4C 8B F2 4C 8B E1 74 1E E8 ? ? ? ? 49 8B 16";
 	constexpr const char* PayRepairCosts = "40 57 41 54 41 55 41 57 48 83 EC 78";
 	constexpr const char* PayBuildingCosts = "48 89 5C 24 18 56 57 41 56 48 83 EC 50 48 83 3A 00";
 	constexpr const char* CantBuild = "48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 41 56 48 83 EC 50 49 8B E9 4D 8B F0 48 8B DA 48 8B F1";
@@ -62,6 +65,7 @@ namespace Patterns
 	constexpr const char* ActorInternalGetNetMode = "48 89 5C 24 ? 57 48 83 EC 20 48 8B 01 48 8B D9 FF 90 ? ? ? ? 4C 8B 83 ? ? ? ? 48 8B F8";
 	constexpr const char* GetPlayerViewPoint = "48 89 5C 24 ? 48 89 74 24 ? 55 41 56 41 57 48 8B EC 48 83 EC 40 48 8B F2 48 C7 45 ? ? ? ? ? 48 8B 55 38";
 	constexpr const char* DispatchRequest = "48 89 5C 24 20 55 56 57 41 56 41 57 48 8B EC 48 83 EC 70 48 8B F1";
+	constexpr const char* ServerSpawnDeco = "40 53 55 41 56 48 83 EC 60 41 8B 41 08 49 8B E8 F2 41 0F 10 01 4C 8B F1";
 	constexpr const char* ApplyCharacterCustomization = "48 8B C4 48 89 50 10 55 57 48 8D 68 A1 48 81 EC ? ? ? ? 80 B9 ? ? ? ? ? 48 8B F9";
 	constexpr const char* KickPlayer = "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 20 49 8B F0 48 8B DA 48 85 D2 0F 84 ? ? ? ? 48 8B BA ? ? ? ? 48 85 FF";
 	constexpr const char* ChangingGameSessionId = "40 55 56 41 56 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 01 4C 8B F2 48 8B F1 FF 90 ? ? ? ? 48 8B 0D ? ? ? ? 48 8B D0";

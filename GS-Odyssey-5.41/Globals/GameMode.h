@@ -68,21 +68,21 @@ namespace GameMode
 				return;
 			}
 
-			if (!bWorldReady)
-				return;
-
-			AActor* PlayerStart = GameMode->ChoosePlayerStart(Params->NewPlayer);
-
-			if (!PlayerStart)
+			if (bWorldReady)
 			{
-				FN_LOG(LogGameMode, Error, "[AGameModeBase::HandleStartingNewPlayer] Failed to get PlayerStart!");
-				return;
+				AActor* PlayerStart = GameMode->ChoosePlayerStart(Params->NewPlayer);
+
+				if (!PlayerStart)
+				{
+					FN_LOG(LogGameMode, Error, "[AGameModeBase::HandleStartingNewPlayer] Failed to get PlayerStart!");
+					return;
+				}
+
+				const FVector& PlayerStartLocation = PlayerStart->K2_GetActorLocation();
+				const FRotator& PlayerStartRotation = PlayerStart->K2_GetActorRotation();
+
+				Util::SpawnPlayer((AFortPlayerControllerAthena*)Params->NewPlayer, PlayerStartLocation, PlayerStartRotation, true);
 			}
-
-			const FVector& PlayerStartLocation = PlayerStart->K2_GetActorLocation();
-			const FRotator& PlayerStartRotation = PlayerStart->K2_GetActorRotation();
-
-			Util::SpawnPlayer((AFortPlayerControllerAthena*)Params->NewPlayer, PlayerStartLocation, PlayerStartRotation, true);
 		}
 		else if (FunctionName.contains("OnAircraftExitedDropZone"))
 		{
@@ -90,7 +90,7 @@ namespace GameMode
 
 			if (!GameMode)
 			{
-				FN_LOG(LogGameMode, Error, "[AFortGameModeAthena::OnAircraftExitedDropZone] Failed to get GameMode/World");
+				FN_LOG(LogGameMode, Error, "[AFortGameModeAthena::OnAircraftExitedDropZone] Failed to get GameMode");
 				return;
 			}
 

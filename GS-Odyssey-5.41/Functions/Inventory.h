@@ -96,7 +96,6 @@ namespace Inventory
 			return nullptr;
 
 		if (ItemDefinition->IsA(UFortAmmoItemDefinition::StaticClass()) ||
-			ItemDefinition->IsA(UFortTrapItemDefinition::StaticClass()) ||
 			ItemDefinition->IsA(UFortResourceItemDefinition::StaticClass()) ||
 			ItemDefinition->IsA(UFortIngredientItemDefinition::StaticClass()))
 			return nullptr;
@@ -220,7 +219,7 @@ namespace Inventory
 
 		if (bSuccess)
 		{
-			for (int i = 0; i < WorldItems.Num(); i++)
+			for (int32 i = 0; i < WorldItems.Num(); i++)
 			{
 				UFortWorldItem* ItemInstance = WorldItems[i];
 
@@ -252,7 +251,7 @@ namespace Inventory
 		if (!WorldInventory)
 			return;
 
-		for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
+		for (int32 i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
 		{
 			UFortWorldItem* ItemInstance = WorldInventory->Inventory.ItemInstances[i];
 			if (!ItemInstance) continue;
@@ -267,7 +266,7 @@ namespace Inventory
 			}
 		}
 
-		for (int i = 0; i < WorldInventory->Inventory.ReplicatedEntries.Num(); i++)
+		for (int32 i = 0; i < WorldInventory->Inventory.ReplicatedEntries.Num(); i++)
 		{
 			FFortItemEntry* ReplicatedItemEntry = &WorldInventory->Inventory.ReplicatedEntries[i];
 
@@ -340,9 +339,9 @@ namespace Inventory
 		if (!WorldInventory)
 			return false;
 
-		int TotalItems = 0;
+		int32 TotalItems = 0;
 
-		for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
+		for (int32 i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
 		{
 			UFortWorldItem* ItemInstance = WorldInventory->Inventory.ItemInstances[i];
 			if (!ItemInstance) continue;
@@ -367,7 +366,7 @@ namespace Inventory
 		if (!WorldInventory)
 			return;
 
-		for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
+		for (int32 i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
 		{
 			UFortWorldItem* ItemInstance = WorldInventory->Inventory.ItemInstances[i];
 			if (!ItemInstance) continue;
@@ -381,7 +380,7 @@ namespace Inventory
 			}
 		}
 
-		for (int i = 0; i < WorldInventory->Inventory.ReplicatedEntries.Num(); i++)
+		for (int32 i = 0; i < WorldInventory->Inventory.ReplicatedEntries.Num(); i++)
 		{
 			FFortItemEntry ReplicatedItemEntry = WorldInventory->Inventory.ReplicatedEntries[i];
 
@@ -424,7 +423,7 @@ namespace Inventory
 		}
 		else if (AmountToRemove < ItemEntry.Count)
 		{
-			int NewCount = ItemEntry.Count - AmountToRemove;
+			int32 NewCount = ItemEntry.Count - AmountToRemove;
 
 			Inventory::ModifyCountItem(PlayerController, ItemGuid, NewCount);
 		}
@@ -446,7 +445,7 @@ namespace Inventory
 
 		TArray<FGuid> ItemGuidToRemove;
 
-		for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
+		for (int32 i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
 		{
 			UFortWorldItem* ItemInstance = WorldInventory->Inventory.ItemInstances[i];
 			if (!ItemInstance) continue;
@@ -482,7 +481,7 @@ namespace Inventory
 		if (!WorldInventory)
 			return;
 
-		for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
+		for (int32 i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
 		{
 			UFortWorldItem* ItemInstance = WorldInventory->Inventory.ItemInstances[i];
 			if (!ItemInstance) continue;
@@ -511,7 +510,7 @@ namespace Inventory
 			}
 		}
 
-		for (int i = 0; i < WorldInventory->Inventory.ReplicatedEntries.Num(); i++)
+		for (int32 i = 0; i < WorldInventory->Inventory.ReplicatedEntries.Num(); i++)
 		{
 			FFortItemEntry* ReplicatedItemEntry = &WorldInventory->Inventory.ReplicatedEntries[i];
 
@@ -534,7 +533,7 @@ namespace Inventory
 		if (!WorldInventory || !PlayerController->MyFortPawn)
 			return;
 
-		for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
+		for (int32 i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
 		{
 			UFortWorldItem* ItemInstance = WorldInventory->Inventory.ItemInstances[i];
 			if (!ItemInstance) continue;
@@ -752,7 +751,7 @@ namespace Inventory
 	{
 		TArray<FItemAndCount> StartingItems = Globals::GetGameMode()->StartingItems;
 
-		for (int i = 0; i < StartingItems.Num(); i++)
+		for (int32 i = 0; i < StartingItems.Num(); i++)
 		{
 			FItemAndCount StartingItem = StartingItems[i];
 
