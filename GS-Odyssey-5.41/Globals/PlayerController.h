@@ -962,35 +962,18 @@ namespace PlayerController
 		ModifyLoadedAmmo(a1, ItemGuid, CorrectAmmo);
 	}
 
-	// 7FF66F979AF0
-	/*void (*TestFunc)(AFortWeapon* Weapon, int a2);
-	void TestFuncHook(AFortWeapon* Weapon, int a2)
-	{
-		if (!Weapon)
-			return;
-
-		int IdkButItsCool = (*(int*)(__int64(Weapon) + 0x9DC));
-
-		FN_LOG(LogMinHook, Log, "Weapon: %s, a2: %i", Weapon->GetName().c_str(), a2);
-
-		FN_LOG(LogMinHook, Log, "IdkButItsCool 1: %i", IdkButItsCool);
-		TestFunc(Weapon, a2);
-		FN_LOG(LogMinHook, Log, "IdkButItsCool 2: %i", IdkButItsCool);
-	}*/
-
 	void InitPlayerController()
 	{
-		static auto FortPlayerControllerAthenaDefault = FindObjectFast<AFortPlayerControllerAthena>("/Script/FortniteGame.Default__FortPlayerControllerAthena");
-
-		static auto IdkDefault = (void*)(__int64(FortPlayerControllerAthenaDefault) + IdkOffset);
-
-		/*MinHook::HookVTable((UObject*)IdkDefault, 0xC, TestFunc01Hook, nullptr, "TestFunc01Hook");
-		MinHook::HookVTable((UObject*)IdkDefault, 0x1D, TestFunc02Hook, nullptr, "TestFunc02Hook");
-		MinHook::HookVTable((UObject*)IdkDefault, 0x11, TestFunc03Hook, (LPVOID*)(&TestFunc03), "TestFunc03Hook");
-		MinHook::HookVTable((UObject*)IdkDefault, 0x10, TestFunc04Hook, nullptr, "TestFunc04Hook");*/
+		static auto FortPlayerControllerAthenaDefault = AFortPlayerControllerAthena::GetDefaultObj();
 
 		uintptr_t AddressRemoveInventoryItem = MinHook::FindPattern(Patterns::RemoveInventoryItem);
 		uintptr_t AddressModifyLoadedAmmo = MinHook::FindPattern(Patterns::ModifyLoadedAmmo);
+
+		MH_CreateHook((LPVOID)(AddressRemoveInventoryItem), RemoveInventoryItemHook, nullptr);
+		MH_EnableHook((LPVOID)(AddressRemoveInventoryItem));
+		MH_CreateHook((LPVOID)(AddressModifyLoadedAmmo), ModifyLoadedAmmoHook, (LPVOID*)(&ModifyLoadedAmmo));
+		MH_EnableHook((LPVOID)(AddressModifyLoadedAmmo));
+
 		uintptr_t AddressGetRepairResourceAmount = MinHook::FindPattern(Patterns::GetRepairResourceAmount);
 		uintptr_t AddressGetCreateResourceAmount = MinHook::FindPattern(Patterns::GetCreateResourceAmount);
 		uintptr_t AddressPayRepairCosts = MinHook::FindPattern(Patterns::PayRepairCosts);
@@ -998,14 +981,6 @@ namespace PlayerController
 		uintptr_t AddressCantBuild = MinHook::FindPattern(Patterns::CantBuild);
 		uintptr_t AddressReplaceBuildingActor = MinHook::FindPattern(Patterns::ReplaceBuildingActor);
 		uintptr_t AddressToDeathCause = MinHook::FindPattern(Patterns::ToDeathCause);
-
-		MH_CreateHook((LPVOID)(AddressRemoveInventoryItem), RemoveInventoryItemHook, nullptr);
-		MH_EnableHook((LPVOID)(AddressRemoveInventoryItem));
-		MH_CreateHook((LPVOID)(AddressModifyLoadedAmmo), ModifyLoadedAmmoHook, (LPVOID*)(&ModifyLoadedAmmo));
-		MH_EnableHook((LPVOID)(AddressModifyLoadedAmmo));
-
-		/*MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x1329AF0), TestFuncHook, (LPVOID*)(&TestFunc));
-		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x1329AF0));*/
 
 		GetRepairResourceAmount = decltype(GetRepairResourceAmount)(AddressGetRepairResourceAmount);
 		GetCreateResourceAmount = decltype(GetCreateResourceAmount)(AddressGetCreateResourceAmount);

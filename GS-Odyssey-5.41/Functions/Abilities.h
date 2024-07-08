@@ -94,7 +94,7 @@ namespace Abilities
 
 	void InitAbilities()
 	{
-		static auto FortAbilitySystemComponentAthenaDefault = FindObjectFast<UObject>("/Script/FortniteGame.Default__FortAbilitySystemComponentAthena");
+		static auto FortAbilitySystemComponentAthenaDefault = UFortAbilitySystemComponentAthena::GetDefaultObj();
 
 		uintptr_t AddressGiveAbility = MinHook::FindPattern(Patterns::GiveAbility);
 		uintptr_t AddressInternalTryActivateAbility = MinHook::FindPattern(Patterns::InternalTryActivateAbility);

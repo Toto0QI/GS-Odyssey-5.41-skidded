@@ -95,7 +95,7 @@ namespace Pawn
 
 	void InitPawn()
 	{
-		static auto FortPlayerPawnAthenaDefault = FindObjectFast<AFortPlayerPawnAthena>("/Script/FortniteGame.Default__FortPlayerPawnAthena");
+		static auto FortPlayerPawnAthenaDefault = AFortPlayerPawnAthena::GetDefaultObj();
 
 		uintptr_t PatternSetPickupTarget = MinHook::FindPattern(Patterns::SetPickupTarget);
 

@@ -12,9 +12,6 @@ namespace InitFunc
 		UC::FMemory_Realloc = decltype(UC::FMemory_Realloc)(AddressFMemoryRealloc);
 		UC::FMemory_Free = decltype(UC::FMemory_Free)(AddressFMemoryFree);
 
-		// Others
-		//Hooks::InitHook();
-
 		// Globals
 		GameMode::InitGameMode();
 		PlayerController::InitPlayerController();

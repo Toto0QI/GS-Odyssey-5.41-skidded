@@ -169,7 +169,7 @@ namespace Hooks
 				if (!Pawn)
 					return;
 
-				
+				UFortResourceItemDefinition;
 			}
 
 			if (GetAsyncKeyState(VK_F2) & 0x1)
@@ -427,18 +427,6 @@ namespace Hooks
 		return Result;
 	}
 
-	char (*sub_7FF66F803900)(__int64* a1, __int64 a2);
-	char sub_7FF66F803900Hook(__int64* a1, __int64 a2)
-	{
-		FN_LOG(LogPlayerController, Debug, "sub_7FF66F803900Hook func called!");
-
-		char Result = sub_7FF66F803900(a1, a2);
-		
-		FN_LOG(LogPlayerController, Debug, "a1: %i, a2: %i, Result: %i", a1, a2, Result);
-
-		return Result;
-	}
-
 	void InitHook()
 	{
 		uintptr_t AddressLocalSpawnPlayActor = MinHook::FindPattern(Patterns::LocalSpawnPlayActor);
@@ -476,8 +464,6 @@ namespace Hooks
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8960), CollectGarbageInternalHook, nullptr);
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8960));
 
-		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x11B3900), sub_7FF66F803900Hook, (LPVOID*)(&sub_7FF66F803900));
-		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x11B3900));
 
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + Offsets::ProcessEvent), ProcessEventHook, (LPVOID*)(&ProcessEvent));
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + Offsets::ProcessEvent));

@@ -137,15 +137,15 @@ namespace Beacon
 		uintptr_t PatternSetWorld = MinHook::FindPattern(Patterns::SetWorld);
 		uintptr_t PatternServerReplicateActors = MinHook::FindPattern(Patterns::ServerReplicateActors);
 
-		uintptr_t AddressListen = MinHook::FindPattern(Patterns::Listen, true, 0x1);
-
-		MH_CreateHook((LPVOID)(AddressListen), ListenHook, nullptr);
-		MH_EnableHook((LPVOID)(AddressListen));
-
 		InitHost = decltype(InitHost)(PatternInitHost);
 		InitListen = decltype(InitListen)(PatternInitListen);
 		SetWorld = decltype(SetWorld)(PatternSetWorld);
 		ServerReplicateActors = decltype(ServerReplicateActors)(PatternServerReplicateActors);
+
+		uintptr_t AddressListen = MinHook::FindPattern(Patterns::Listen, true, 0x1);
+
+		MH_CreateHook((LPVOID)(AddressListen), ListenHook, nullptr);
+		MH_EnableHook((LPVOID)(AddressListen));
 
 		FN_LOG(LogInit, Log, "InitBeacon Success!");
 	}

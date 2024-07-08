@@ -18,9 +18,9 @@ namespace MinHook
             uintptr_t FuncCallAddress = uintptr_t(Class->VTable[Index]);
             uintptr_t Offset = FuncCallAddress - InSDKUtils::GetImageBase();
             
+            // Index Found!
             if (Offset == FuncOffset)
             {
-                // Index Found!
                 FN_LOG(LogHook, Debug, "Index Found: 0x%llx", (unsigned long long)Index);
 
                 return Index;

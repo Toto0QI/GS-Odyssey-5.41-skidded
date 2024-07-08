@@ -219,23 +219,9 @@ namespace FortKismetLibrary
 		}
 	}
 
-	int32 (*K2_RemoveItemFromPlayerByGuid)(UObject* Context, void* Stack, void* Ret);
-	int32 K2_RemoveItemFromPlayerByGuidHook(UObject* Context, void* Stack, void* Ret)
-	{
-
-		FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::K2_RemoveItemFromPlayerByGuid] called!");
-
-		return K2_RemoveItemFromPlayerByGuid(Context, Stack, Ret);
-	}
-
 	void InitFortKismetLibrary()
 	{
-		static auto FortKismetLibraryDefault = FindObjectFast<UFortKismetLibrary>("/Script/FortniteGame.Default__FortKismetLibrary");
-
-		static auto regererg = FindObjectFast<UFunction>("/Script/FortniteGame.FortKismetLibrary.GiveItemToInventoryOwner");
-
-		MinHook::HookFunctionExec(regererg, K2_RemoveItemFromPlayerByGuidHook, (LPVOID*)(&K2_RemoveItemFromPlayerByGuid));
-
+		static auto FortKismetLibraryDefault = UFortKismetLibrary::GetDefaultObj();
 
 		FN_LOG(LogInit, Log, "InitFortKismetLibrary Success!");
 	}

@@ -70,5 +70,4 @@ namespace Patterns
 	constexpr const char* KickPlayer = "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 20 49 8B F0 48 8B DA 48 85 D2 0F 84 ? ? ? ? 48 8B BA ? ? ? ? 48 85 FF";
 	constexpr const char* ChangingGameSessionId = "40 55 56 41 56 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 01 4C 8B F2 48 8B F1 FF 90 ? ? ? ? 48 8B 0D ? ? ? ? 48 8B D0";
 	constexpr const char* LocalSpawnPlayActor = "40 55 53 56 57 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 40 48 8B D9 4D 8B F1 49 8B C9 4D 8B F8 48 8B F2";
-	//constexpr const char* CollectGarbageInternal = "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 20 48 8D 99 ? ? ? ? 48 8B F2 48 63 7B 08 8D 47 01 89 43 08 3B 43 0C 7E 0A 8B D7 48 8B CB E8 ? ? ? ? 48 8D 0C BF 48 8B D6 48 C1 E1 04 48 03 0B E8 ? ? ? ? 48 8B 5C 24 ? B0 01 48 8B 74 24 ? 48 83 C4 20 5F C3 48 8D 45 08 E9 ? ? ? ?";
 }
