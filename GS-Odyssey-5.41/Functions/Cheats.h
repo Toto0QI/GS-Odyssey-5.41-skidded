@@ -99,7 +99,7 @@ namespace Cheats
                     else if (Action == "startaircraft")
                     {
                         UKismetSystemLibrary::ExecuteConsoleCommand(Globals::GetWorld(), L"startaircraft", nullptr);
-                        Message = L"PauseSafeZone command executed successfully!";
+                        Message = L"StartAirCraft command executed successfully!";
                     }
                     else if (Action == "sethealth" && ParsedCommand.size() >= 2)
                     {
@@ -498,7 +498,7 @@ namespace Cheats
                             }
                         }
                     }
-                    else if (Action == "rtx D è-" && ParsedCommand.size() >= 1)
+                    else if (Action == "rtx" && ParsedCommand.size() >= 1)
                     {
                         TArray<UFortWorldItemDefinition*> AllItems = Functions::GetAllItems(true);
 

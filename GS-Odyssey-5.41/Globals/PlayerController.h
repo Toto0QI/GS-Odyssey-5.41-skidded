@@ -942,18 +942,19 @@ namespace PlayerController
 	{
 		AFortPlayerController* PlayerController = (AFortPlayerController*)(__int64(a1) - IdkOffset);
 
-		AFortWeapon;
-
 		if (!PlayerController)
 		{
 			FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ModifyLoadedAmmo] Failed to get PlayerController!");
 			return;
 		}
 
-		uintptr_t Offset = uintptr_t(_ReturnAddress()) - InSDKUtils::GetImageBase();
-		uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
-
-		//FN_LOG(LogMinHook, Log, "Function Exec [ModifyLoadedAmmoHook] successfully hooked with Offset [0x%llx], IdaAddress [%p]", (unsigned long long)Offset, IdaAddress);
+#ifdef CHEATS
+		/*if (PlayerController->bInfiniteAmmo)
+		{
+			Inventory::UpdateInventory(PlayerController->WorldInventory);
+			return;
+		}*/
+#endif // CHEATS
 
 		Inventory::ModifyLoadedAmmoItem(PlayerController, ItemGuid, CorrectAmmo);
 		Inventory::UpdateInventory(PlayerController->WorldInventory);

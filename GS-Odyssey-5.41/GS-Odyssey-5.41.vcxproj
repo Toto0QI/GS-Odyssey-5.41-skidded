@@ -107,6 +107,7 @@
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="SDK\Basic.cpp" />
     <ClCompile Include="SDK\CoreUObject_functions.cpp" />
+    <ClCompile Include="SDK\CUBE_functions.cpp" />
     <ClCompile Include="SDK\Engine_functions.cpp" />
     <ClCompile Include="SDK\FortniteGame_functions.cpp" />
     <ClCompile Include="SDK\GameplayAbilities_functions.cpp" />

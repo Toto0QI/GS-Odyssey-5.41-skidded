@@ -365,7 +365,7 @@ namespace Functions
 
 			int32 Recurcives = 0;
 
-			QuantityNumToSpawn = 50000;
+			// QuantityNumToSpawn = 50000;
 
 			for (int32 i = 0; i < QuantityNumToSpawn; i++)
 			{

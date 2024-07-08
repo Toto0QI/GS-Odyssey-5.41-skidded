@@ -52,6 +52,20 @@ namespace GameMode
 
 					Functions::FillVendingMachines();
 
+					TArray<AActor*> OutActors;
+					UGameplayStatics::GetAllActorsOfClass(Globals::GetWorld(), ACUBE_C::StaticClass(), &OutActors);
+
+					for (int32 i = 0; i < OutActors.Num(); i++)
+					{
+						ACUBE_C* CUBE = (ACUBE_C*)OutActors[i];
+						if (!CUBE) continue;
+
+						/*CUBE->SpawnCube();
+						CUBE->OnRep_CubeSpawn();*/
+
+						CUBE->Next(560);
+					}
+
 					GameMode->StartPlay();
 					GameMode->StartMatch();
 				}

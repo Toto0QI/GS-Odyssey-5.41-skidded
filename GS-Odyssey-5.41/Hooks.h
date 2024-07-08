@@ -87,6 +87,8 @@ namespace Hooks
 		PickupCombine(Pickup);
 	}
 
+	int32 CubeIndex = 561;
+
 	void PickupDelayHook(AFortPickup* Pickup)
 	{
 		if (!Pickup)
@@ -182,18 +184,21 @@ namespace Hooks
 
 			if (GetAsyncKeyState(VK_F3) & 0x1)
 			{
-				AFortGameStateAthena* GameState = Globals::GetGameState();
+				TArray<AActor*> OutActors;
+				UGameplayStatics::GetAllActorsOfClass(Globals::GetWorld(), ACUBE_C::StaticClass(), &OutActors);
 
-				if (GameState && GameState->WorldManager)
+				for (int32 i = 0; i < OutActors.Num(); i++)
 				{
-					auto WorldManager =  GameState->WorldManager;
+					ACUBE_C* CUBE = (ACUBE_C*)OutActors[i];
+					if (!CUBE) continue;
 
+					CUBE->Next(CubeIndex);
 
-					FN_LOG(LogHooks, Debug, "WorldManager: %s", WorldManager->GetName().c_str());
-					FN_LOG(LogHooks, Debug, "CurrentZoneIndex: %i", WorldManager->CurrentZoneIndex);
-					FN_LOG(LogHooks, Debug, "CurrentWorldRecord: %s", WorldManager->CurrentWorldRecord->GetName().c_str());
-					FN_LOG(LogHooks, Debug, "CurrentZoneRecord: %s", WorldManager->CurrentZoneRecord->GetName().c_str());
+					CubeIndex++;
+
+					FN_LOG(LogHooks, Debug, "CubeIndex: %i", CubeIndex);
 				}
+
 
 				// 7FF66F6694B0
 				/*char (*Restart)(AFortGameSessionDedicated* GameSession) = decltype(Restart)(0x10194B0 + uintptr_t(GetModuleHandle(0)));
@@ -351,6 +356,7 @@ namespace Hooks
 				AFortGameStateAthena* GameState = Globals::GetGameState();
 
 				UFortPlaylistAthena* Playlist = UObject::FindObjectSlow<UFortPlaylistAthena>("FortPlaylistAthena Playlist_DefaultSolo.Playlist_DefaultSolo");
+				//UFortPlaylistAthena* Playlist = UObject::FindObjectSlow<UFortPlaylistAthena>("FortPlaylistAthena Playlist_Playground.Playlist_Playground");
 
 				if (GameState && Playlist)
 				{

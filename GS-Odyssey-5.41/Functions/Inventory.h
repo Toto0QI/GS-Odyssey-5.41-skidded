@@ -493,11 +493,11 @@ namespace Inventory
 				UFortItemDefinition* ItemDefinition = ItemEntry->ItemDefinition;
 
 				// For Grappler
-				/*if (ItemDefinition && ItemDefinition->IsA(UFortWeaponRangedItemDefinition::StaticClass()))
+				/*if (ItemDefinition && ItemDefinition->IsA(UFortWeaponItemDefinition::StaticClass()))
 				{
-					UFortWeaponRangedItemDefinition* WeaponRangedItemDefinition = (UFortWeaponRangedItemDefinition*)ItemDefinition;
+					UFortWeaponItemDefinition* WeaponItemDefinition = (UFortWeaponItemDefinition*)ItemDefinition;
 
-					if (WeaponRangedItemDefinition->bUsesCustomAmmoType && NewLoadedAmmo <= 0)
+					if (WeaponItemDefinition->bUsesCustomAmmoType && NewLoadedAmmo <= 0)
 					{
 						Inventory::RemoveItemFromInventory(PlayerController, ItemGuid);
 						return;
