@@ -107,8 +107,26 @@ namespace Beacon
 
 					SetWorld(World->NetDriver, World);
 
-					/*World->LevelCollections[0].NetDriver = World->NetDriver;
-					World->LevelCollections[1].NetDriver = World->NetDriver;*/
+
+					// int32 PlaylistId = 2; // Solo
+					int32 PlaylistId = 10; // Duo
+					// int32 PlaylistId = 9; // Squad
+					// int32 PlaylistId = 35; // Playground
+					// int32 PlaylistId = 50; // 50VS50
+
+					// int32 PlaylistId = 140; // Bling (Solo)
+
+
+					// 7FF66F2504C0
+					/*void (*SetCurrentPlaylistId)(AFortGameModeAthena* GameMode, int32 NewPlaylistId) = decltype(SetCurrentPlaylistId)(0xC004C0 + uintptr_t(GetModuleHandle(0)));
+
+					SetCurrentPlaylistId(Globals::GetGameMode(), PlaylistId);*/
+
+
+					// 7FF66F6584B0
+					/*void (*CreateDedicatedSession)(AFortGameSessionDedicated* GameSession) = decltype(CreateDedicatedSession)(0x10084B0 + uintptr_t(GetModuleHandle(0)));
+					CreateDedicatedSession((AFortGameSessionDedicated*)Globals::GetGameMode()->FortGameSession);*/
+
 
 					uintptr_t PatternTickFlush = MinHook::FindPattern(Patterns::TickFlush);
 

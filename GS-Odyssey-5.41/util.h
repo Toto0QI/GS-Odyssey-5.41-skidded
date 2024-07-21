@@ -53,6 +53,18 @@ static T* FindObjectFast(std::string ObjectName, UClass* ObjectClass = UObject::
     return StaticFindObject(ObjectClass, nullptr, OrigInName, false);
 }
 
+enum class EGetWorldErrorMode
+{
+    // Silently returns nullptr, the calling code is expected to handle this gracefully
+    ReturnNull,
+
+    // Raises a runtime error but still returns nullptr, the calling code is expected to handle this gracefully
+    LogAndReturnNull,
+
+    // Asserts, the calling code is not expecting to handle a failure gracefully
+    Assert
+};
+
 struct FActorSpawnParameters
 {
     /* A name to assign as the Name of the Actor being spawned. If no value is specified, the name of the spawned Actor will be automatically generated using the form [Class]_[Number]. */

@@ -29,7 +29,7 @@ namespace Patterns
 	constexpr const char* GetCreateResourceAmount = "41 54 41 56 48 83 EC 38 48 83 3A 00 4C 8B F2 4C 8B E1 74 1E E8 ? ? ? ? 49 8B 16";
 	constexpr const char* PayRepairCosts = "40 57 41 54 41 55 41 57 48 83 EC 78";
 	constexpr const char* PayBuildingCosts = "48 89 5C 24 18 56 57 41 56 48 83 EC 50 48 83 3A 00";
-	constexpr const char* CantBuild = "48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 41 56 48 83 EC 50 49 8B E9 4D 8B F0 48 8B DA 48 8B F1";
+	constexpr const char* CanAddBuildingActorToGrid = "48 89 5C 24 ? 48 89 6C 24 ? 48 89 7C 24 ? 41 54 41 56 41 57 48 83 EC 50 33 FF";
 	constexpr const char* ReplaceBuildingActor = "48 8B C4 44 89 48 20 55 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 48 89 70 E8 33 FF 40 38 3D ? ? ? ? 48 8B F1";
 	constexpr const char* ToDeathCause = "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 20 0F B6 FA 48 8B D9 E8 ? ? ? ? 33 F6";
 

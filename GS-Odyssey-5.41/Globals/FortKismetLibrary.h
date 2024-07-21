@@ -102,6 +102,33 @@ namespace FortKismetLibrary
 				Inventory::AddInventoryItem(PlayerController, &ItemEntry, CurrentWeaponGuid);
 			}
 		}
+		else if (FunctionName.contains("GiveItemToInventoryOwner"))
+		{
+			auto Params = (Params::FortKismetLibrary_GiveItemToInventoryOwner*)Parms;
+
+			UFortWorldItemDefinition* ItemDefinition = Params->ItemDefinition;
+
+			if (!ItemDefinition)
+			{
+				FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::GiveItemToInventoryOwner] failed to get ItemDefinition!");
+				return;
+			}
+
+			TScriptInterface<IFortInventoryOwnerInterface> InventoryOwner = Params->InventoryOwner;
+
+			UObject* ObjectRef = InventoryOwner.GetObjectRef();
+			
+			if (!ObjectRef)
+			{
+				FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::GiveItemToInventoryOwner] failed to get ObjectRef!");
+				return;
+			}
+
+			int32 NumberToGive = Params->NumberToGive;
+			bool bNotifyPlayer = Params->bNotifyPlayer;
+
+			FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::GiveItemToInventoryOwner] ObjectRef: %s", ObjectRef->GetName().c_str());
+		}
 		else if (FunctionName.contains("K2_RemoveItemFromAllPlayers"))
 		{
 			auto Params = (Params::FortKismetLibrary_K2_RemoveItemFromAllPlayers*)Parms;

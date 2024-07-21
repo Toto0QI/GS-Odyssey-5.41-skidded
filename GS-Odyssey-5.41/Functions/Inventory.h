@@ -687,7 +687,8 @@ namespace Inventory
 
 					PlayerController->ServerAttemptInventoryDrop(CurrentItemInstance->GetItemGuid(), CurrentItemInstance->GetNumInStack());
 
-					ItemInstance = AddItem(PlayerController, ItemEntry, true, OldItemGuid);
+					// ItemInstance = AddItem(PlayerController, ItemEntry, true, OldItemGuid);
+					ItemInstance = AddItem(PlayerController, ItemEntry, false, OldItemGuid);
 
 					if (ItemInstance && Pawn)
 					{
@@ -706,7 +707,8 @@ namespace Inventory
 					{
 						if (ItemDefinition->bAllowMultipleStacks)
 						{
-							ItemInstance = AddItem(PlayerController, ItemEntry, true, OldItemGuid);
+							// ItemInstance = AddItem(PlayerController, ItemEntry, true, OldItemGuid);
+							ItemInstance = AddItem(PlayerController, ItemEntry, false, OldItemGuid);
 							bSuccess = true;
 						}
 						else
@@ -717,7 +719,8 @@ namespace Inventory
 					}
 					else
 					{
-						ItemInstance = AddItem(PlayerController, ItemEntry, true, OldItemGuid);
+						// ItemInstance = AddItem(PlayerController, ItemEntry, true, OldItemGuid);
+						ItemInstance = AddItem(PlayerController, ItemEntry, false, OldItemGuid);
 						bSuccess = true;
 					}
 				}

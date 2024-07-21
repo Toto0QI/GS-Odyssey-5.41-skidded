@@ -25199,7 +25199,7 @@ public:
 	static bool GetTrapStatsRow(const struct FDataTableRowHandle& DataTableRowHandle, struct FFortTrapStats* OutRow);
 	static bool GetWeaponDurabilityByRarityStatsRow(const struct FDataTableRowHandle& DataTableRowHandle, struct FFortWeaponDurabilityByRarityStats* OutRow);
 	static bool GetWeaponStatsRow(const struct FDataTableRowHandle& DataTableRowHandle, struct FFortBaseWeaponStats* OutRow);
-	static void GiveItemToInventoryOwner(TScriptInterface<class IFortInventoryOwnerInterface> InventoryOwner, const class UFortWorldItemDefinition* ItemDefinition, int32 NumberToGive, bool bNotifyPlayer);
+	static void GiveItemToInventoryOwner(TScriptInterface<class IFortInventoryOwnerInterface> InventoryOwner, class UFortWorldItemDefinition* ItemDefinition, int32 NumberToGive, bool bNotifyPlayer);
 	static bool HasMultipleVisibleRewards(const struct FFortRewardInfo& RewardInfo);
 	static bool HasOpenBroadcasterGrantWindow(class UObject* WorldContextObject);
 	static bool HasRewards(const struct FFortRewardInfo& RewardInfo);

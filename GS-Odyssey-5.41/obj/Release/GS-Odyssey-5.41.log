@@ -5,38 +5,42 @@ C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\SDK\Basic.hpp(737,2): war
 C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\SDK\CoreUObject_structs.hpp(344,31): warning C4244: 'return' : conversion de 'double' en 'SDK::FVector::UnderlayingType', perte possible de données
 C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\SDK\HeadMountedDisplay_structs.hpp(27,2): warning C4309: 'initialisation' : troncation de valeur de constante
 C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\SDK\HeadMountedDisplay_structs.hpp(27,2): warning C4369: 'SDK::EXRTrackedDeviceType::EXRTrackedDeviceType_MAX' : la valeur de l'énumérateur '256' ne peut pas être représentée sous la forme 'unsigned char', la valeur est '256'
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Inventory.h(745,114): warning C4244: 'argument' : conversion de 'UC::int32' en 'float', perte possible de données
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Inventory.h(745,73): warning C4244: 'argument' : conversion de 'float' en 'UC::int32', perte possible de données
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Functions.h(169,143): warning C4244: 'argument' : conversion de 'UC::int32' en 'float', perte possible de données
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(115,65): warning C4101: 'e' : variable locale non référencée
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(119,61): warning C4101: 'e' : variable locale non référencée
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(142,65): warning C4101: 'e' : variable locale non référencée
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(146,61): warning C4101: 'e' : variable locale non référencée
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(167,65): warning C4101: 'e' : variable locale non référencée
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(171,61): warning C4101: 'e' : variable locale non référencée
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(192,65): warning C4101: 'e' : variable locale non référencée
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(196,61): warning C4101: 'e' : variable locale non référencée
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Inventory.h(748,114): warning C4244: 'argument' : conversion de 'UC::int32' en 'float', perte possible de données
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Inventory.h(748,73): warning C4244: 'argument' : conversion de 'float' en 'UC::int32', perte possible de données
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Functions.h(137,143): warning C4244: 'argument' : conversion de 'UC::int32' en 'float', perte possible de données
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Threads.h(56,9): warning C4244: 'argument' : conversion de 'float' en 'DWORD', perte possible de données
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Threads.h(70,146): warning C4244: 'argument' : conversion de 'UC::int32' en 'float', perte possible de données
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Threads.h(70,91): warning C4244: 'argument' : conversion de 'float' en 'UC::int32', perte possible de données
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Globals\BuildingActor.h(83,52): warning C4244: 'initialisation' : conversion de 'float' en 'int', perte possible de données
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Globals\BuildingActor.h(84,43): warning C4244: 'initialisation' : conversion de 'double' en 'int', perte possible de données
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Globals\PlayerController.h(337,136): warning C4244: 'argument' : conversion de 'UC::int32' en 'float', perte possible de données
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Globals\PlayerController.h(339,23): warning C4244: 'initialisation' : conversion de 'float' en 'UC::int32', perte possible de données
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(121,65): warning C4101: 'e' : variable locale non référencée
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(125,61): warning C4101: 'e' : variable locale non référencée
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(148,65): warning C4101: 'e' : variable locale non référencée
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(152,61): warning C4101: 'e' : variable locale non référencée
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(173,65): warning C4101: 'e' : variable locale non référencée
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(177,61): warning C4101: 'e' : variable locale non référencée
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(198,65): warning C4101: 'e' : variable locale non référencée
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(202,61): warning C4101: 'e' : variable locale non référencée
 C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(272,65): warning C4101: 'e' : variable locale non référencée
 C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(276,61): warning C4101: 'e' : variable locale non référencée
 C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(299,65): warning C4101: 'e' : variable locale non référencée
 C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(303,61): warning C4101: 'e' : variable locale non référencée
 C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(326,65): warning C4101: 'e' : variable locale non référencée
 C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Cheats.h(330,61): warning C4101: 'e' : variable locale non référencée
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Threads.h(56,9): warning C4244: 'argument' : conversion de 'float' en 'DWORD', perte possible de données
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Threads.h(70,146): warning C4244: 'argument' : conversion de 'UC::int32' en 'float', perte possible de données
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Functions\Threads.h(70,91): warning C4244: 'argument' : conversion de 'float' en 'UC::int32', perte possible de données
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Globals\BuildingActor.h(83,52): warning C4244: 'initialisation' : conversion de 'float' en 'int', perte possible de données
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Globals\BuildingActor.h(84,43): warning C4244: 'initialisation' : conversion de 'double' en 'int', perte possible de données
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Globals\PlayerController.h(332,136): warning C4244: 'argument' : conversion de 'UC::int32' en 'float', perte possible de données
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Globals\PlayerController.h(334,23): warning C4244: 'initialisation' : conversion de 'float' en 'UC::int32', perte possible de données
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Hooks.h(180,5): warning C4091: '' : ignoré à gauche de 'SDK::UFortEngine' quand aucune variable n'est déclarée
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Hooks.h(338,27): warning C4305: '/=' : troncation de 'double' à 'float'
-C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Hooks.h(340,27): warning C4305: '/=' : troncation de 'double' à 'float'
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Hooks.h(194,5): warning C4091: '' : ignoré à gauche de 'SDK::UFortResourceItemDefinition' quand aucune variable n'est déclarée
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Hooks.h(246,5): warning C4091: '' : ignoré à gauche de 'SDK::AFortGameModeAthena' quand aucune variable n'est déclarée
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Hooks.h(247,5): warning C4091: '' : ignoré à gauche de 'SDK::AFortGameStateAthena' quand aucune variable n'est déclarée
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Hooks.h(395,27): warning C4305: '/=' : troncation de 'double' à 'float'
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Hooks.h(397,27): warning C4305: '/=' : troncation de 'double' à 'float'
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Hooks.h(512,3): warning C4091: '' : ignoré à gauche de 'SDK::UFortBuildingInstructions' quand aucune variable n'est déclarée
+C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\Hooks.h(533,3): warning C4091: '' : ignoré à gauche de 'SDK::AFortGameSession' quand aucune variable n'est déclarée
 C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\dllmain.cpp(51,15): warning C4244: 'argument' : conversion de 'time_t' en 'unsigned int', perte possible de données
 LINK : warning LNK4098: conflit entre la bibliothèque par défaut 'LIBCMTD' et les autres bibliothèques ; utilisez /NODEFAULTLIB:library
   Génération de code en cours
-  1 of 1542 functions (<0.1%) were compiled, the rest were copied from previous compilation.
-    0 functions were new in current compilation
-    2 functions had inline decision re-evaluated but remain unchanged
+  8 of 1561 functions ( 0.5%) were compiled, the rest were copied from previous compilation.
+    1 functions were new in current compilation
+    38 functions had inline decision re-evaluated but remain unchanged
   Fin de la génération du code
   GS-Odyssey-5.41.vcxproj -> C:\Users\antho\Desktop\GS-Odyssey-5.41\GS-Odyssey-5.41\bin\Release\GS-Odyssey-5.41.dll

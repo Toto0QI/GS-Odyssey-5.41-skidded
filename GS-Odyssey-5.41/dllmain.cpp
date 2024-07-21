@@ -21,7 +21,6 @@
 #include "Functions/Inventory.h"
 #include "Functions/Loots.h"
 #include "Functions/Functions.h"
-#include "Functions/Cheats.h"
 #include "Functions/Threads.h"
 
 #include "Globals/GameMode.h"
@@ -30,6 +29,7 @@
 #include "Globals/Pawn.h"
 #include "Globals/FortKismetLibrary.h"
 
+#include "Functions/Cheats.h"
 #include "Functions/Beacon.h"
 
 #include <fstream>

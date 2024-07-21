@@ -36,7 +36,6 @@ namespace Cheats
             {
                 std::string Command = Params->Msg.ToString();
                 std::vector<std::string> ParsedCommand = split(Command, ' ');
-                AFortPawn* Pawn = (AFortPawn*)PlayerController->Pawn;
 
                 if (!ParsedCommand.empty())
                 {
@@ -47,6 +46,8 @@ namespace Cheats
                     FString Message = L"Unknown Command";
 
                     UCheatManager* CheatManager = PlayerController->CheatManager;
+                    AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
+                    AFortPlayerPawn* Pawn = PlayerController->MyFortPawn;
 
                     if (Action == "listplayers")
                     {
@@ -60,15 +61,15 @@ namespace Cheats
 
                             for (int32 i = 0; i < AllFortPlayerController.Num(); i++)
                             {
-                                AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)AllFortPlayerController[i];
-                                if (!PlayerController) continue;
+                                AFortPlayerControllerAthena* FortPlayerController = (AFortPlayerControllerAthena*)AllFortPlayerController[i];
+                                if (!FortPlayerController) continue;
 
-                                if (!PlayerController->PlayerState || PlayerController->PlayerState->bIsABot)
+                                if (!FortPlayerController->PlayerState)
                                     continue;
 
                                 NumPlayers++;
 
-                                std::string LootMessage = "[" + std::to_string(NumPlayers) + "] - PlayerName: " + PlayerController->PlayerState->GetPlayerName().ToString();
+                                std::string LootMessage = "[" + std::to_string(NumPlayers) + "] - PlayerName: " + FortPlayerController->PlayerState->GetPlayerName().ToString();
                                 FString FLootMessage = std::wstring(LootMessage.begin(), LootMessage.end()).c_str();
                                 PlayerController->ClientMessage(FLootMessage, FName(), 1);
 
@@ -95,6 +96,11 @@ namespace Cheats
                     {
                         UKismetSystemLibrary::ExecuteConsoleCommand(Globals::GetWorld(), L"pausesafezone", nullptr);
                         Message = L"PauseSafeZone command executed successfully!";
+                    }
+                    else if (Action == "skipsafezone")
+                    {
+                        UKismetSystemLibrary::ExecuteConsoleCommand(Globals::GetWorld(), L"skipsafezone", nullptr);
+                        Message = L"SkipSafeZone command executed successfully!";
                     }
                     else if (Action == "startaircraft")
                     {
@@ -242,20 +248,14 @@ namespace Cheats
                     else if (Action == "tpw")
                     {
                         AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
-                        //LocalWorldMapMarker
 
                         if (PlayerState)
                         {
-                            PlayerState->LocalWorldMapMarker->MarkerPosition2D;
-                        }
-                        if (CheatManager)
-                        {
-                            CheatManager->Teleport();
-                            Message = L"Teleportation successful!";
-                        }
-                        else
-                        {
-                            Message = L"CheatManager not found!";
+                            FVector MarkerPosition = PlayerState->LocalWorldMapMarker->MarkerPosition2D;
+
+                            MarkerPosition.Z = 10000;
+
+                            CheatManager->BugItGo(MarkerPosition.X, MarkerPosition.Y, MarkerPosition.Z, 0.f, 0.f, 0.f);
                         }
                     }
                     else if (Action == "changesize" && ParsedCommand.size() >= 2)

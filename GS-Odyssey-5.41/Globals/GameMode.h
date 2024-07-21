@@ -2,6 +2,8 @@
 
 namespace GameMode
 {
+	void (*RemoveFromAlivePlayers)(AFortGameModeAthena* GameMode, AFortPlayerControllerAthena* PlayerController, AFortPlayerStateAthena* PlayerState, AFortPlayerPawnAthena* Pawn, UFortWeaponItemDefinition* WeaponItemDefinition, EDeathCause DeathCause, char a7);
+	void (*AddFromAlivePlayers)(AFortGameModeAthena* GameMode, AFortPlayerControllerAthena* PlayerController);
 	void (*ApplyCharacterCustomization)(AFortPlayerState* PlayerState, AFortPawn* Pawn);
 
 	bool bPreReadyToStartMatch = false;
@@ -123,11 +125,45 @@ namespace GameMode
 		}
 	}
 
+	APlayerPawn_Athena_C* SpawnDefaultPawnFor(AGameModeBase* GameMode, AController* NewPlayer, AActor* StartSpot)
+	{
+		TSubclassOf<APawn> DefaultPawnClass = GameMode->DefaultPawnClass;
+
+		if (DefaultPawnClass.Get())
+		{
+			FN_LOG(LogGameMode, Debug, "[AGameModeBase::SpawnDefaultPawnFor] DefaultPawnClass: %s", DefaultPawnClass.Get()->GetName().c_str());
+		}
+
+		FTransform SpawnTransform = StartSpot->GetTransform();
+
+		APlayerPawn_Athena_C* PlayerPawn = (APlayerPawn_Athena_C*)GameMode->SpawnDefaultPawnAtTransform(NewPlayer, SpawnTransform);
+
+		if (!PlayerPawn)
+		{
+			FN_LOG(LogGameMode, Error, "[AGameModeBase::SpawnDefaultPawnFor] failed to spawn PlayerPawn!");
+			return nullptr;
+		}
+
+		// Function VTable [SpawnDefaultPawnFor] successfully hooked with Offset [0xc017a0], IdaAddress [00007FF66F2517A0]
+
+		FN_LOG(LogGameMode, Debug, "[AGameModeBase::SpawnDefaultPawnFor] func called!");
+
+		return PlayerPawn;
+	}
+
 	void InitGameMode()
 	{
+		static auto FortGameModeAthenaDefault = AFortGameModeAthena::GetDefaultObj();
+
+		uintptr_t PatternAddFromAlivePlayers = MinHook::FindPattern(Patterns::AddFromAlivePlayers);
+		uintptr_t PatternRemoveFromAlivePlayers = MinHook::FindPattern(Patterns::RemoveFromAlivePlayers);
 		uintptr_t PatternApplyCharacterCustomization = MinHook::FindPattern(Patterns::ApplyCharacterCustomization);
 
+		AddFromAlivePlayers = decltype(AddFromAlivePlayers)(PatternAddFromAlivePlayers);
+		RemoveFromAlivePlayers = decltype(RemoveFromAlivePlayers)(PatternRemoveFromAlivePlayers);
 		ApplyCharacterCustomization = decltype(ApplyCharacterCustomization)(PatternApplyCharacterCustomization);
+
+		MinHook::HookVTable(FortGameModeAthenaDefault, 0xC2, SpawnDefaultPawnFor, nullptr, "SpawnDefaultPawnFor");
 
 		FN_LOG(LogInit, Log, "InitGameMode Success!");
 	}
