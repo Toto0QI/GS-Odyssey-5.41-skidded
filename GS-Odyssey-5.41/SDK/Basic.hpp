@@ -570,16 +570,55 @@ public:
 	void*                                         InterfacePointer;                                  // 0x0008(0x0008)(NOT AUTO-GENERATED PROPERTY)
 
 public:
-	class UObject* GetObjectRef() const
-	{
-		return ObjectPointer;
-	}
-	
 	void* GetInterfaceRef() const
 	{
 		return InterfacePointer;
 	}
 	
+	void operator=(const FScriptInterface& Other)
+	{
+		ObjectPointer = Other.ObjectPointer;
+		InterfacePointer = Other.InterfacePointer;
+	}
+
+	FORCEINLINE UObject* GetObject() const
+	{
+		return ObjectPointer;
+	}
+
+	FORCEINLINE UObject*& GetObjectRef()
+	{
+		return ObjectPointer;
+	}
+
+	FORCEINLINE void* GetInterface() const
+	{
+		return ObjectPointer != NULL ? InterfacePointer : NULL;
+	}
+
+	FORCEINLINE void SetObject(UObject* InObjectPointer)
+	{
+		ObjectPointer = InObjectPointer;
+		if (ObjectPointer == NULL)
+		{
+			SetInterface(NULL);
+		}
+	}
+
+	FORCEINLINE void SetInterface(void* InInterfacePointer)
+	{
+		InterfacePointer = InInterfacePointer;
+	}
+
+	FORCEINLINE bool operator==(const FScriptInterface& Other) const
+	{
+		return GetInterface() == Other.GetInterface() && ObjectPointer == Other.GetObject();
+	}
+
+	FORCEINLINE bool operator!=(const FScriptInterface& Other) const
+	{
+		return GetInterface() != Other.GetInterface() || ObjectPointer != Other.GetObject();
+	}
 };
 
 // Predefined struct TScriptInterface

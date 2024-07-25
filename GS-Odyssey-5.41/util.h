@@ -176,6 +176,14 @@ public:
 
             SetShield(PlayerPawn, 0);
 
+            APlayerCameraManager* PlayerCameraManager = PlayerController->PlayerCameraManager;
+
+            if (PlayerCameraManager)
+            {
+                PlayerCameraManager->ViewRollMin = 0.f;
+                PlayerCameraManager->ViewRollMax = 0.f;
+            }
+
             PlayerController->bIsDisconnecting = false;
             PlayerController->bHasClientFinishedLoading = true;
             PlayerController->bHasServerFinishedLoading = true;

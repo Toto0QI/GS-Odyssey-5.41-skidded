@@ -4,12 +4,111 @@ namespace PlayerController
 {
 	ABuildingSMActor* (*ReplaceBuildingActor)(ABuildingSMActor* BuildingActor, int32 a2, TSubclassOf<ABuildingSMActor> BuildingClass, int32 BuildingLevel, int32 RotationIterations, bool bMirrored, AFortPlayerController* PlayerController);
 	EFortStructuralGridQueryResults (*CanAddBuildingActorToGrid)(UObject* WorldContextObject, UClass* BuildingClass, const FVector& BuildLoc, const FRotator& BuildRot, bool bMirrored, TArray<ABuildingActor*>* ExistingBuildings);
+	bool (*CheckBeginEditBuildingActor)(ABuildingSMActor* BuildingActorToEdit, AFortPlayerController* PlayerController);
 	int32 (*GetRepairResourceAmount)(ABuildingSMActor* BuildingActorToRepair, AFortPlayerController* PlayerController);
 	int32 (*GetCreateResourceAmount)(AFortPlayerController* PlayerController, const FBuildingClassData& BuildingClassData);
 	int32 (*PayRepairCosts)(AFortPlayerController* PlayerController, ABuildingSMActor* BuildingActorToRepair);
 	int32 (*PayBuildingCosts)(AFortPlayerController* PlayerController, const FBuildingClassData& BuildingClassData);
 	void (*ModifyLoadedAmmo)(void* a1, const FGuid& ItemGuid, int32 CorrectAmmo);
 	EDeathCause (*ToDeathCause)(FGameplayTagContainer TagContainer, char bWasDBNOIg);
+
+	void ServerBeginEditingBuildingActor(AFortPlayerController* PlayerController, ABuildingSMActor* BuildingActorToEdit)
+	{
+		if (BuildingActorToEdit &&
+			PlayerController->MyFortPawn &&
+			CheckBeginEditBuildingActor(BuildingActorToEdit, PlayerController))
+		{
+			AFortPlayerStateZone* PlayerState = (AFortPlayerStateZone*)PlayerController->PlayerState;
+
+			if (PlayerState)
+			{
+				Functions::SetEditingPlayer(BuildingActorToEdit, PlayerState);
+
+				TSoftObjectPtr<UFortEditToolItemDefinition> EditToolItem = UFortGameData::GetDefaultObj()->EditToolItem;
+
+				UFortEditToolItemDefinition* EditTool = EditToolItem.Get();
+
+				if (!EditTool)
+				{
+					std::string ItemPath = EditToolItem.ObjectID.SubPathString.ToString();
+					EditTool = StaticLoadObject<UFortEditToolItemDefinition>(std::wstring(ItemPath.begin(), ItemPath.end()).c_str());
+				}
+
+				//__int64 v11 = sub_7FF61CD35B30(Idk, EditTool, 0);
+				if (/*v11 &&*/ EditTool /*&& sub_7FF61CE48920(EditTool, v11, PlayerController)*/)
+				{
+					AFortWeapon* CurrentWeapon = PlayerController->MyFortPawn->CurrentWeapon;
+
+					if (CurrentWeapon && CurrentWeapon->IsA(AFortWeap_EditingTool::StaticClass()))
+					{
+						AFortWeap_EditingTool* EditingTool = (AFortWeap_EditingTool*)CurrentWeapon;
+
+						Functions::SetEditingActor(EditingTool, BuildingActorToEdit);
+					}
+				}
+			}
+		}
+	}
+
+	void ServerEditBuildingActor(AFortPlayerController* PlayerController, ABuildingSMActor* BuildingActorToEdit, TSubclassOf<ABuildingSMActor> NewBuildingClass, int32 RotationIterations, bool bMirrored)
+	{
+		if (BuildingActorToEdit && 
+			BuildingActorToEdit->EditingPlayer == PlayerController->PlayerState && 
+			!BuildingActorToEdit->bDestroyed)
+		{
+			Functions::SetEditingPlayer(BuildingActorToEdit, nullptr);
+
+			int32 CurrentBuildingLevel = BuildingActorToEdit->CurrentBuildingLevel;
+			ReplaceBuildingActor(BuildingActorToEdit, 1, NewBuildingClass, CurrentBuildingLevel, RotationIterations, bMirrored, PlayerController);
+
+			// sub_7FF61C89CE20(PlayerController, "Edit", BuildingActorToEdit, 0);
+
+			AFortGameMode* GameMode = Globals::GetGameMode();
+
+			if (GameMode)
+			{
+				//sub_7FF61CAA91E0(GameMode, 4u, PlayerController, BuildingActorToEdit);
+			}
+		}
+	}
+
+	void ServerEndEditingBuildingActor(AFortPlayerController* PlayerController, ABuildingSMActor* BuildingActorToStopEditing)
+	{
+		if (BuildingActorToStopEditing &&
+			PlayerController->MyFortPawn &&
+			BuildingActorToStopEditing->EditingPlayer == PlayerController->PlayerState &&
+			!BuildingActorToStopEditing->bDestroyed)
+		{
+			Functions::SetEditingPlayer(BuildingActorToStopEditing, nullptr);
+
+			TSoftObjectPtr<UFortEditToolItemDefinition> EditToolItem = UFortGameData::GetDefaultObj()->EditToolItem;
+
+			UFortEditToolItemDefinition* EditTool = EditToolItem.Get();
+
+			if (!EditTool)
+			{
+				std::string ItemPath = EditToolItem.ObjectID.SubPathString.ToString();
+				EditTool = StaticLoadObject<UFortEditToolItemDefinition>(std::wstring(ItemPath.begin(), ItemPath.end()).c_str());
+			}
+
+			//__int64 v6 = sub_7FF61CD35B30(Idk, EditTool, nullptr);
+
+			if (/*v6 &&*/ EditTool /*&& sub_7FF61CE48920(EditTool, v6, PlayerController)*/)
+			{
+				AFortWeapon* CurrentWeapon = PlayerController->MyFortPawn->CurrentWeapon;
+
+				if (CurrentWeapon && CurrentWeapon->IsA(AFortWeap_EditingTool::StaticClass()))
+				{
+					AFortWeap_EditingTool* EditingTool = (AFortWeap_EditingTool*)CurrentWeapon;
+
+					Functions::SetEditingActor(EditingTool, nullptr);
+				}
+			}
+		}
+	}
+
+
+
 
 	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms)
 	{
@@ -587,7 +686,7 @@ namespace PlayerController
 					return;
 				}
 
-				float Distance = MyFortPawn->GetDistanceTo(BuildingActorToRepair);
+				const float Distance = MyFortPawn->GetDistanceTo(BuildingActorToRepair);
 
 				// Ban Def Player
 				if (Distance > 1000)
@@ -639,13 +738,22 @@ namespace PlayerController
 			AFortPlayerPawn* MyFortPawn = PlayerController->MyFortPawn;
 			AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
 
-			if (BuildingActorToEdit->HasAuthority())
+			if (BuildingActorToEdit->HasAuthority() && CheckBeginEditBuildingActor(BuildingActorToEdit, PlayerController))
 			{
 				if (!UFortKismetLibrary::OnSameTeam(PlayerController, BuildingActorToEdit))
 				{
 					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerBeginEditingBuildingActor] PlayerController (team: [%i]) and BuildingActorToEdit (team [%i]) is not on the same team!",
 						PlayerState->TeamIndex, BuildingActorToEdit->Team);
 
+					return;
+				}
+
+				float Distance = MyFortPawn->GetDistanceTo(BuildingActorToEdit);
+
+				// Kick Player
+				if (Distance > 1000)
+				{
+					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] Maximum distance is 1000, your distance is %.2f.", Distance);
 					return;
 				}
 
@@ -673,11 +781,8 @@ namespace PlayerController
 					return;
 				}
 
-				__int64 (*sub_7FF66F3270B0)(ABuildingSMActor* BuildingActor, AFortPlayerState* EditingPlayer) = decltype(sub_7FF66F3270B0)(0xCD70B0 + uintptr_t(GetModuleHandle(0)));
-				sub_7FF66F3270B0(BuildingActorToEdit, (AFortPlayerState*)PlayerController->PlayerState);
-
-				EditTool->EditActor = BuildingActorToEdit;
-				EditTool->OnRep_EditActor();
+				Functions::SetEditingPlayer(BuildingActorToEdit, (AFortPlayerStateZone*)PlayerController->PlayerState);
+				Functions::SetEditingActor(EditTool, BuildingActorToEdit);
 			}
 		}
 		else if (FunctionName.contains("ServerEditBuildingActor"))
@@ -698,7 +803,7 @@ namespace PlayerController
 
 			if (BuildingActorToEdit->HasAuthority() && !BuildingActorToEdit->bDestroyed)
 			{
-				// Ban Def Player
+				// Kick Player
 				if (PlayerState != BuildingActorToEdit->EditingPlayer)
 				{
 					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] PlayerController (EditingPlayer: [%s]) and BuildingActorToEdit (EditingPlayer [%s]) is not the same!",
@@ -712,15 +817,6 @@ namespace PlayerController
 					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] PlayerController (team: [%i]) and BuildingActorToEdit (team [%i]) is not on the same team!",
 						PlayerState->TeamIndex, BuildingActorToEdit->Team);
 
-					return;
-				}
-
-				float Distance = MyFortPawn->GetDistanceTo(BuildingActorToEdit);
-
-				// Kick Player
-				if (Distance > 1000)
-				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] Maximum distance is 1000, your distance is %.2f.", Distance);
 					return;
 				}
 
@@ -741,8 +837,7 @@ namespace PlayerController
 
 				if (BuildingActor)
 				{
-					__int64 (*sub_7FF66F3270B0)(ABuildingSMActor* BuildingActor, AFortPlayerState* EditingPlayer) = decltype(sub_7FF66F3270B0)(0xCD70B0 + uintptr_t(GetModuleHandle(0)));
-					sub_7FF66F3270B0(BuildingActorToEdit, nullptr);
+					Functions::SetEditingPlayer(BuildingActorToEdit, nullptr);
 
 					BuildingActor->bPlayerPlaced = true;
 					BuildingActor->Team = PlayerState->TeamIndex;
@@ -767,6 +862,15 @@ namespace PlayerController
 
 			if (BuildingActorToStopEditing->HasAuthority())
 			{
+				// Kick Player
+				if (PlayerState != BuildingActorToStopEditing->EditingPlayer)
+				{
+					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] PlayerController (EditingPlayer: [%s]) and BuildingActorToStopEditing (EditingPlayer [%s]) is not the same!",
+						PlayerState->GetName().c_str(), BuildingActorToStopEditing->EditingPlayer->GetName().c_str());
+
+					return;
+				}
+
 				if (!UFortKismetLibrary::OnSameTeam(PlayerController, BuildingActorToStopEditing))
 				{
 					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEndEditingBuildingActor] PlayerController (team: [%i]) and BuildingActorToStopEditing (team [%i]) is not on the same team!",
@@ -791,11 +895,8 @@ namespace PlayerController
 					return;
 				}
 
-				__int64 (*sub_7FF66F3270B0)(ABuildingSMActor* BuildingActor, AFortPlayerState* EditingPlayer) = decltype(sub_7FF66F3270B0)(0xCD70B0 + uintptr_t(GetModuleHandle(0)));
-				sub_7FF66F3270B0(BuildingActorToStopEditing, nullptr);
-
-				EditTool->EditActor = nullptr;
-				EditTool->OnRep_EditActor();
+				Functions::SetEditingPlayer(BuildingActorToStopEditing, nullptr);
+				Functions::SetEditingActor(EditTool, nullptr);
 			}
 		}
 		else if (FunctionName.contains("ClientOnPawnDied"))
@@ -899,9 +1000,9 @@ namespace PlayerController
 						WeaponItemDefinition = ((AFortWeapon*)DamageCauser)->WeaponData;
 				}
 
-				/*GameMode::RemoveFromAlivePlayers(GameMode, PlayerController, CorrectPlayerState, KillerPawn, WeaponItemDefinition, ToDeathCause(Tags, Pawn->bIsDBNO), 0);
+				//RemoveFromAlivePlayers(GameMode, PlayerController, CorrectPlayerState, KillerPawn, WeaponItemDefinition, ToDeathCause(Tags, Pawn->bIsDBNO), 0);
 
-				if (GameMode && GameMode->bAllowSpectateAfterDeath && KillerPawn)
+				/*if (GameMode && GameMode->bAllowSpectateAfterDeath && KillerPawn)
 				{
 					PlayerController->PlayerToSpectateOnDeath = KillerPawn;
 
@@ -1047,6 +1148,7 @@ namespace PlayerController
 		return bResult;
 	}
 
+	// Call in 7FF66F979AF0
 	void ModifyLoadedAmmoHook(void* a1, const FGuid& ItemGuid, int32 CorrectAmmo)
 	{
 		AFortPlayerController* PlayerController = (AFortPlayerController*)(__int64(a1) - IdkOffset);
@@ -1069,61 +1171,6 @@ namespace PlayerController
 		Inventory::UpdateInventory(PlayerController->WorldInventory);
 
 		ModifyLoadedAmmo(a1, ItemGuid, CorrectAmmo);
-	}
-
-
-
-
-
-
-
-	char (*sub_7FF66F80EEF0)(void* a1, const FGuid& ItemGuid, float a3, char a4);
-	char sub_7FF66F80EEF0Hook(void* a1, const FGuid& ItemGuid, float a3, char a4)
-	{
-		uintptr_t Offset = uintptr_t(_ReturnAddress()) - InSDKUtils::GetImageBase();
-		uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
-
-		FN_LOG(LogMinHook, Log, "Function [sub_7FF66F80EEF0Hook], Offset [0x%llx], IdaAddress [%p], a3: [%i], a4: [%i]", (unsigned long long)Offset, IdaAddress, a3, a4);
-
-		return sub_7FF66F80EEF0(a1, ItemGuid, a3, a4);
-	}
-
-	char return_1_1(void* a1)
-	{
-		uintptr_t Offset = uintptr_t(_ReturnAddress()) - InSDKUtils::GetImageBase();
-		uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
-
-		FN_LOG(LogMinHook, Log, "Function [return_1_1], Offset [0x%llx], IdaAddress [%p]", (unsigned long long)Offset, IdaAddress);
-
-		return 1;
-	}
-
-	char return_1_2(void* a1)
-	{
-		uintptr_t Offset = uintptr_t(_ReturnAddress()) - InSDKUtils::GetImageBase();
-		uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
-
-		FN_LOG(LogMinHook, Log, "Function [return_1_2], Offset [0x%llx], IdaAddress [%p]", (unsigned long long)Offset, IdaAddress);
-
-		return 1;
-	}
-
-	char return_0_1(void* a1)
-	{
-		uintptr_t Offset = uintptr_t(_ReturnAddress()) - InSDKUtils::GetImageBase();
-		uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
-
-		FN_LOG(LogMinHook, Log, "Function [return_0_1], Offset [0x%llx], IdaAddress [%p]", (unsigned long long)Offset, IdaAddress);
-
-		return 0;
-	}
-
-	void nullsub_1(void* a1)
-	{
-		uintptr_t Offset = uintptr_t(_ReturnAddress()) - InSDKUtils::GetImageBase();
-		uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
-
-		FN_LOG(LogMinHook, Log, "Function [nullsub_1], Offset [0x%llx], IdaAddress [%p]", (unsigned long long)Offset, IdaAddress);
 	}
 
 	void InitPlayerController()
@@ -1154,6 +1201,7 @@ namespace PlayerController
 		uintptr_t AddressPayRepairCosts = MinHook::FindPattern(Patterns::PayRepairCosts);
 		uintptr_t AddressPayBuildingCosts = MinHook::FindPattern(Patterns::PayBuildingCosts);
 		uintptr_t AddressCanAddBuildingActorToGrid = MinHook::FindPattern(Patterns::CanAddBuildingActorToGrid);
+		uintptr_t AddressCheckBeginEditBuildingActor = MinHook::FindPattern(Patterns::CheckBeginEditBuildingActor);
 		uintptr_t AddressReplaceBuildingActor = MinHook::FindPattern(Patterns::ReplaceBuildingActor);
 		uintptr_t AddressToDeathCause = MinHook::FindPattern(Patterns::ToDeathCause);
 
@@ -1162,6 +1210,7 @@ namespace PlayerController
 		PayRepairCosts = decltype(PayRepairCosts)(AddressPayRepairCosts);
 		PayBuildingCosts = decltype(PayBuildingCosts)(AddressPayBuildingCosts);
 		CanAddBuildingActorToGrid = decltype(CanAddBuildingActorToGrid)(AddressCanAddBuildingActorToGrid);
+		CheckBeginEditBuildingActor = decltype(CheckBeginEditBuildingActor)(AddressCheckBeginEditBuildingActor);
 		ReplaceBuildingActor = decltype(ReplaceBuildingActor)(AddressReplaceBuildingActor);
 		ToDeathCause = decltype(ToDeathCause)(AddressToDeathCause);
 

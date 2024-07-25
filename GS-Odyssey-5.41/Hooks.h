@@ -89,77 +89,6 @@ namespace Hooks
 
 	int32 CubeIndex = 561;
 
-	void PickupDelayHook(AFortPickup* Pickup)
-	{
-		if (!Pickup)
-		{
-			FN_LOG(LogHooks, Error, "[AFortPickup::PickupDelay] Failed to get Pickup.");
-			return;
-		}
-
-		FFortPickupLocationData* PickupLocationData = &Pickup->PickupLocationData;
-		FFortItemEntry* ItemEntry = &Pickup->PrimaryPickupItemEntry;
-
-		if (!PickupLocationData || !ItemEntry)
-		{
-			FN_LOG(LogHooks, Error, "[AFortPickup::PickupDelay] Failed to get PickupLocationData/ItemEntry!");
-			return;
-		}
-
-		UFortWorldItemDefinition* ItemDefinition = (UFortWorldItemDefinition*)ItemEntry->ItemDefinition;
-
-		if (!ItemDefinition)
-		{
-			FN_LOG(LogHooks, Error, "[AFortPickup::PickupDelay] Failed to get ItemDefinition!");
-			return;
-		}
-
-		AFortPawn* Pawn = PickupLocationData->PickupTarget;
-
-		if (!Pawn)
-		{
-			FN_LOG(LogHooks, Error, "[AFortPickup::PickupDelay] Failed to get Pawn!");
-			return;
-		}
-
-		AFortPlayerController* PlayerController = (AFortPlayerController*)Pawn->Controller;
-
-		if (!PlayerController)
-		{
-			FN_LOG(LogHooks, Error, "[AFortPickup::PickupDelay] Failed to get PlayerController!");
-			return;
-		}
-
-		FGuid CurrentWepGuid = PickupLocationData->PickupGuid;
-
-		Inventory::AddInventoryItem(PlayerController, ItemEntry, CurrentWepGuid);
-		Inventory::UpdateInventory(PlayerController->WorldInventory);
-
-		PickupDelay(Pickup);
-	}
-
-	void PickupAddInventoryOwnerInterfaceHook(AFortPickup* Pickup, TScriptInterface<IFortInventoryOwnerInterface> InventoryOwner)
-	{
-		if (!Pickup)
-		{
-			FN_LOG(LogHooks, Error, "[AFortPickup::PickupAddInventoryOwnerInterface] Failed to get Pickup.");
-			return;
-		}
-
-		FFortPickupLocationData* PickupLocationData = &Pickup->PickupLocationData;
-		FFortItemEntry* ItemEntry = &Pickup->PrimaryPickupItemEntry;
-
-		if (!PickupLocationData || !ItemEntry)
-		{
-			FN_LOG(LogHooks, Error, "[AFortPickup::PickupAddInventoryOwnerInterface] Failed to get PickupLocationData/ItemEntry!");
-			return;
-		}
-
-		UObject* ObjectRef = InventoryOwner.GetObjectRef();
-
-		FN_LOG(LogHooks, Debug, "PickupAddInventoryOwnerInterfaceHook - ObjectRef: %s", ObjectRef->GetName().c_str());
-	}
-
 	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms)
 	{
 		if (!Object || !Function)
@@ -231,24 +160,49 @@ namespace Hooks
 
 			if (GetAsyncKeyState(VK_F4) & 0x1)
 			{
-				AFortPlayerController* PlayerController = (AFortPlayerController*)Globals::GetGameplayStatics()->GetPlayerController(Globals::GetWorld(), 0);
+				AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)Globals::GetGameplayStatics()->GetPlayerController(Globals::GetWorld(), 0);
+				UFortPlaylistAthena* Playlist = Globals::GetPlaylist();
 
-				if (!PlayerController)
+				if (!PlayerController || !Playlist)
 					return;
 
-				AFortPlayerPawn* Pawn = PlayerController->MyFortPawn;
+				UFortRegisteredPlayerInfo* RegisteredPlayerInfo = UFortKismetLibrary::GetPlayerInfoFromUniqueID(PlayerController, PlayerController->GetGameAccountId());
 
-				if (!Pawn)
+				if (!RegisteredPlayerInfo)
 					return;
 
-				Pawn->K2_TeleportTo(FVector(0, 0, 5000), FRotator());
+				UFortMcpProfileAthena* AthenaProfile = RegisteredPlayerInfo->AthenaProfile;
 
-				AFortGameModeAthena;
-				AFortGameStateAthena;
+				if (!AthenaProfile)
+					return;
 
-				UKismetGuidLibrary::NewGuid();
+				//AthenaProfile->EndBattleRoyaleGame({}, UKismetStringLibrary::Conv_IntToString(Playlist->PlaylistId), FAthenaMatchStats(), 0, 0, 0.f, true, true, {}, nullptr);
 
-				UKismetMathLibrary::Abs(10.f);
+				UFortKismetLibrary::FortShippingLog(PlayerController, L"erergergergergerg", true);
+
+				FN_LOG(LogHooks, Debug, "PlayerController: %s, RegisteredPlayerInfo: %s, AthenaProfile: %s", PlayerController->GetName().c_str(), RegisteredPlayerInfo->GetName().c_str(), AthenaProfile->GetName().c_str());
+
+				UGameInstance* GameInstance = UGameplayStatics::GetGameInstance(PlayerController);
+				AGameModeBase* GameMode = UGameplayStatics::GetGameMode(PlayerController);
+				AGameStateBase* GameState = UGameplayStatics::GetGameState(PlayerController);
+
+				FN_LOG(LogHooks, Debug, "GameInstance: %s, GameMode: %s, GameState: %s", GameInstance->GetName().c_str(), GameMode->GetName().c_str(), GameState->GetName().c_str());
+
+				TArray<UAthenaCosmeticItemDefinition*> AthenaCosmetics = UFortniteAutomationBlueprintLibrary::GetAllAthenaCosmetics(EFortItemType::AthenaCharacter);
+
+				FN_LOG(LogHooks, Debug, "AthenaCosmetics: %i", AthenaCosmetics.Num());
+
+				for (int32 i = 0; i < AthenaCosmetics.Num(); i++)
+				{
+					UAthenaCosmeticItemDefinition* AthenaCosmetic = AthenaCosmetics[i];
+					if (!AthenaCosmetic) continue;
+
+					FN_LOG(LogHooks, Debug, "[%i] - AthenaCosmetics - CosmeticItemDefinition: %s", i, AthenaCosmetic->GetName().c_str());
+				}
+
+				//UKismetGuidLibrary::NewGuid();
+
+				//UKismetMathLibrary::Abs(10.f);
 
 				/*UAthenaSeasonItemDefinition* Season5 = StaticLoadObject<UAthenaSeasonItemDefinition>(L"/Game/Athena/Items/Seasons/AthenaSeason5.AthenaSeason5");
 
@@ -316,22 +270,6 @@ namespace Hooks
 				if (!PlayerController)
 					return;
 
-				AFortPlayerPawn* Pawn = PlayerController->MyFortPawn;
-
-				if (!Pawn)
-					return;
-
-				static auto Nigger = FindObjectFast<UFortWeaponRangedItemDefinition>("/Game/Athena/Items/Weapons/WID_Pistol_HandCannon_Athena_SR_Ore_T03.WID_Pistol_HandCannon_Athena_SR_Ore_T03");
-
-				FFortItemEntry ItemEntry;
-				Inventory::CreateDefaultItemEntry(&ItemEntry, Nigger, 1, 0);
-
-				Inventory::CreateSimplePickup(PlayerController, &ItemEntry, Pawn->K2_GetActorLocation(), FRotator());
-
-
-
-
-
 				static auto FortPlayerControllerAthenaDefault = (AFortPlayerControllerAthena*)(AFortPlayerControllerAthena::StaticClass())->DefaultObject;
 
 				static auto IdkDefault = (void*)(__int64(FortPlayerControllerAthenaDefault) + IdkOffset);
@@ -375,6 +313,83 @@ namespace Hooks
 
 				//MinHook::FindIndexVTable((UObject*)IdkDefault, 0x0, 0x21);
 			}
+
+			if (GetAsyncKeyState(VK_F6) & 0x1)
+			{
+				AFortPlayerController* PlayerController = (AFortPlayerController*)Globals::GetGameplayStatics()->GetPlayerController(Globals::GetWorld(), 0);
+
+				if (!PlayerController || !PlayerController->Pawn)
+					return;
+
+				AFortGameStateAthena* GameState = Globals::GetGameState();
+
+				if (GameState && GameState->MapInfo)
+				{
+					AFortAthenaMapInfo* MapInfo = GameState->MapInfo;
+
+					FString ContextString;
+					EEvaluateCurveTableResult Result;
+
+					float MaxPlacementHeightXY;
+					UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->SupplyDropMaxPlacementHeight.Curve.CurveTable, MapInfo->SupplyDropMaxPlacementHeight.Curve.RowName, 0, &Result, &MaxPlacementHeightXY, ContextString);
+
+					const float MaxPlacementHeight = MaxPlacementHeightXY * MapInfo->SupplyDropMaxPlacementHeight.Value;
+
+					FN_LOG(LogFunctions, Debug, "MaxPlacementHeight: %.2f", MaxPlacementHeight);
+
+					float MinPlacementHeightXY;
+					UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->SupplyDropMinPlacementHeight.Curve.CurveTable, MapInfo->SupplyDropMinPlacementHeight.Curve.RowName, 0, &Result, &MinPlacementHeightXY, ContextString);
+
+					const float MinPlacementHeight = MinPlacementHeightXY * MapInfo->SupplyDropMinPlacementHeight.Value;
+
+					FN_LOG(LogFunctions, Debug, "MinPlacementHeight: %.2f", MinPlacementHeight);
+
+					//AFortAthenaSupplyDrop* SpawnSupplyDrop(AFortAthenaMapInfo* MapInfo, const FVector& Location, unsigned int* Rotation, __int64 SupplyDropClass, int a5, int a6);
+
+					// 7FF66F21BA90
+					AFortAthenaSupplyDrop* (*SpawnSupplyDrop)(AFortAthenaMapInfo* MapInfo, const FVector& Location, const FRotator& Rotation, UClass* SupplyDropClass, float TraceStartZ, float TraceEndZ) = decltype(SpawnSupplyDrop)(0xBCBA90 + uintptr_t(GetModuleHandle(0)));
+
+					FVector Location = PlayerController->Pawn->K2_GetActorLocation();
+
+					Location.X += 500;
+
+					FRotator Rotation = FRotator();
+
+					Rotation.Yaw = UKismetMathLibrary::RandomFloatInRange(0.f, 360.f);
+
+					SpawnSupplyDrop(MapInfo, Location, Rotation, MapInfo->LlamaClass, MaxPlacementHeight, MinPlacementHeight);
+				}
+			}
+
+			if (GetAsyncKeyState(VK_F7) & 0x1)
+			{
+				AFortPlayerController* PlayerController = (AFortPlayerController*)Globals::GetGameplayStatics()->GetPlayerController(Globals::GetWorld(), 0);
+
+				if (!PlayerController)
+					return;
+
+				UKismetSystemLibrary::ExecuteConsoleCommand(PlayerController, L"SPAWNLLAMA", PlayerController);
+			}
+
+			if (GetAsyncKeyState(VK_F9) & 0x1)
+			{
+				AFortPlayerController* PlayerController = (AFortPlayerController*)Globals::GetGameplayStatics()->GetPlayerController(Globals::GetWorld(), 0);
+
+				if (!PlayerController)
+					return;
+
+				UKismetSystemLibrary::ExecuteConsoleCommand(PlayerController, L"SPAWNEXITCRAFTFAST", PlayerController);
+			}
+
+			if (GetAsyncKeyState(VK_F10) & 0x1)
+			{
+				AFortPlayerController* PlayerController = (AFortPlayerController*)Globals::GetGameplayStatics()->GetPlayerController(Globals::GetWorld(), 0);
+
+				if (!PlayerController)
+					return;
+
+				UKismetSystemLibrary::ExecuteConsoleCommand(PlayerController, L"SPAWNEXITCRAFT", PlayerController);
+			}
 		}
 		else if (FunctionName.contains("ServerUpdatePhysicsParams"))
 		{
@@ -413,10 +428,10 @@ namespace Hooks
 				AFortGameStateAthena* GameState = Globals::GetGameState();
 				AFortGameModeAthena* GameMode = Globals::GetGameMode();
 
-				// int32 PlaylistId = 2; // Solo
+				int32 PlaylistId = 2; // Solo
 				//int32 PlaylistId = 10; // Duo
 				// int32 PlaylistId = 9; // Squad
-				int32 PlaylistId = 35; // Playground
+				//int32 PlaylistId = 35; // Playground
 				// int32 PlaylistId = 50; // 50VS50
 
 				// int32 PlaylistId = 140; // Bling (Solo)
@@ -527,50 +542,92 @@ namespace Hooks
 		return BeginDeferredActorSpawnFromClass(WorldContextObject, ActorClass, SpawnTransform, bNoCollisionFail, Owner);
 	}
 
-	void (*sub_7FF66F247000)(AFortGameModeAthena* GameMode, AFortPlayerControllerAthena* PlayerController);
-	void sub_7FF66F247000Hook(AFortGameModeAthena* GameMode, AFortPlayerControllerAthena* PlayerController)
+	// 00007FF66F5F11C0
+	bool (*PickupAddInventoryOwnerInterface)(AFortPickup* Pickup, void* InterfaceAddress);
+	bool PickupAddInventoryOwnerInterfaceHook(AFortPickup* Pickup, void* InterfaceAddress)
 	{
-		AFortGameSession;
+		if (!Pickup)
+		{
+			FN_LOG(LogHooks, Error, "[AFortPickup::PickupAddInventoryOwnerInterface] Failed to get Pickup.");
+			return PickupAddInventoryOwnerInterface(Pickup, InterfaceAddress);
+		}
+
+		FFortPickupLocationData* PickupLocationData = &Pickup->PickupLocationData;
+		FFortItemEntry* ItemEntry = &Pickup->PrimaryPickupItemEntry;
+
+		if (!PickupLocationData || !ItemEntry)
+		{
+			FN_LOG(LogHooks, Error, "[AFortPickup::PickupAddInventoryOwnerInterface] Failed to get PickupLocationData/ItemEntry!");
+			return PickupAddInventoryOwnerInterface(Pickup, InterfaceAddress);
+		}
+
+		UObject* (*GetObjectByAddress)(void* InterfaceAddress) = decltype(GetObjectByAddress)(((UObject*)InterfaceAddress)->VTable[0x1]);
+		UObject* Object = GetObjectByAddress(InterfaceAddress);
+
+		if (!Object || !Object->IsA(AFortPlayerController::StaticClass()))
+		{
+			FN_LOG(LogHooks, Error, "[AFortPickup::PickupAddInventoryOwnerInterface] Failed to get Object or Object is not AFortPlayerController class!");
+			return PickupAddInventoryOwnerInterface(Pickup, InterfaceAddress);
+		}
+
+		AFortPlayerController* PlayerController = (AFortPlayerController*)Object;
+
+		FGuid CurrentWepGuid = PickupLocationData->PickupGuid;
+
+		Inventory::AddInventoryItem(PlayerController, ItemEntry, CurrentWepGuid);
+		Inventory::UpdateInventory(PlayerController->WorldInventory);
+
+		return PickupAddInventoryOwnerInterface(Pickup, InterfaceAddress);
+	}
+
+	// 7FF66F481290
+	UClass** sub_7FF66F481290Hook(__int64 a1, UClass** OutGameSessionClass)
+	{
+		//*OutGameSessionClass = AFortGameSessionDedicatedAthena::StaticClass();
+		*OutGameSessionClass = AFortGameSessionDedicated::StaticClass();
+		return OutGameSessionClass;
+	}
+
+	AActor* (*SpawnActor)(UWorld* World, UClass* Class, FVector const* Location, FRotator const* Rotation, const FActorSpawnParameters& SpawnParameters);
+	AActor* SpawnActorHook(UWorld* World, UClass* Class, FVector const* Location, FRotator const* Rotation, const FActorSpawnParameters& SpawnParameters)
+	{
+		if (Class && Class->IsA(AFortAthenaAircraft::StaticClass()))
+		{
+			
+		}
 
 		uintptr_t Offset = uintptr_t(_ReturnAddress()) - InSDKUtils::GetImageBase();
 		uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
 
-		FN_LOG(LogMinHook, Log, "Function [sub_7FF66F247000Hook], Offset [0x%llx], IdaAddress [%p], GameMode: [%s], PlayerController: [%s]", (unsigned long long)Offset, IdaAddress, GameMode->GetName().c_str(), PlayerController->GetName().c_str());
+		FN_LOG(LogMinHook, Log, "Function [SpawnActorHook] successfully hooked with Offset [0x%llx], IdaAddress [%p], Class: [%s]", (unsigned long long)Offset, IdaAddress, Class->GetName().c_str());
 
-		// Function [sub_7FF66F247000Hook], Offset [0xe3f06c], IdaAddress [00007FF66F48F06C], GameMode: [Athena_GameMode_C_0], PlayerState: [Athena_PlayerController_C_0]
-
-		sub_7FF66F247000(GameMode, PlayerController);
+		return SpawnActor(World, Class, Location, Rotation, SpawnParameters);
 	}
 
-	void (*CreateDedicatedSession)(AFortGameSessionDedicated* GameSession);
-	void CreateDedicatedSessionHook(AFortGameSessionDedicated* GameSession)
+	AActor* (*RealSpawnActor)(UWorld* World, UClass* Class, __m128* a3, const FActorSpawnParameters& SpawnParameters);
+	AActor* RealSpawnActorHook(UWorld* World, UClass* Class, __m128* a3, const FActorSpawnParameters& SpawnParameters)
 	{
 		uintptr_t Offset = uintptr_t(_ReturnAddress()) - InSDKUtils::GetImageBase();
 		uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
 
-		FN_LOG(LogMinHook, Log, "Function [CreateDedicatedSessionHook], Offset [0x%llx], IdaAddress [%p], GameSession: [%s]", (unsigned long long)Offset, IdaAddress, GameSession->GetName().c_str());
+		FN_LOG(LogMinHook, Log, "Function [SpawnActorHook] successfully hooked with Offset [0x%llx], IdaAddress [%p], Class: [%s]", (unsigned long long)Offset, IdaAddress, Class->GetName().c_str());
 
-		// Function [CreateDedicatedSessionHook], Offset [0x6e6ac30a0], IdaAddress [00007FFD551130A0], GameMode: [FortGameSession_0], PlayerController: [FortGameSession_0]
-
-		CreateDedicatedSession(GameSession);
-	}
-
-	__int64 (*Testergergre)(AFortPickup* Pickup);
-	__int64 TestergergreHook(AFortPickup* Pickup)
-	{
-		FN_LOG(LogMinHook, Log, "TestergergreHook: %s", Pickup->GetName().c_str());
-		return Testergergre(Pickup);
+		return RealSpawnActor(World, Class, a3, SpawnParameters);
 	}
 
 	void InitHook()
 	{
+		static auto FortPickupAthenaDefault = AFortPickupAthena::GetDefaultObj();
+		static auto FortPlayerPawnAthenaDefault = AFortPlayerPawnAthena::GetDefaultObj();
+
+		MinHook::HookVTable(FortPickupAthenaDefault, 0xBF, PickupAddInventoryOwnerInterfaceHook, (LPVOID*)(&PickupAddInventoryOwnerInterface), "PickupAddInventoryOwnerInterface");
+
 		uintptr_t AddressLocalSpawnPlayActor = MinHook::FindPattern(Patterns::LocalSpawnPlayActor);
 		uintptr_t AddressInternalGetNetMode = MinHook::FindPattern(Patterns::InternalGetNetMode);
 		uintptr_t AddressActorInternalGetNetMode = MinHook::FindPattern(Patterns::ActorInternalGetNetMode);
 		uintptr_t AddressChangingGameSessionId = MinHook::FindPattern(Patterns::ChangingGameSessionId);
 		uintptr_t AddressKickPlayer = MinHook::FindPattern(Patterns::KickPlayer);
 		uintptr_t AddressPickupCombine = MinHook::FindPattern(Patterns::PickupCombine);
-		uintptr_t AddressPickupDelay = MinHook::FindPattern(Patterns::PickupDelay);
 		uintptr_t AddressDispatchRequest = MinHook::FindPattern(Patterns::DispatchRequest);
 		uintptr_t AddressGetPlayerViewPoint = MinHook::FindPattern(Patterns::GetPlayerViewPoint);
 		uintptr_t AddressServerSpawnDeco = MinHook::FindPattern(Patterns::ServerSpawnDeco);
@@ -587,8 +644,6 @@ namespace Hooks
 		MH_EnableHook((LPVOID)(AddressKickPlayer));
 		MH_CreateHook((LPVOID)(AddressPickupCombine), PickupCombineHook, (LPVOID*)(&PickupCombine));
 		MH_EnableHook((LPVOID)(AddressPickupCombine));
-		MH_CreateHook((LPVOID)(AddressPickupDelay), PickupDelayHook, (LPVOID*)(&PickupDelay));
-		MH_EnableHook((LPVOID)(AddressPickupDelay));
 		MH_CreateHook((LPVOID)(AddressDispatchRequest), DispatchRequestHook, (LPVOID*)(&DispatchRequest));
 		MH_EnableHook((LPVOID)(AddressDispatchRequest));
 		MH_CreateHook((LPVOID)(AddressGetPlayerViewPoint), GetPlayerViewPointHook, (LPVOID*)(&GetPlayerViewPoint));
@@ -599,20 +654,19 @@ namespace Hooks
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8960), CollectGarbageInternalHook, nullptr);
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8960));
 
-		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x24FB490), BeginDeferredActorSpawnFromClassHook, (LPVOID*)(&BeginDeferredActorSpawnFromClass));
-		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x24FB490));
+		/*MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x.2fB490), BeginDeferredActorSpawnFromClassHook, (LPVOID*)(&BeginDeferredActorSpawnFromClass));
+		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x.2fB490));*/
 
-		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0xBF7000), sub_7FF66F247000Hook, (LPVOID*)(&sub_7FF66F247000));
-		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0xBF7000));
+		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0xE31290), sub_7FF66F481290Hook, nullptr);
+		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0xE31290));
 
-		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x10084B0), CreateDedicatedSessionHook, (LPVOID*)(&CreateDedicatedSession));
-		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x10084B0));
+		/*MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x25D4D40), SpawnActorHook, (LPVOID*)(&SpawnActor));
+		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x25D4D40));
+		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x25D3D60), RealSpawnActorHook, (LPVOID*)(&RealSpawnActor));
+		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x25D3D60));*/
 
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + Offsets::ProcessEvent), ProcessEventHook, (LPVOID*)(&ProcessEvent));
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + Offsets::ProcessEvent));
-
-		MinHook::HookVTable(AFortPickup::GetDefaultObj(), 0xBF, PickupAddInventoryOwnerInterfaceHook, nullptr, "PickupAddInventoryOwnerInterfaceHook");
-		MinHook::HookVTable(AFortPickup::GetDefaultObj(), 0x159, TestergergreHook, (LPVOID*)(&Testergergre), "TestergergreHook");
 
 		FN_LOG(LogInit, Log, "InitHook Success!");
 	}

@@ -80,8 +80,8 @@ namespace BuildingActor
 
                         Globals::GetFunctionLibrary()->EvaluateCurveTableRow(CurveTable, BuildingActor->BuildingResourceAmountOverride.RowName, 0.f, &OutResult, &OutXY, ContextString);
 
-                        int PotentialResourceCount = OutXY / (BuildingActor->GetMaxHealth() / Params->Damage);
-                        int ResourceCount = round(PotentialResourceCount);
+                        int32 PotentialResourceCount = OutXY / (BuildingActor->GetMaxHealth() / Params->Damage);
+                        int32 ResourceCount = round(PotentialResourceCount);
 
                         if (ResourceCount > 0)
                         {

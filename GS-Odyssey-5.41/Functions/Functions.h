@@ -3,6 +3,7 @@
 
 namespace Functions
 {
+	AFortAthenaSupplyDrop* (*SpawnSupplyDrop)(AFortAthenaMapInfo* MapInfo, const FVector& Location, const FRotator& Rotation, UClass* SupplyDropClass, float TraceStartZ, float TraceEndZ);
 	UWorld* (*GetWorldFromContextObject)(UEngine* Engine, const UObject* Object, EGetWorldErrorMode ErrorMode);
 
 	bool IsPlayerBuildableClasse(UClass* BuildableClasse)
@@ -31,6 +32,27 @@ namespace Functions
 		return false;
 	}
 
+	// 7FF66F3270B0
+	void SetEditingPlayer(ABuildingSMActor* BuildingActor, AFortPlayerStateZone* EditingPlayer)
+	{
+		if (BuildingActor->HasAuthority() && (!BuildingActor->EditingPlayer || !EditingPlayer))
+		{
+			BuildingActor->SetNetDormancy(ENetDormancy(2 - (EditingPlayer != 0)));
+			BuildingActor->ForceNetUpdate();
+			BuildingActor->EditingPlayer = EditingPlayer;
+		}
+	}
+
+	// 7FF66F986F80
+	void SetEditingActor(AFortWeap_EditingTool* EditingTool, ABuildingSMActor* BuildingActor)
+	{
+		if (EditingTool->HasAuthority())
+		{
+			EditingTool->EditActor = BuildingActor;
+			EditingTool->OnRep_EditActor();
+		}
+	}
+
 	int GetRandomRarity(const std::map<int32, float>& RarityAndWeight) 
 	{
 		std::random_device rd;
@@ -56,10 +78,10 @@ namespace Functions
 		if (FloorLootClass && FloorLootWarmupClass)
 		{
 			TArray<AActor*> FloorLootsResult;
-			Globals::GetGameplayStatics()->GetAllActorsOfClass(Globals::GetWorld(), FloorLootClass, &FloorLootsResult);
+			UGameplayStatics::GetAllActorsOfClass(Globals::GetWorld(), FloorLootClass, &FloorLootsResult);
 
 			TArray<AActor*> FloorLootWarmupResult;
-			Globals::GetGameplayStatics()->GetAllActorsOfClass(Globals::GetWorld(), FloorLootWarmupClass, &FloorLootWarmupResult);
+			UGameplayStatics::GetAllActorsOfClass(Globals::GetWorld(), FloorLootWarmupClass, &FloorLootWarmupResult);
 
 			TArray<AActor*> FloorLoots;
 
@@ -115,7 +137,7 @@ namespace Functions
 			AFortAthenaMapInfo* MapInfo = GameState->MapInfo;
 
 			TArray<AActor*> VendingMachines;
-			Globals::GetGameplayStatics()->GetAllActorsOfClass(Globals::GetWorld(), MapInfo->VendingMachineClass, &VendingMachines);
+			UGameplayStatics::GetAllActorsOfClass(MapInfo, MapInfo->VendingMachineClass, &VendingMachines);
 
 			FString ContextString;
 			EEvaluateCurveTableResult Result;
@@ -134,9 +156,7 @@ namespace Functions
 			for (int32 i = 0; i < 6; i++)
 			{
 				float RarityCountXY;
-				Globals::GetFunctionLibrary()->EvaluateCurveTableRow(VendingMachineRarityCount.Curve.CurveTable, VendingMachineRarityCount.Curve.RowName, i, &Result, &RarityCountXY, ContextString);
-
-				FN_LOG(LogFunctions, Debug, "[%i] - RarityCount: %.2f, Value: %.2f", i, RarityCountXY, VendingMachineRarityCount.Value);
+				UDataTableFunctionLibrary::EvaluateCurveTableRow(VendingMachineRarityCount.Curve.CurveTable, VendingMachineRarityCount.Curve.RowName, i, &Result, &RarityCountXY, ContextString);
 
 				RarityAndWeight[i] = (RarityCountXY * VendingMachineRarityCount.Value);
 			}
@@ -214,8 +234,6 @@ namespace Functions
 				}
 
 				VendingMachine->StartingGoalLevel = RandomRarity;
-
-				FN_LOG(LogFunctions, Debug, "[%i] - VendingMachine: %s, RandomRarity: %i, LootTierGroup: %s", i, VendingMachine->GetName().c_str(), RandomRarity, LootTierGroup.ToString().c_str());
 			}
 
 			if (VendingMachines.Num() > 0)
@@ -234,26 +252,24 @@ namespace Functions
 			EEvaluateCurveTableResult OutResult;
 			FString ContextString;
 
-			float MinSpawnPercent; // 50%
-			Globals::GetFunctionLibrary()->EvaluateCurveTableRow(MapInfo->TreasureChestMinSpawnPercent.Curve.CurveTable, MapInfo->TreasureChestMinSpawnPercent.Curve.RowName, 0.f, &OutResult, &MinSpawnPercent, ContextString);
+			float MinSpawnPercentXY; // 50%
+			UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->TreasureChestMinSpawnPercent.Curve.CurveTable, MapInfo->TreasureChestMinSpawnPercent.Curve.RowName, 0.f, &OutResult, &MinSpawnPercentXY, ContextString);
 
-			float MaxSpawnPercent; // 70%
-			Globals::GetFunctionLibrary()->EvaluateCurveTableRow(MapInfo->TreasureChestMaxSpawnPercent.Curve.CurveTable, MapInfo->TreasureChestMaxSpawnPercent.Curve.RowName, 0.f, &OutResult, &MaxSpawnPercent, ContextString);
+			float MaxSpawnPercentXY; // 70%
+			UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->TreasureChestMaxSpawnPercent.Curve.CurveTable, MapInfo->TreasureChestMaxSpawnPercent.Curve.RowName, 0.f, &OutResult, &MaxSpawnPercentXY, ContextString);
 
 			TArray<AActor*> TreasureChests;
-			Globals::GetGameplayStatics()->GetAllActorsOfClass(Globals::GetWorld(), MapInfo->TreasureChestClass, &TreasureChests);
-
-			UKismetMathLibrary* MathLibrary = Globals::GetMathLibrary();
+			UGameplayStatics::GetAllActorsOfClass(MapInfo, MapInfo->TreasureChestClass, &TreasureChests);
 
 			int32 TotalTreasureChests = TreasureChests.Num();
-			int32 MinTreasureChestsToKeep = MathLibrary->FFloor((TotalTreasureChests * (MinSpawnPercent / 100.f)) * MapInfo->TreasureChestMinSpawnPercent.Value);
-			int32 MaxTreasureChestsToKeep = MathLibrary->FFloor((TotalTreasureChests * (MaxSpawnPercent / 100.f)) * MapInfo->TreasureChestMaxSpawnPercent.Value);
+			int32 MinTreasureChestsToKeep = UKismetMathLibrary::FFloor((TotalTreasureChests * (MinSpawnPercentXY / 100.f)) * MapInfo->TreasureChestMinSpawnPercent.Value);
+			int32 MaxTreasureChestsToKeep = UKismetMathLibrary::FFloor((TotalTreasureChests * (MaxSpawnPercentXY / 100.f)) * MapInfo->TreasureChestMaxSpawnPercent.Value);
 
-			int32 NumTreasureChestsToKeep = MathLibrary->RandomIntegerInRange(MinTreasureChestsToKeep, MaxTreasureChestsToKeep);
+			int32 NumTreasureChestsToKeep = UKismetMathLibrary::RandomIntegerInRange(MinTreasureChestsToKeep, MaxTreasureChestsToKeep);
 
 			for (int32 i = TotalTreasureChests - 1; i >= NumTreasureChestsToKeep; --i)
 			{
-				int32 IndexToDestroy = MathLibrary->RandomIntegerInRange(0, i);
+				int32 IndexToDestroy = UKismetMathLibrary::RandomIntegerInRange(0, i);
 
 				TreasureChests[IndexToDestroy]->K2_DestroyActor();
 				TreasureChests.Remove(IndexToDestroy);
@@ -275,26 +291,24 @@ namespace Functions
 			EEvaluateCurveTableResult OutResult;
 			FString ContextString;
 
-			float MinSpawnPercent; // 65%
-			Globals::GetFunctionLibrary()->EvaluateCurveTableRow(MapInfo->AmmoBoxMinSpawnPercent.Curve.CurveTable, MapInfo->AmmoBoxMinSpawnPercent.Curve.RowName, 0.f, &OutResult, &MinSpawnPercent, ContextString);
+			float MinSpawnPercentXY; // 65%
+			UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->AmmoBoxMinSpawnPercent.Curve.CurveTable, MapInfo->AmmoBoxMinSpawnPercent.Curve.RowName, 0.f, &OutResult, &MinSpawnPercentXY, ContextString);
 
-			float MaxSpawnPercent; // 80%
-			Globals::GetFunctionLibrary()->EvaluateCurveTableRow(MapInfo->AmmoBoxMaxSpawnPercent.Curve.CurveTable, MapInfo->AmmoBoxMaxSpawnPercent.Curve.RowName, 0.f, &OutResult, &MaxSpawnPercent, ContextString);
+			float MaxSpawnPercentXY; // 80%
+			UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->AmmoBoxMaxSpawnPercent.Curve.CurveTable, MapInfo->AmmoBoxMaxSpawnPercent.Curve.RowName, 0.f, &OutResult, &MaxSpawnPercentXY, ContextString);
 
 			TArray<AActor*> AmmoBoxs;
-			Globals::GetGameplayStatics()->GetAllActorsOfClass(Globals::GetWorld(), MapInfo->AmmoBoxClass, &AmmoBoxs);
-
-			UKismetMathLibrary* MathLibrary = Globals::GetMathLibrary();
+			UGameplayStatics::GetAllActorsOfClass(MapInfo, MapInfo->AmmoBoxClass, &AmmoBoxs);
 
 			int32 TotalAmmoBoxs = AmmoBoxs.Num();
-			int32 MinAmmoBoxsToKeep = MathLibrary->FFloor((TotalAmmoBoxs * (MinSpawnPercent / 100.f)) * MapInfo->AmmoBoxMinSpawnPercent.Value);
-			int32 MaxAmmoBoxsToKeep = MathLibrary->FFloor((TotalAmmoBoxs * (MaxSpawnPercent / 100.f)) * MapInfo->AmmoBoxMaxSpawnPercent.Value);
+			int32 MinAmmoBoxsToKeep = UKismetMathLibrary::FFloor((TotalAmmoBoxs * (MinSpawnPercentXY / 100.f)) * MapInfo->AmmoBoxMinSpawnPercent.Value);
+			int32 MaxAmmoBoxsToKeep = UKismetMathLibrary::FFloor((TotalAmmoBoxs * (MaxSpawnPercentXY / 100.f)) * MapInfo->AmmoBoxMaxSpawnPercent.Value);
 
-			int32 NumAmmoBoxsToKeep = MathLibrary->RandomIntegerInRange(MinAmmoBoxsToKeep, MaxAmmoBoxsToKeep);
+			int32 NumAmmoBoxsToKeep = UKismetMathLibrary::RandomIntegerInRange(MinAmmoBoxsToKeep, MaxAmmoBoxsToKeep);
 
 			for (int32 i = TotalAmmoBoxs - 1; i >= NumAmmoBoxsToKeep; --i)
 			{
-				int32 IndexToDestroy = MathLibrary->RandomIntegerInRange(0, i);
+				int32 IndexToDestroy = UKismetMathLibrary::RandomIntegerInRange(0, i);
 
 				AmmoBoxs[IndexToDestroy]->K2_DestroyActor();
 				AmmoBoxs.Remove(IndexToDestroy);
@@ -316,42 +330,48 @@ namespace Functions
 			EEvaluateCurveTableResult OutResult;
 			FString ContextString;
 
-			float QuantityMin;
-			Globals::GetFunctionLibrary()->EvaluateCurveTableRow(MapInfo->LlamaQuantityMin.Curve.CurveTable, MapInfo->LlamaQuantityMin.Curve.RowName, 0.f, &OutResult, &QuantityMin, ContextString);
+			float QuantityMinXY; // 3
+			UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->LlamaQuantityMin.Curve.CurveTable, MapInfo->LlamaQuantityMin.Curve.RowName, 0.f, &OutResult, &QuantityMinXY, ContextString);
 
-			float QuantityMax;
-			Globals::GetFunctionLibrary()->EvaluateCurveTableRow(MapInfo->LlamaQuantityMax.Curve.CurveTable, MapInfo->LlamaQuantityMax.Curve.RowName, 0.f, &OutResult, &QuantityMax, ContextString);
+			float QuantityMaxXY; // 3
+			UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->LlamaQuantityMax.Curve.CurveTable, MapInfo->LlamaQuantityMax.Curve.RowName, 0.f, &OutResult, &QuantityMaxXY, ContextString);
 
-			UKismetMathLibrary* MathLibrary = Globals::GetMathLibrary();
+			const int32 QuantityMinToSpawn = UKismetMathLibrary::FFloor(QuantityMinXY * MapInfo->LlamaQuantityMin.Value);
+			const int32 QuantityMaxToSpawn = UKismetMathLibrary::FFloor(QuantityMaxXY * MapInfo->LlamaQuantityMax.Value);
+			
+			int32 QuantityNumToSpawn = UKismetMathLibrary::RandomIntegerInRange(QuantityMinToSpawn, QuantityMaxToSpawn);
 
-			int32 QuantityMinToSpawn = MathLibrary->FFloor(QuantityMin * MapInfo->LlamaQuantityMin.Value);
-			int32 QuantityMaxToSpawn = MathLibrary->FFloor(QuantityMax * MapInfo->LlamaQuantityMax.Value);
+			float MinPlacementHeightXY;
+			UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->SupplyDropMinPlacementHeight.Curve.CurveTable, MapInfo->SupplyDropMinPlacementHeight.Curve.RowName, 0, &OutResult, &MinPlacementHeightXY, ContextString);
 
-			int32 QuantityNumToSpawn = MathLibrary->RandomIntegerInRange(QuantityMinToSpawn, QuantityMaxToSpawn);
+			float MaxPlacementHeightXY;
+			UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->SupplyDropMaxPlacementHeight.Curve.CurveTable, MapInfo->SupplyDropMaxPlacementHeight.Curve.RowName, 0, &OutResult, &MaxPlacementHeightXY, ContextString);
+
+			const float MinPlacementHeight = MinPlacementHeightXY * MapInfo->SupplyDropMinPlacementHeight.Value;
+			const float MaxPlacementHeight = MaxPlacementHeightXY * MapInfo->SupplyDropMaxPlacementHeight.Value;
 
 			TSubclassOf<AFortAthenaSupplyDrop> LlamaClass = MapInfo->LlamaClass;
 
 			int32 Recurcives = 0;
 
-			// QuantityNumToSpawn = 50000;
+			QuantityNumToSpawn = 10000;
 
 			for (int32 i = 0; i < QuantityNumToSpawn; i++)
 			{
 				FVector Location = FVector(0, 0, 10000);
-
+			
+				// Fortnite use SafeZone
 				Location.X = Globals::GetMathLibrary()->RandomFloatInRange(-100000.f, 100000.f);
 				Location.Y = Globals::GetMathLibrary()->RandomFloatInRange(-100000.f, 100000.f);
 
-				AFortAthenaSupplyDrop* LlamaForLocation = Util::SpawnActor<AFortAthenaSupplyDrop>(LlamaClass, Location, FRotator());
+				FRotator Rotation = FRotator();
 
-				if (!LlamaForLocation)
-					continue;
+				// Random Rotation
+				Rotation.Yaw = UKismetMathLibrary::RandomFloatInRange(0.f, 360.f);
 
-				FVector FinalLocation = LlamaForLocation->FindGroundLocationAt(Location);
+				AFortAthenaSupplyDrop* Llama = SpawnSupplyDrop(MapInfo, Location, Rotation, LlamaClass, MaxPlacementHeight, MinPlacementHeight);
 
-				LlamaForLocation->K2_DestroyActor();
-
-				if (FinalLocation.Z == 10000 || FinalLocation.Z <= 0)
+				if (!Llama || Llama->K2_GetActorLocation().Z <= 0)
 				{
 					if (Recurcives > 500)
 						break;
@@ -360,10 +380,6 @@ namespace Functions
 					QuantityNumToSpawn++;
 					continue;
 				}
-
-				FN_LOG(LogFunctions, Log, "FinalLocation: X: %.2f Y: %.2f Z: %.2f", FinalLocation.X, FinalLocation.Y, FinalLocation.Z);
-
-				Util::SpawnActor<AFortAthenaSupplyDrop>(LlamaClass, FinalLocation, FRotator());
 			}
 		}
 	}
@@ -382,7 +398,7 @@ namespace Functions
 			if (!ItemDefinition)
 				continue;
 
-			const FString& PathName = Globals::GetSystemLibrary()->GetPathName(ItemDefinition);
+			const FString& PathName = UKismetSystemLibrary::GetPathName(ItemDefinition);
 
 			if (!PathName.ToString().contains("/Game/Athena/Items"))
 				continue;
@@ -427,8 +443,10 @@ namespace Functions
 	void InitFunctions()
 	{
 		uintptr_t AddressGetWorldFromContextObject = MinHook::FindPattern(Patterns::GetWorldFromContextObject);
+		uintptr_t AddressSpawnSupplyDrop = MinHook::FindPattern(Patterns::SpawnSupplyDrop);
 
 		GetWorldFromContextObject = decltype(GetWorldFromContextObject)(AddressGetWorldFromContextObject);
+		SpawnSupplyDrop = decltype(SpawnSupplyDrop)(AddressSpawnSupplyDrop);
 
 		FN_LOG(LogInit, Log, "InitFunctions Success!");
 	}

@@ -30,6 +30,7 @@ namespace Patterns
 	constexpr const char* PayRepairCosts = "40 57 41 54 41 55 41 57 48 83 EC 78";
 	constexpr const char* PayBuildingCosts = "48 89 5C 24 18 56 57 41 56 48 83 EC 50 48 83 3A 00";
 	constexpr const char* CanAddBuildingActorToGrid = "48 89 5C 24 ? 48 89 6C 24 ? 48 89 7C 24 ? 41 54 41 56 41 57 48 83 EC 50 33 FF";
+	constexpr const char* CheckBeginEditBuildingActor = "48 89 5C 24 ? 55 56 57 48 8B EC 48 83 EC 60 48 8B F2 48 8B F9 48 85 D2";
 	constexpr const char* ReplaceBuildingActor = "48 8B C4 44 89 48 20 55 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 48 89 70 E8 33 FF 40 38 3D ? ? ? ? 48 8B F1";
 	constexpr const char* ToDeathCause = "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 20 0F B6 FA 48 8B D9 E8 ? ? ? ? 33 F6";
 
@@ -60,6 +61,7 @@ namespace Patterns
 	constexpr const char* GetItemInstances = "48 89 5C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 41 56 48 83 EC 30 45 33 F6 49 8B D8 48 8B FA";
 
 	// Others
+	constexpr const char* SpawnSupplyDrop = "40 53 55 56 41 56 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 49 8B D9";
 	constexpr const char* GetWorldFromContextObject = "48 89 5C 24 18 56 48 83 EC 40 41 8B D8";
 	constexpr const char* InternalGetNetMode = "40 53 48 81 EC ? ? ? ? 48 83 79 ? ? 48 8B D9 74 0E";
 	constexpr const char* ActorInternalGetNetMode = "48 89 5C 24 ? 57 48 83 EC 20 48 8B 01 48 8B D9 FF 90 ? ? ? ? 4C 8B 83 ? ? ? ? 48 8B F8";
