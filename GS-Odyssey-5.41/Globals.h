@@ -5,65 +5,46 @@ uintptr_t IdkOffset = 0x680;
 #define CHEATS
 #define DEBUGS
 
-namespace Globals
+template<typename T = UObject>
+static T* Cast(UObject* Object)
 {
-	UWorld* World = nullptr;
-	UFortEngine* FortEngine = nullptr;
-
-	UFortEngine* GetFortEngine(bool SkipCheck = false)
+	if (Object && Object->IsA(T::StaticClass()))
 	{
-		if (FortEngine == nullptr && !SkipCheck)
-			FortEngine = UObject::FindObjectSlow<UFortEngine>("FortEngine_");
-
-		return FortEngine;
+		return (T*)Object;
 	}
 
+	return nullptr;
+}
+
+namespace Globals
+{
 	UWorld* GetWorld(bool SkipCheck = false)
 	{
-		if (World == nullptr && !SkipCheck)
+		UEngine* Engine = UEngine::GetEngine();
+
+		if (Engine)
 		{
-			UFortEngine* FortEngine = GetFortEngine();
-
-			if (FortEngine)
-			{
-				if (FortEngine->GameViewport)
-				{
-					if (FortEngine->GameViewport->World)
-						return FortEngine->GameViewport->World;
-				}
-			}
-
-			return nullptr;
+			if (Engine->GameViewport)
+				return Engine->GameViewport->World;
 		}
 
-		return World;
+		return nullptr;
 	}
 
 	TArray<ULocalPlayer*> GetLocalPlayers()
 	{
-		UFortEngine* FortEngine = GetFortEngine();
+		UGameEngine* Engine = Cast<UGameEngine>(UEngine::GetEngine());
 
-		if (FortEngine)
+		if (Engine)
 		{
-			if (FortEngine->GameInstance)
-				return FortEngine->GameInstance->LocalPlayers;
+			if (Engine->GameInstance)
+				return Engine->GameInstance->LocalPlayers;
 		}
 	}
 
-	APlayerController* GetServerPlayerController()
+	AFortPlayerControllerAthena* GetServerPlayerController()
 	{
-		TArray<ULocalPlayer*> LocalPlayers = GetLocalPlayers();
-		ULocalPlayer* LocalPlayer = LocalPlayers[0];
-
-		if (LocalPlayer)
-		{
-			APlayerController* PlayerController = LocalPlayer->PlayerController;
-
-			if (PlayerController)
-				return PlayerController;
-		}
-
-		return nullptr;
+		return Cast<AFortPlayerControllerAthena>(UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0));
 	}
 
 	AFortGameModeAthena* GetGameMode()
@@ -72,7 +53,7 @@ namespace Globals
 
 		if (World)
 		{
-			AFortGameModeAthena* GameMode = (AFortGameModeAthena*)World->AuthorityGameMode;
+			AFortGameModeAthena* GameMode = Cast<AFortGameModeAthena>(World->AuthorityGameMode);
 
 			if (GameMode)
 				return GameMode;
@@ -87,7 +68,7 @@ namespace Globals
 
 		if (World)
 		{
-			AFortGameStateAthena* GameState = (AFortGameStateAthena*)World->GameState;
+			AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(World->GameState);
 
 			if (GameState)
 				return GameState;
@@ -106,6 +87,21 @@ namespace Globals
 
 			if (Playlist)
 				return Playlist;
+		}
+
+		return nullptr;
+	}
+
+	UFortGameData* GetGameData()
+	{
+		UFortAssetManager* AssetManager = Cast<UFortAssetManager>(UEngine::GetEngine()->AssetManager);
+
+		if (AssetManager)
+		{
+			UFortGameData* GameData = AssetManager->GameData;
+
+			if (GameData)
+				return GameData;
 		}
 
 		return nullptr;
@@ -130,35 +126,5 @@ namespace Globals
 		}
 
 		return nullptr;
-	}
-
-	UKismetMathLibrary* GetMathLibrary()
-	{
-		return (UKismetMathLibrary*)UKismetMathLibrary::StaticClass();
-	}
-
-	UKismetSystemLibrary* GetSystemLibrary()
-	{
-		return (UKismetSystemLibrary*)UKismetSystemLibrary::StaticClass();
-	}
-
-	UKismetStringLibrary* GetStringLibrary()
-	{
-		return (UKismetStringLibrary*)UKismetStringLibrary::StaticClass();
-	}
-
-	UGameplayStatics* GetGameplayStatics()
-	{
-		return (UGameplayStatics*)UGameplayStatics::StaticClass();
-	}
-
-	UDataTableFunctionLibrary* GetFunctionLibrary()
-	{
-		return (UDataTableFunctionLibrary*)UDataTableFunctionLibrary::StaticClass();
-	}
-
-	UFortKismetLibrary* GetKismetLibrary()
-	{
-		return (UFortKismetLibrary*)UFortKismetLibrary::StaticClass();
 	}
 }

@@ -32,9 +32,9 @@ namespace Beacon
 
 		if (World && IdaAddress == 0x7FF670F1F3C9ULL) // Pu sa grand mère
 		{
-			UFortEngine* FortEngine = Globals::GetFortEngine();
+			UEngine* Engine = UEngine::GetEngine();
 
-			if (FortEngine)
+			if (Engine)
 			{
 				AOnlineBeaconHost* Beacon = Util::SpawnActor<AOnlineBeaconHost>(AOnlineBeaconHost::StaticClass(), {}, {});
 				UWorld* World = Globals::GetWorld();
@@ -67,7 +67,7 @@ namespace Beacon
 				if (World->NetDriver)
 				{
 					World->NetDriver->World = World;
-					World->NetDriver->NetDriverName = Globals::GetStringLibrary()->Conv_StringToName(L"GameNetDriver");
+					World->NetDriver->NetDriverName = UKismetStringLibrary::Conv_StringToName(L"GameNetDriver");
 
 					// 7FF670F69750
 					FLevelCollection* (*FindCollectionByType)(UWorld* World, int InType) = decltype(FindCollectionByType)(0x2919750 + uintptr_t(GetModuleHandle(0)));
@@ -106,27 +106,6 @@ namespace Beacon
 					}
 
 					SetWorld(World->NetDriver, World);
-
-
-					// int32 PlaylistId = 2; // Solo
-					int32 PlaylistId = 10; // Duo
-					// int32 PlaylistId = 9; // Squad
-					// int32 PlaylistId = 35; // Playground
-					// int32 PlaylistId = 50; // 50VS50
-
-					// int32 PlaylistId = 140; // Bling (Solo)
-
-
-					// 7FF66F2504C0
-					/*void (*SetCurrentPlaylistId)(AFortGameModeAthena* GameMode, int32 NewPlaylistId) = decltype(SetCurrentPlaylistId)(0xC004C0 + uintptr_t(GetModuleHandle(0)));
-
-					SetCurrentPlaylistId(Globals::GetGameMode(), PlaylistId);*/
-
-
-					// 7FF66F6584B0
-					/*void (*CreateDedicatedSession)(AFortGameSessionDedicated* GameSession) = decltype(CreateDedicatedSession)(0x10084B0 + uintptr_t(GetModuleHandle(0)));
-					CreateDedicatedSession((AFortGameSessionDedicated*)Globals::GetGameMode()->FortGameSession);*/
-
 
 					uintptr_t PatternTickFlush = MinHook::FindPattern(Patterns::TickFlush);
 

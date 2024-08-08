@@ -91,6 +91,7 @@
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>./vendor;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -115,6 +116,7 @@
   <ItemGroup>
     <ClInclude Include="Functions\Abilities.h" />
     <ClInclude Include="Functions\Beacon.h" />
+    <ClInclude Include="Functions\Bots.h" />
     <ClInclude Include="Functions\Cheats.h" />
     <ClInclude Include="Functions\Functions.h" />
     <ClInclude Include="Functions\Inventory.h" />
@@ -122,6 +124,7 @@
     <ClInclude Include="Functions\Threads.h" />
     <ClInclude Include="Globals.h" />
     <ClInclude Include="Globals\BuildingActor.h" />
+    <ClInclude Include="Globals\FortAthenaSupplyDrop.h" />
     <ClInclude Include="Globals\FortKismetLibrary.h" />
     <ClInclude Include="Globals\GameMode.h" />
     <ClInclude Include="Globals\Pawn.h" />

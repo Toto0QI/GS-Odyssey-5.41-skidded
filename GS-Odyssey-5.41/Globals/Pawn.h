@@ -32,7 +32,7 @@ namespace Pawn
 			if (Params->Pickup->bPickedUp)
 				return;
 
-			SetPickupTarget(Params->Pickup, Pawn, Globals::GetMathLibrary()->RandomFloatInRange(0.40f, 0.54f), FVector());
+			SetPickupTarget(Params->Pickup, Pawn, UKismetMathLibrary::RandomFloatInRange(0.40f, 0.54f), FVector());
 
 			FFortPickupLocationData* PickupLocationData = &Params->Pickup->PickupLocationData;
 			PickupLocationData->PickupGuid = Pawn->CurrentWeapon ? Pawn->CurrentWeapon->ItemEntryGuid : FGuid();
@@ -50,6 +50,8 @@ namespace Pawn
 
 			if (!PlayerController)
 				return;
+
+			static UClass* FireClass = StaticLoadObject<UClass>(L"/Game/Athena/Items/QuestInteractables/FlamingHoops/Actor_QuestObject_Touch_FlamingHoops_Parent.uasset.Actor_QuestObject_Touch_FlamingHoops_Parent_C");
 
 			if (Params->OtherActor->IsA(AFortPickup::StaticClass()))
 			{
@@ -74,6 +76,17 @@ namespace Pawn
 					}
 				}
 			}
+#ifdef DEBUGS
+			else if (FireClass && Params->OtherActor->IsA(FireClass) && Pawn->IsInVehicle())
+			{
+				static UFunction* Func = nullptr;
+
+				if (Func == nullptr)
+					Func = Params->OtherActor->Class->GetFunction("Actor_QuestObject_Touch_FlamingHoops_Parent_C", "ObjectiveSuccessfullyCompleted");
+
+				Params->OtherActor->ProcessEvent(Func, &PlayerController);
+			}
+#endif // DEBUGS
 		}
 		else if (FunctionName.contains("OnDeathServer"))
 		{

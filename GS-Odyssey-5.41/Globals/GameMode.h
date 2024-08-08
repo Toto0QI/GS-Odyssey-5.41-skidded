@@ -5,6 +5,7 @@ namespace GameMode
 	void (*RemoveFromAlivePlayers)(AFortGameModeAthena* GameMode, AFortPlayerControllerAthena* PlayerController, AFortPlayerStateAthena* PlayerState, AFortPlayerPawnAthena* Pawn, UFortWeaponItemDefinition* WeaponItemDefinition, EDeathCause DeathCause, char a7);
 	void (*AddFromAlivePlayers)(AFortGameModeAthena* GameMode, AFortPlayerControllerAthena* PlayerController);
 	void (*ApplyCharacterCustomization)(AFortPlayerState* PlayerState, AFortPawn* Pawn);
+	void (*HandleMatchHasStarted)(AFortGameModeAthena* GameMode);
 
 	bool bPreReadyToStartMatch = false;
 	bool bWorldReady = false;
@@ -20,7 +21,7 @@ namespace GameMode
 		{
 			if (!bPreReadyToStartMatch)
 			{
-				Globals::GetFortEngine(true);
+				//Globals::GetFortEngine(true);
 				Globals::GetWorld(true);
 
 				FN_LOG(LogHooks, Debug, "bPreReadyToStartMatch called!");
@@ -40,10 +41,9 @@ namespace GameMode
 				if (GameMode->NumPlayers + GameMode->NumBots > 0 &&
 					MatchState.ToString() == "WaitingToStart")
 				{
-					FName InProgress = Globals::GetStringLibrary()->Conv_StringToName(L"InProgress");
+					FName InProgress = UKismetStringLibrary::Conv_StringToName(L"InProgress");
 
-					GameState->GamePhase = EAthenaGamePhase::Warmup;
-					GameState->OnRep_GamePhase(EAthenaGamePhase::None);
+					HandleMatchHasStarted(Globals::GetGameMode());
 
 					GameMode->MatchState = InProgress;
 					GameMode->K2_OnSetMatchState(InProgress);
@@ -53,23 +53,6 @@ namespace GameMode
 					Functions::InitializeLlamas();
 
 					Functions::FillVendingMachines();
-
-					TArray<AActor*> OutActors;
-					UGameplayStatics::GetAllActorsOfClass(Globals::GetWorld(), ACUBE_C::StaticClass(), &OutActors);
-
-					for (int32 i = 0; i < OutActors.Num(); i++)
-					{
-						ACUBE_C* CUBE = (ACUBE_C*)OutActors[i];
-						if (!CUBE) continue;
-
-						/*CUBE->SpawnCube();
-						CUBE->OnRep_CubeSpawn();*/
-
-						CUBE->Next(560);
-					}
-
-					GameMode->StartPlay();
-					GameMode->StartMatch();
 				}
 			}
 		}
@@ -100,40 +83,10 @@ namespace GameMode
 				Util::SpawnPlayer((AFortPlayerControllerAthena*)Params->NewPlayer, PlayerStartLocation, PlayerStartRotation, true);
 			}
 		}
-		else if (FunctionName.contains("OnAircraftExitedDropZone"))
-		{
-			AFortGameModeAthena* GameMode = (AFortGameModeAthena*)Object;
-
-			if (!GameMode)
-			{
-				FN_LOG(LogGameMode, Error, "[AFortGameModeAthena::OnAircraftExitedDropZone] Failed to get GameMode");
-				return;
-			}
-
-			TArray<AFortPlayerController*> AllFortPlayerController = Globals::GetKismetLibrary()->GetAllFortPlayerControllers(GameMode, true, false);
-
-			for (int32 i = 0; i < AllFortPlayerController.Num(); i++)
-			{
-				AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)AllFortPlayerController[i];
-				if (!PlayerController) continue;
-
-				if (PlayerController->Pawn || !PlayerController->IsInAircraft())
-					continue;
-
-				PlayerController->ServerAttemptAircraftJump(PlayerController->GetControlRotation());
-			}
-		}
 	}
 
-	APlayerPawn_Athena_C* SpawnDefaultPawnFor(AGameModeBase* GameMode, AController* NewPlayer, AActor* StartSpot)
+	APlayerPawn_Athena_C* SpawnDefaultPawnForHook(AGameModeBase* GameMode, AController* NewPlayer, AActor* StartSpot)
 	{
-		TSubclassOf<APawn> DefaultPawnClass = GameMode->DefaultPawnClass;
-
-		if (DefaultPawnClass.Get())
-		{
-			FN_LOG(LogGameMode, Debug, "[AGameModeBase::SpawnDefaultPawnFor] DefaultPawnClass: %s", DefaultPawnClass.Get()->GetName().c_str());
-		}
-
 		FTransform SpawnTransform = StartSpot->GetTransform();
 
 		APlayerPawn_Athena_C* PlayerPawn = (APlayerPawn_Athena_C*)GameMode->SpawnDefaultPawnAtTransform(NewPlayer, SpawnTransform);
@@ -144,9 +97,18 @@ namespace GameMode
 			return nullptr;
 		}
 
-		// Function VTable [SpawnDefaultPawnFor] successfully hooked with Offset [0xc017a0], IdaAddress [00007FF66F2517A0]
+		PlayerPawn->SetMaxHealth(100);
+		PlayerPawn->SetHealth(100);
+		PlayerPawn->SetMaxShield(100);
 
-		FN_LOG(LogGameMode, Debug, "[AGameModeBase::SpawnDefaultPawnFor] func called!");
+		// 7FF66F7BC760 (Je suis sévèrement autiste)
+		void (*SetShield)(AFortPawn* Pawn, float NewShieldValue) = decltype(SetShield)(0x116C760 + uintptr_t(GetModuleHandle(0)));
+
+		SetShield(PlayerPawn, 0);
+
+		GameMode::ApplyCharacterCustomization((AFortPlayerState*)NewPlayer->PlayerState, PlayerPawn);
+
+		FN_LOG(LogGameMode, Error, "[AGameModeBase::SpawnDefaultPawnFor] called!");
 
 		return PlayerPawn;
 	}
@@ -155,15 +117,20 @@ namespace GameMode
 	{
 		static auto FortGameModeAthenaDefault = AFortGameModeAthena::GetDefaultObj();
 
+		uintptr_t PatternSpawnDefaultPawnFor = MinHook::FindPattern(Patterns::SpawnDefaultPawnFor);
+
+		MH_CreateHook((LPVOID)(PatternSpawnDefaultPawnFor), SpawnDefaultPawnForHook, nullptr);
+		MH_EnableHook((LPVOID)(PatternSpawnDefaultPawnFor));
+
 		uintptr_t PatternAddFromAlivePlayers = MinHook::FindPattern(Patterns::AddFromAlivePlayers);
 		uintptr_t PatternRemoveFromAlivePlayers = MinHook::FindPattern(Patterns::RemoveFromAlivePlayers);
 		uintptr_t PatternApplyCharacterCustomization = MinHook::FindPattern(Patterns::ApplyCharacterCustomization);
+		uintptr_t PatternHandleMatchHasStarted = MinHook::FindPattern(Patterns::HandleMatchHasStarted);
 
 		AddFromAlivePlayers = decltype(AddFromAlivePlayers)(PatternAddFromAlivePlayers);
 		RemoveFromAlivePlayers = decltype(RemoveFromAlivePlayers)(PatternRemoveFromAlivePlayers);
 		ApplyCharacterCustomization = decltype(ApplyCharacterCustomization)(PatternApplyCharacterCustomization);
-
-		MinHook::HookVTable(FortGameModeAthenaDefault, 0xC2, SpawnDefaultPawnFor, nullptr, "SpawnDefaultPawnFor");
+		HandleMatchHasStarted = decltype(HandleMatchHasStarted)(PatternHandleMatchHasStarted);
 
 		FN_LOG(LogInit, Log, "InitGameMode Success!");
 	}

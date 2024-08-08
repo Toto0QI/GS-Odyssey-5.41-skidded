@@ -1,5 +1,10 @@
 #pragma once
 
+#include <iostream>
+#include <string>
+
+#include <curl/curl.h>
+
 namespace Threads
 {
 	DWORD WINAPI CompletePickupCombine(LPVOID PickupParm)

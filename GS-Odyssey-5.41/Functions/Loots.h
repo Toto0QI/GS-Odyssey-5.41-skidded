@@ -8,7 +8,7 @@ namespace Loots
 		std::vector<FFortLootPackageData*> AvailableLootPackageData;
 
 		TArray<FName> RowNames;
-		Globals::GetFunctionLibrary()->GetDataTableRowNames(AthenaLootPackages, &RowNames);
+		UDataTableFunctionLibrary::GetDataTableRowNames(AthenaLootPackages, &RowNames);
 
 		for (int i = 0; i < RowNames.Num(); i++)
 		{
@@ -31,7 +31,7 @@ namespace Loots
 		std::vector<FFortLootTierData*> AvailableLootTierData;
 
 		TArray<FName> RowNames;
-		Globals::GetFunctionLibrary()->GetDataTableRowNames(AthenaLootTierData, &RowNames);
+		UDataTableFunctionLibrary::GetDataTableRowNames(AthenaLootTierData, &RowNames);
 
 		for (int i = 0; i < RowNames.Num(); i++)
 		{
@@ -113,10 +113,9 @@ namespace Loots
 	{
 		std::vector<FFortItemEntry> LootToDrops;
 
-		UKismetStringLibrary* StringLibrary = Globals::GetStringLibrary();
 		UFortPlaylistAthena* Playlist = Globals::GetPlaylist();
 
-		if (!StringLibrary || !Playlist)
+		if (!Playlist)
 		{
 			*bSuccess = false;
 			return LootToDrops;
@@ -136,8 +135,8 @@ namespace Loots
 			UClass* LootTierDataClass = bIsCompositeLootTierData ? UCompositeDataTable::StaticClass() : UDataTable::StaticClass();
 			UClass* LootPackagesClass = bIsCompositeLootPackages ? UCompositeDataTable::StaticClass() : UDataTable::StaticClass();
 
-			const TCHAR* LootTierDataPath = StringLibrary->Conv_NameToString(LootTierDataObjectPtr.ObjectID.AssetPathName).CStr();
-			const TCHAR* LootPackagesPath = StringLibrary->Conv_NameToString(LootPackagesObjectPtr.ObjectID.AssetPathName).CStr();
+			const TCHAR* LootTierDataPath = UKismetStringLibrary::Conv_NameToString(LootTierDataObjectPtr.ObjectID.AssetPathName).CStr();
+			const TCHAR* LootPackagesPath = UKismetStringLibrary::Conv_NameToString(LootPackagesObjectPtr.ObjectID.AssetPathName).CStr();
 
 			LootTierData = (UDataTable*)StaticLoadObjectInternal(LootTierDataClass, nullptr, LootTierDataPath, nullptr, 0, nullptr, false);
 			LootPackages = (UDataTable*)StaticLoadObjectInternal(LootPackagesClass, nullptr, LootPackagesPath, nullptr, 0, nullptr, false);
@@ -193,7 +192,7 @@ namespace Loots
 
 			if (LootPackageData->LootPackageCall.IsValid())
 			{
-				FName LootPackageID = Globals::GetStringLibrary()->Conv_StringToName(LootPackageData->LootPackageCall);
+				FName LootPackageID = UKismetStringLibrary::Conv_StringToName(LootPackageData->LootPackageCall);
 				std::vector<FFortLootPackageData*> AvailableLootPackageDataCall = GetAvailableLootPackageData(LootPackages, LootPackageID);
 
 				if (AvailableLootPackageDataCall.empty())

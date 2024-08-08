@@ -18,6 +18,7 @@ namespace InitFunc
 		Pawn::InitPawn();
 		BuildingActor::InitBuildingActor();
 		FortKismetLibrary::InitFortKismetLibrary();
+		FortAthenaSupplyDrop::InitFortAthenaSupplyDrop();
 
 		// Functions
 		Beacon::InitBeacon();

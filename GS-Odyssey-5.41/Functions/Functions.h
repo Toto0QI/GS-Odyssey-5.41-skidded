@@ -341,6 +341,8 @@ namespace Functions
 			
 			int32 QuantityNumToSpawn = UKismetMathLibrary::RandomIntegerInRange(QuantityMinToSpawn, QuantityMaxToSpawn);
 
+			// or try AFortAthenaSupplyDrop::GetSupplyDropSpawnData(float* MinSpawnHeight, float* MaxSpawnHeight);
+
 			float MinPlacementHeightXY;
 			UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->SupplyDropMinPlacementHeight.Curve.CurveTable, MapInfo->SupplyDropMinPlacementHeight.Curve.RowName, 0, &OutResult, &MinPlacementHeightXY, ContextString);
 
@@ -361,8 +363,8 @@ namespace Functions
 				FVector Location = FVector(0, 0, 10000);
 			
 				// Fortnite use SafeZone
-				Location.X = Globals::GetMathLibrary()->RandomFloatInRange(-100000.f, 100000.f);
-				Location.Y = Globals::GetMathLibrary()->RandomFloatInRange(-100000.f, 100000.f);
+				Location.X = UKismetMathLibrary::RandomFloatInRange(-100000.f, 100000.f);
+				Location.Y = UKismetMathLibrary::RandomFloatInRange(-100000.f, 100000.f);
 
 				FRotator Rotation = FRotator();
 

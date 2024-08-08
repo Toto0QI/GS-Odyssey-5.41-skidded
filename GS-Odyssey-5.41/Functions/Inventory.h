@@ -115,7 +115,7 @@ namespace Inventory
 			return nullptr;
 
 		TArray<AActor*> Actors;
-		Globals::GetGameplayStatics()->GetAllActorsOfClass(Globals::GetWorld(), AFortPickup::StaticClass(), &Actors);
+		UGameplayStatics::GetAllActorsOfClass(Globals::GetWorld(), AFortPickup::StaticClass(), &Actors);
 
 		AFortPickup* ClosestPickup = nullptr;
 
@@ -306,7 +306,7 @@ namespace Inventory
 
 		Pickup->bRandomRotation = true;
 
-		AFortPickup* ClosestPickup = GetClosestPickup(ItemEntry->ItemDefinition, Position, 300.f);
+		/*AFortPickup* ClosestPickup = GetClosestPickup(ItemEntry->ItemDefinition, Position, 300.f);
 
 		if (ClosestPickup)
 		{
@@ -324,7 +324,7 @@ namespace Inventory
 				Pickup->ForceNetUpdate();
 			}
 		}
-		else
+		else*/
 		{
 			Pickup->TossPickup(Position, ItemOwner, 0, bToss);
 		}

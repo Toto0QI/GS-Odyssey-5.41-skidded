@@ -463,6 +463,11 @@ public:
 		return static_cast<UEType*>(FWeakObjectPtr::Get());
 	}
 
+	bool IsValid() const
+	{
+		return ObjectSerialNumber > 0 && ObjectIndex > 0;
+	}
+
 	UEType* operator->() const
 	{
 		return static_cast<UEType*>(FWeakObjectPtr::Get());

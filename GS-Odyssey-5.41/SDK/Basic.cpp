@@ -47,7 +47,7 @@ UFunction* BasicFilesImpleUtils::FindFunctionByFName(const FName* Name)
 	{
 		UObject* Object = UObject::GObjects->GetByIndex(i);
 
-		if (!Object)
+		if (!Object || !Object->IsA(UFunction::StaticClass()))
 			continue;
 
 		if (Object->Name == *Name)

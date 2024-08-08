@@ -40,19 +40,18 @@ namespace BuildingActor
 
                 if (BuildingActor->IsA(ABuildingSMActor::StaticClass()) && WeaponItemDefinition->IsA(UFortWeaponMeleeItemDefinition::StaticClass()))
                 {
-                    UFortResourceItemDefinition* ResourceItemDefinition = Globals::GetKismetLibrary()->K2_GetResourceItemDefinition(BuildingActor->ResourceType);
+                    UFortResourceItemDefinition* ResourceItemDefinition = UFortKismetLibrary::K2_GetResourceItemDefinition(BuildingActor->ResourceType);
 
                     if (!ResourceItemDefinition)
                         return;
 
                     if (BuildingActor->BuildingResourceAmountOverride.RowName.IsValid())
                     {
-                        UKismetStringLibrary* StringLibrary = Globals::GetStringLibrary();
                         UFortPlaylistAthena* Playlist = Globals::GetPlaylist();
 
-                        if (!StringLibrary || !Playlist)
+                        if (!Playlist)
                         {
-                            FN_LOG(LogBuildingActor, Error, "[ABuildingActor::OnDamageServer] Failed to get StringLibrary/Playlist.");
+                            FN_LOG(LogBuildingActor, Error, "[ABuildingActor::OnDamageServer] Failed to get Playlist.");
                             return;
                         }
 
@@ -62,7 +61,7 @@ namespace BuildingActor
 
                         if (ResourceRatesObjectPtr.ObjectID.AssetPathName.IsValid())
                         {
-                            CurveTable = StaticLoadObject<UCurveTable>(StringLibrary->Conv_NameToString(ResourceRatesObjectPtr.ObjectID.AssetPathName).CStr());
+                            CurveTable = StaticLoadObject<UCurveTable>(UKismetStringLibrary::Conv_NameToString(ResourceRatesObjectPtr.ObjectID.AssetPathName).CStr());
                         }
 
                         if (!CurveTable)
@@ -78,7 +77,7 @@ namespace BuildingActor
                         FString ContextString;
                         float OutXY;
 
-                        Globals::GetFunctionLibrary()->EvaluateCurveTableRow(CurveTable, BuildingActor->BuildingResourceAmountOverride.RowName, 0.f, &OutResult, &OutXY, ContextString);
+                        UDataTableFunctionLibrary::EvaluateCurveTableRow(CurveTable, BuildingActor->BuildingResourceAmountOverride.RowName, 0.f, &OutResult, &OutXY, ContextString);
 
                         int32 PotentialResourceCount = OutXY / (BuildingActor->GetMaxHealth() / Params->Damage);
                         int32 ResourceCount = round(PotentialResourceCount);

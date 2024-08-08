@@ -23,7 +23,7 @@ namespace FortKismetLibrary
 
 			const EFortResourceType& ResourceType = Params->ResourceType;
 
-			UFortResourceItemDefinition* ResourceItemDefinition = Globals::GetKismetLibrary()->K2_GetResourceItemDefinition(ResourceType);
+			UFortResourceItemDefinition* ResourceItemDefinition = UFortKismetLibrary::K2_GetResourceItemDefinition(ResourceType);
 
 			if (!ResourceItemDefinition)
 			{

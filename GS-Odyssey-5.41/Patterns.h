@@ -18,6 +18,8 @@ namespace Patterns
 	// GameMode
 	constexpr const char* AddFromAlivePlayers = "48 85 D2 0F 84 ? ? ? ? 56 57 48 83 EC 78";
 	constexpr const char* RemoveFromAlivePlayers = "4C 89 4C 24 ? 4C 89 44 24 ? 55 41 54 41 55 41 56 41 57 48 8D 6C 24 ?";
+	constexpr const char* SpawnDefaultPawnFor = "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 30 49 8B F0 48 8B FA 48 8B D9 48 85 D2";
+	constexpr const char* HandleMatchHasStarted = "4C 8B DC 53 48 83 EC 70 80 3D ? ? ? ? ? 48 8B D9 49 89 73 18 49 89 7B F0 72 3B";
 
 	// Pawn
 	constexpr const char* SetPickupTarget = "40 55 53 56 41 54 48 8D 6C 24 B8";
@@ -32,6 +34,7 @@ namespace Patterns
 	constexpr const char* CanAddBuildingActorToGrid = "48 89 5C 24 ? 48 89 6C 24 ? 48 89 7C 24 ? 41 54 41 56 41 57 48 83 EC 50 33 FF";
 	constexpr const char* CheckBeginEditBuildingActor = "48 89 5C 24 ? 55 56 57 48 8B EC 48 83 EC 60 48 8B F2 48 8B F9 48 85 D2";
 	constexpr const char* ReplaceBuildingActor = "48 8B C4 44 89 48 20 55 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 48 89 70 E8 33 FF 40 38 3D ? ? ? ? 48 8B F1";
+	constexpr const char* OnEnterAircraft = "40 55 56 57 41 56 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 E0 80 B9 ? ? ? ? ? 48 8D 3D ? ? ? ?";
 	constexpr const char* ToDeathCause = "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 20 0F B6 FA 48 8B D9 E8 ? ? ? ? 33 F6";
 
 	// Beacon
@@ -47,6 +50,8 @@ namespace Patterns
 	constexpr const char* GiveAbility = "48 89 5C 24 ? 48 89 6C 24 ? 48 89 7C 24 ? 41 56 48 83 EC 20 83 B9 ? ? ? ? ? 49 8B E8 4C 8B F2 48 8B F9 7E 56";
 	constexpr const char* CreateDefaultObject = "4C 8B DC 57 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 48 83 B9 ? ? ? ? ? 48 8B F9";
 	constexpr const char* GiveAbilityAndActivateOnce = "48 89 5C 24 ? 55 56 57 48 8B EC 48 83 EC 70 49 8B 40 10 49 8B D8";
+	constexpr const char* CreateDefaultAbilitySpec = "80 61 29 F8 48 8B 44 24 ? 48 89 41 20 33 C0";
+	constexpr const char* CopyAbilitySpec = "48 89 5C 24 ? 48 89 74 24 ? 57 41 56 41 57 48 83 EC 20 48 8B F2 48 8B F9 48 3B D1";
 
 	// Inventory
 	constexpr const char* CreateSimplePickup = "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 60 48 8B 01 49 8B D9";
@@ -62,6 +67,7 @@ namespace Patterns
 
 	// Others
 	constexpr const char* SpawnSupplyDrop = "40 53 55 56 41 56 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 49 8B D9";
+	constexpr const char* SpawningLootOnDestruction = "48 85 D2 74 68 57 48 83 EC 20 48 89 5C 24 ? 48 8B F9 48 8B 9A ? ? ? ? 48 85 DB 74 45";
 	constexpr const char* GetWorldFromContextObject = "48 89 5C 24 18 56 48 83 EC 40 41 8B D8";
 	constexpr const char* InternalGetNetMode = "40 53 48 81 EC ? ? ? ? 48 83 79 ? ? 48 8B D9 74 0E";
 	constexpr const char* ActorInternalGetNetMode = "48 89 5C 24 ? 57 48 83 EC 20 48 8B 01 48 8B D9 FF 90 ? ? ? ? 4C 8B 83 ? ? ? ? 48 8B F8";

@@ -55,7 +55,7 @@ namespace Cheats
 
                         if (GameMode)
                         {
-                            TArray<AFortPlayerController*> AllFortPlayerController = Globals::GetKismetLibrary()->GetAllFortPlayerControllers(GameMode, true, false);
+                            TArray<AFortPlayerController*> AllFortPlayerController = UFortKismetLibrary::GetAllFortPlayerControllers(GameMode, true, false);
 
                             int32 NumPlayers = 0;
 
@@ -101,6 +101,16 @@ namespace Cheats
                     {
                         UKismetSystemLibrary::ExecuteConsoleCommand(Globals::GetWorld(), L"skipsafezone", nullptr);
                         Message = L"SkipSafeZone command executed successfully!";
+                    }
+                    else if (Action == "skipshrinksafezone")
+                    {
+                        UKismetSystemLibrary::ExecuteConsoleCommand(Globals::GetWorld(), L"skipshrinksafezone", nullptr);
+                        Message = L"SkipShrinkSafeZone command executed successfully!";
+                    }
+                    else if (Action == "startshrinksafezone")
+                    {
+                        UKismetSystemLibrary::ExecuteConsoleCommand(Globals::GetWorld(), L"startshrinksafezone", nullptr);
+                        Message = L"StartShrinkSafeZone command executed successfully!";
                     }
                     else if (Action == "startaircraft")
                     {
@@ -362,7 +372,7 @@ namespace Cheats
 
                         if (CheatManager && bIsLootTierInt)
                         {
-                            FName TierGroup = Globals::GetStringLibrary()->Conv_StringToName(std::wstring(LootTierGroup.begin(), LootTierGroup.end()).c_str());
+                            FName TierGroup = UKismetStringLibrary::Conv_StringToName(std::wstring(LootTierGroup.begin(), LootTierGroup.end()).c_str());
 
                             LootTier = std::stoi(ParsedCommand[2]);
 
@@ -405,7 +415,7 @@ namespace Cheats
                     {
                         std::string& LootTierGroup = ParsedCommand[1];
 
-                        FName SearchLootTierGroup = Globals::GetStringLibrary()->Conv_StringToName(std::wstring(LootTierGroup.begin(), LootTierGroup.end()).c_str());
+                        FName SearchLootTierGroup = UKismetStringLibrary::Conv_StringToName(std::wstring(LootTierGroup.begin(), LootTierGroup.end()).c_str());
 
                         bool bSuccess;
                         std::vector<FFortItemEntry> LootToDrops = Loots::ChooseLootToDrops(SearchLootTierGroup, 0, &bSuccess);

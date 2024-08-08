@@ -24,7 +24,7 @@ namespace PlayerController
 			{
 				Functions::SetEditingPlayer(BuildingActorToEdit, PlayerState);
 
-				TSoftObjectPtr<UFortEditToolItemDefinition> EditToolItem = UFortGameData::GetDefaultObj()->EditToolItem;
+				TSoftObjectPtr<UFortEditToolItemDefinition> EditToolItem = Globals::GetGameData()->EditToolItem;
 
 				UFortEditToolItemDefinition* EditTool = EditToolItem.Get();
 
@@ -34,8 +34,8 @@ namespace PlayerController
 					EditTool = StaticLoadObject<UFortEditToolItemDefinition>(std::wstring(ItemPath.begin(), ItemPath.end()).c_str());
 				}
 
-				//__int64 v11 = sub_7FF61CD35B30(Idk, EditTool, 0);
-				if (/*v11 &&*/ EditTool /*&& sub_7FF61CE48920(EditTool, v11, PlayerController)*/)
+				//__int64 Outer = sub_7FF61CD35B30(Idk, EditTool, 0);
+				if (/*Outer &&*/ EditTool /*&& sub_7FF61CE48920(EditTool, Outer, PlayerController)*/)
 				{
 					AFortWeapon* CurrentWeapon = PlayerController->MyFortPawn->CurrentWeapon;
 
@@ -81,7 +81,7 @@ namespace PlayerController
 		{
 			Functions::SetEditingPlayer(BuildingActorToStopEditing, nullptr);
 
-			TSoftObjectPtr<UFortEditToolItemDefinition> EditToolItem = UFortGameData::GetDefaultObj()->EditToolItem;
+			TSoftObjectPtr<UFortEditToolItemDefinition> EditToolItem = Globals::GetGameData()->EditToolItem;
 
 			UFortEditToolItemDefinition* EditTool = EditToolItem.Get();
 
@@ -109,6 +109,70 @@ namespace PlayerController
 
 
 
+	void SelfCompletedUpdatedQuest(UFortQuestManager* QuestManager, AFortPlayerController* QuestOwner, const UFortQuestItemDefinition* QuestDef, FName BackendName, int32 CompletionCount, int32 DeltaChange)
+	{
+		if (QuestDef)
+		{
+			UFortQuestItem* QuestWithDefinition = QuestManager->GetQuestWithDefinition(QuestDef);
+
+			if (QuestWithDefinition)
+			{
+				if (QuestOwner && QuestOwner->IsA(AFortPlayerControllerAthena::StaticClass()))
+				{
+					uint64_t v47 = ((uint64_t)DeltaChange << 32) | (uint32_t)CompletionCount;
+					uint64_t v46 = reinterpret_cast<uint64_t>(QuestDef);
+					v46 |= static_cast<uint64_t>(BackendName.ComparisonIndex) << 32;
+
+					uint64_t v45[2];
+					v45[1] = v47;
+					v45[0] = v46;
+
+					// sub_7FF6B9D4B650(reinterpret_cast<int64_t*>(QuestOwner), v45);
+				}
+			}
+		}
+	}
+
+	int32 GetAircraftIndex(AFortGameStateAthena* GameState, AFortPlayerStateAthena* PlayerState)
+	{
+		int32 result; // rax
+		__int64 v10; // [rsp+40h] [rbp+8h] BYREF
+
+		if (!GameState->CurrentPlaylistData || GameState->AirCraftBehavior != EAirCraftBehavior::OpposingAirCraftForEachTeam)
+			return 0;
+
+		if (!Cast<AFortPlayerStateAthena>(PlayerState))
+		{
+			FN_LOG(LogGameState, Error, "AFortGameStateAthena::GetAircraftIndex called with an invalid PlayerState.");
+			return 0;
+		}
+
+		auto IdkPlayerState = (void*)(__int64(PlayerState) + 0x3F0);
+
+		int32 (*IdkFunc)(void* IdkPlayerState, __int64* OutIdk, __int64* Idk) = decltype(IdkFunc)(((UObject*)IdkPlayerState)->VTable[0x5]);
+
+		__int64* (*IdkFunc2)(UFortPlaylistAthena* CurrentPlaylistData) = decltype(IdkFunc2)(GameState->CurrentPlaylistData->VTable[0xE]);
+
+		result = IdkFunc(IdkPlayerState, &v10, IdkFunc2(GameState->CurrentPlaylistData));
+
+		/*result = *(unsigned __int8*)(*(__int64(__fastcall**)(__int64, __int64*))(*(__int64*)(PlayerState + 0x3F0) + 40i64))(
+			__int64(PlayerState) + 0x3F0,
+			&v10)
+			- (unsigned int)*(unsigned __int8*)(GameState->CurrentPlaylistData + 112i64);*/
+
+		if ((EAthenaGamePhase)((int)GameState->GamePhase - 1) <= EAthenaGamePhase::Setup)
+		{
+			if (result >= 0)
+				return result;
+
+			return 0;
+		}
+
+		if (result < 0 || result >= GameState->Aircrafts.Num())
+			return 0;
+
+		return result;
+	}
 
 	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms)
 	{
@@ -141,6 +205,7 @@ namespace PlayerController
 #endif // DEBUGS
 
 				Abilities::GrantGameplayAbility(DefaultAbilities, Pawn);
+				Abilities::GrantGameplayEffect(DefaultAbilities, Pawn);
 				GameMode::ApplyCharacterCustomization((AFortPlayerState*)Pawn->PlayerState, Pawn);
 			}
 
@@ -159,10 +224,8 @@ namespace PlayerController
 			Inventory::SetupInventory(PlayerController, PickaxeDefinition);
 
 #ifdef CHEATS
-			UGameplayStatics* GameplayStatics = Globals::GetGameplayStatics();
-
-			if (GameplayStatics && !PlayerController->CheatManager)
-				PlayerController->CheatManager = (UCheatManager*)GameplayStatics->SpawnObject(UCheatManager::StaticClass(), PlayerController);
+			if (!PlayerController->CheatManager)
+				PlayerController->CheatManager = (UCheatManager*)UGameplayStatics::SpawnObject(UCheatManager::StaticClass(), PlayerController);
 
 			// UFortCheatManager
 
@@ -182,23 +245,54 @@ namespace PlayerController
 			AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)Object;
 			auto Params = (Params::FortPlayerControllerAthena_ServerAttemptAircraftJump*)Parms;
 
-			if (!PlayerController)
+			if (!PlayerController || !PlayerController->PlayerState)
 			{
 				FN_LOG(LogPlayerController, Error, "[AFortPlayerControllerAthena::ServerAttemptAircraftJump] Failed to get PlayerController!");
 				return;
 			}
 
+			AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
+
 			if (PlayerController->IsInAircraft() && !PlayerController->Pawn)
 			{
+				AFortGameModeAthena* GameMode = Globals::GetGameMode();
 				AFortGameStateAthena* GameState = Globals::GetGameState();
 
-				if (!GameState)
+				if (!GameMode || !GameState)
 				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerControllerAthena::ServerAttemptAircraftJump] Failed to get GameState!");
+					FN_LOG(LogPlayerController, Error, "[AFortPlayerControllerAthena::ServerAttemptAircraftJump] Failed to get GameMode/GameState!");
 					return;
 				}
 
-				AFortAthenaAircraft* Aircraft = GameState->GetAircraft(0);
+				if (GameState->MapInfo)
+				{
+					AFortAthenaMapInfo* MapInfo = GameState->MapInfo;
+
+					for (int32 i = 0; i < MapInfo->FlightInfos.Num(); i++)
+					{
+						FAircraftFlightInfo FlightInfo = MapInfo->FlightInfos[i];
+
+						FVector_NetQuantize100 FlightStartLocation = FlightInfo.FlightStartLocation;
+						FRotator FlightStartRotation = FlightInfo.FlightStartRotation;
+						float FlightSpeed = FlightInfo.FlightSpeed;
+						float TimeTillFlightEnd = FlightInfo.TimeTillFlightEnd;
+						float TimeTillDropStart = FlightInfo.TimeTillDropStart;
+						float TimeTillDropEnd = FlightInfo.TimeTillDropEnd;
+
+						FN_LOG(LogPlayerController, Debug, "FlightStartLocation: [X: %.2f, Y: %.2f, Z: %.2f]", FlightStartLocation.X, FlightStartLocation.Y, FlightStartLocation.Z);
+						FN_LOG(LogPlayerController, Debug, "FlightStartRotation: [Pitch: %.2f, Yaw: %.2f, Roll: %.2f]", FlightStartRotation.Pitch, FlightStartRotation.Yaw, FlightStartRotation.Roll);
+						FN_LOG(LogPlayerController, Debug, "FlightSpeed: [%.2f]", FlightSpeed);
+						FN_LOG(LogPlayerController, Debug, "TimeTillFlightEnd: [%.2f]", TimeTillFlightEnd);
+						FN_LOG(LogPlayerController, Debug, "TimeTillDropStart: [%.2f]", TimeTillDropStart);
+						FN_LOG(LogPlayerController, Debug, "TimeTillDropEnd: [%.2f]", TimeTillDropEnd);
+					}
+				}
+
+				// 7FF66F239300
+				int32 (*GetAircraftIndex)(AFortGameStateAthena* GameState, AFortPlayerStateAthena* PlayerState) = decltype(GetAircraftIndex)(0xBE9300 + uintptr_t(GetModuleHandle(0)));
+				int32 AircraftIndex = GetAircraftIndex(GameState, PlayerState);
+
+				AFortAthenaAircraft* Aircraft = GameState->GetAircraft(AircraftIndex);
 
 				if (!Aircraft)
 				{
@@ -208,24 +302,7 @@ namespace PlayerController
 
 				const FVector& AircraftLocation = Aircraft->K2_GetActorLocation();
 
-				AFortPlayerPawn* PlayerPawn = Util::SpawnPlayer(PlayerController, AircraftLocation, {}, false);
-
-				if (PlayerPawn && PlayerController->PlayerState)
-				{
-					PlayerPawn->SetMaxHealth(100);
-					PlayerPawn->SetHealth(100);
-					PlayerPawn->SetMaxShield(100);
-
-					// 7FF66F7BC760 (Je suis sévèrement autiste)
-					void (*SetShield)(AFortPawn* Pawn, float NewShieldValue) = decltype(SetShield)(0x116C760 + uintptr_t(GetModuleHandle(0)));
-
-					SetShield(PlayerPawn, 0);
-
-					GameMode::ApplyCharacterCustomization((AFortPlayerState*)PlayerController->PlayerState, PlayerPawn);
-
-					Inventory::RemoveAllItemsFromInventory(PlayerController);
-					Inventory::UpdateInventory(PlayerController->WorldInventory);
-				}
+				Util::SpawnPlayer(PlayerController, AircraftLocation, FRotator(), false);
 
 				PlayerController->SetControlRotation(Params->ClientRotation);
 			}
@@ -365,18 +442,13 @@ namespace PlayerController
 			{
 				if (ReceivingActor->IsA(AFortAthenaSupplyDrop::StaticClass()))
 				{
-					static UClass* AthenaSupplyDropLlamaClass = FindObjectFast<UClass>("/Game/Athena/SupplyDrops/Llama/AthenaSupplyDrop_Llama.AthenaSupplyDrop_Llama_C");
 					static UClass* AthenaSupplyDropClass = FindObjectFast<UClass>("/Game/Athena/SupplyDrops/AthenaSupplyDrop.AthenaSupplyDrop_C");
 
 					FName SearchLootTierGroup;
-
-					if (ReceivingActor->IsA(AthenaSupplyDropLlamaClass))
+					
+					if (ReceivingActor->IsA(AthenaSupplyDropClass))
 					{
-						SearchLootTierGroup = Globals::GetStringLibrary()->Conv_StringToName(L"Loot_AthenaLlama");
-					}
-					else if (ReceivingActor->IsA(AthenaSupplyDropClass))
-					{
-						SearchLootTierGroup = Globals::GetStringLibrary()->Conv_StringToName(L"Loot_AthenaSupplyDrop");
+						SearchLootTierGroup = UKismetStringLibrary::Conv_StringToName(L"Loot_AthenaSupplyDrop");
 					}
 
 					if (SearchLootTierGroup.IsValid())
@@ -433,7 +505,7 @@ namespace PlayerController
 						FScalableFloat InputCount = ItemCollection.InputCount;
 
 						float InputCostXY;
-						Globals::GetFunctionLibrary()->EvaluateCurveTableRow(InputCount.Curve.CurveTable, InputCount.Curve.RowName, BuildingItemCollector->StartingGoalLevel, &Result, &InputCostXY, ContextString);
+						UDataTableFunctionLibrary::EvaluateCurveTableRow(InputCount.Curve.CurveTable, InputCount.Curve.RowName, BuildingItemCollector->StartingGoalLevel, &Result, &InputCostXY, ContextString);
 
 						int32 InputCost = (InputCostXY * InputCount.Value);
 
@@ -480,34 +552,91 @@ namespace PlayerController
 					static UClass* JigsawClass = StaticLoadObject<UClass>(L"/Game/Athena/Items/QuestInteractables/Llama_Puzzle/Prop_QuestInteractable_Jigsaw_Parent.Prop_QuestInteractable_Jigsaw_Parent_C");
 					static UClass* HiddenStarClass = StaticLoadObject<UClass>(L"/Game/Athena/Items/QuestInteractables/HiddenStars/Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C");
 
+					/*
+						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.UserConstructionScript
+						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Bob and Spin__FinishedFunc
+						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Bob and Spin__UpdateFunc
+						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Reveal__FinishedFunc
+						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Reveal__UpdateFunc
+						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Disappear__FinishedFunc
+						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Disappear__UpdateFunc
+						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Fade Out__FinishedFunc
+						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Fade Out__UpdateFunc
+						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.QuestInitializedAndValid
+						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Star Reveal
+						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.ThisQuestObjectiveComplete
+						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.DeactivateHiddenStar
+						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.ReceiveBeginPlay
+						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Star Hide
+						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.ExecuteUbergraph_Prop_QuestInteractable_HiddenStar_Parent
+					*/
+
 					if (BuildingProp->IsA(JigsawClass))
 					{
-						//static UClass* JigsawClass = StaticLoadObject<UClass>(L"/Game/Athena/Items/QuestInteractables/Generic/Prop_QuestInteractable_Parent.Prop_QuestInteractable_Parent_C");
+						if (true)
+						{
+							static UFunction* Func = nullptr;
 
-						/*static UProperty* PropertyQuestItem = StaticLoadObject<UProperty>(L"/Game/Athena/Items/QuestInteractables/Llama_Puzzle/Prop_QuestInteractable_Jigsaw_Parent.Prop_QuestInteractable_Jigsaw_Parent_C.QuestItem");
+							if (Func == nullptr)
+								Func = BuildingProp->Class->GetFunction("Prop_QuestInteractable_Jigsaw_Parent_C", "StartRattle");
 
-						UFortQuestItemDefinition* QuestItem = *(UFortQuestItemDefinition**)(__int64(BuildingProp) + PropertyQuestItem->Offset);*/
+							BuildingProp->ProcessEvent(Func, nullptr);
 
-						BuildingProp->BlueprintOnInteract(PlayerController->MyFortPawn);
-
-						FN_LOG(LogPlayerController, Debug, "JigsawClass - BuildingProp: %s", BuildingProp->GetName().c_str());
-					}
-					else if (BuildingProp->IsA(HiddenStarClass))
-					{
-						//static UFunction* HiddenStarObjectiveComplete = FindObjectFast<UFunction>("/Game/Athena/Items/QuestInteractables/HiddenStars/Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.ThisQuestObjectiveComplete");
+							FN_LOG(LogPlayerController, Debug, "JigsawClass - Func: %s", Func->GetName().c_str());
+						}
 
 						if (true)
 						{
 							static UFunction* Func = nullptr;
 
 							if (Func == nullptr)
-								Func = BuildingProp->Class->GetFunction("Prop_QuestInteractable_HiddenStar_Parent_C", "QuestInitializedAndValid");
+								Func = BuildingProp->Class->GetFunction("Prop_QuestInteractable_Jigsaw_Parent_C", "Set Letter at Beginning");
 
 							BuildingProp->ProcessEvent(Func, nullptr);
 
-							FN_LOG(LogPlayerController, Debug, "HiddenStarClass - Func: %s", Func->GetName().c_str());
+							FN_LOG(LogPlayerController, Debug, "JigsawClass - Func: %s", Func->GetName().c_str());
 						}
 
+						if (true)
+						{
+							static UFunction* Func = nullptr;
+
+							if (Func == nullptr)
+								Func = BuildingProp->Class->GetFunction("Prop_QuestInteractable_Jigsaw_Parent_C", "QuestUpdatedFromAnywhere");
+
+							BuildingProp->ProcessEvent(Func, nullptr);
+
+							FN_LOG(LogPlayerController, Debug, "JigsawClass - Func: %s", Func->GetName().c_str());
+						}
+
+						if (true)
+						{
+							static UFunction* Func = nullptr;
+
+							if (Func == nullptr)
+								Func = BuildingProp->Class->GetFunction("Prop_QuestInteractable_Jigsaw_Parent_C", "ThisQuestObjectiveComplete");
+
+							BuildingProp->ProcessEvent(Func, &PlayerController->MyFortPawn);
+
+							FN_LOG(LogPlayerController, Debug, "JigsawClass - Func: %s", Func->GetName().c_str());
+						}
+
+						if (true)
+						{
+							static UFunction* Func = nullptr;
+
+							if (Func == nullptr)
+								Func = BuildingProp->Class->GetFunction("Prop_QuestInteractable_Jigsaw_Parent_C", "PieceRattle");
+
+							BuildingProp->ProcessEvent(Func, nullptr);
+
+							FN_LOG(LogPlayerController, Debug, "JigsawClass - Func: %s", Func->GetName().c_str());
+						}
+
+						FN_LOG(LogPlayerController, Debug, "JigsawClass - BuildingProp: %s", BuildingProp->GetName().c_str());
+					}
+					else if (BuildingProp->IsA(HiddenStarClass))
+					{
 						if (true)
 						{
 							static UFunction* Func = nullptr;
@@ -515,39 +644,25 @@ namespace PlayerController
 							if (Func == nullptr)
 								Func = BuildingProp->Class->GetFunction("Prop_QuestInteractable_HiddenStar_Parent_C", "ThisQuestObjectiveComplete");
 
-							struct Prop_QuestInteractable_HiddenStar_Parent_C_ThisQuestObjectiveComplete final
-							{
-							public:
-								AFortPawn* IneractingPawn;
-							} Parms{};
-
-							Parms.IneractingPawn = PlayerController->MyFortPawn;
-
-							BuildingProp->ProcessEvent(Func, &Parms);
+							BuildingProp->ProcessEvent(Func, &PlayerController->MyFortPawn);
 
 							FN_LOG(LogPlayerController, Debug, "HiddenStarClass - Func: %s", Func->GetName().c_str());
 						}
+	
+						FN_LOG(LogPlayerController, Debug, "HiddenStarClass - BuildingProp: %s", BuildingProp->GetName().c_str());
+					}
 
-						if (true)
+					for (UStruct* Clss = BuildingProp->Class; Clss; Clss = Clss->Super)
+					{
+						for (UField* Field = Clss->Children; Field; Field = Field->Next)
 						{
-							static UFunction* Func = nullptr;
-
-							if (Func == nullptr)
-								Func = BuildingProp->Class->GetFunction("Prop_QuestInteractable_HiddenStar_Parent_C", "Bob and Spin");
-
-							if (Func)
+							if (Field->HasTypeFlag(EClassCastFlags::Function))
 							{
-								BuildingProp->ProcessEvent(Func, nullptr);
+								UFunction* Test = (UFunction*)Field;
 
-								FN_LOG(LogPlayerController, Debug, "HiddenStarClass - Func: %s", Func->GetName().c_str());
-							}
-							else
-							{
-								FN_LOG(LogPlayerController, Error, "Failed to find func!");
+								FN_LOG(LogHooks, Debug, "Test: %s", Test->GetFullName().c_str());
 							}
 						}
-							
-						FN_LOG(LogPlayerController, Debug, "HiddenStarClass - BuildingProp: %s", BuildingProp->GetName().c_str());
 					}
 				}
 #endif // DEBUGS
@@ -758,6 +873,7 @@ namespace PlayerController
 				}
 
 				static UFortEditToolItemDefinition* EditToolDefinition = FindObjectFast<UFortEditToolItemDefinition>("/Game/Items/Weapons/BuildingTools/EditTool.EditTool");
+				// static UFortEditToolItemDefinition* EditToolDefinition = Globals::GetGameData()->EditToolItem.Get();
 
 				if (!EditToolDefinition)
 				{
@@ -803,7 +919,6 @@ namespace PlayerController
 
 			if (BuildingActorToEdit->HasAuthority() && !BuildingActorToEdit->bDestroyed)
 			{
-				// Kick Player
 				if (PlayerState != BuildingActorToEdit->EditingPlayer)
 				{
 					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] PlayerController (EditingPlayer: [%s]) and BuildingActorToEdit (EditingPlayer [%s]) is not the same!",
@@ -862,7 +977,6 @@ namespace PlayerController
 
 			if (BuildingActorToStopEditing->HasAuthority())
 			{
-				// Kick Player
 				if (PlayerState != BuildingActorToStopEditing->EditingPlayer)
 				{
 					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] PlayerController (EditingPlayer: [%s]) and BuildingActorToStopEditing (EditingPlayer [%s]) is not the same!",
@@ -880,6 +994,7 @@ namespace PlayerController
 				}
 
 				static UFortEditToolItemDefinition* EditToolDefinition = FindObjectFast<UFortEditToolItemDefinition>("/Game/Items/Weapons/BuildingTools/EditTool.EditTool");
+				// static UFortEditToolItemDefinition* EditToolDefinition = Globals::GetGameData()->EditToolItem.Get();
 
 				if (!EditToolDefinition)
 				{
@@ -1110,7 +1225,7 @@ namespace PlayerController
 		}
 		else if (FunctionName.contains("ServerReturnToMainMenu"))
 		{
-			/*AFortPlayerController* PlayerController = (AFortPlayerController*)Object;
+			AFortPlayerController* PlayerController = (AFortPlayerController*)Object;
 
 			if (PlayerController)
 			{
@@ -1118,7 +1233,7 @@ namespace PlayerController
 					PlayerController->ServerSuicide();
 
 				PlayerController->ClientTravel(L"/Game/Maps/Frontend", ETravelType::TRAVEL_Absolute, false, FGuid());
-			}*/
+			}
 		}
 	}
 
@@ -1159,18 +1274,25 @@ namespace PlayerController
 			return;
 		}
 
-#ifdef CHEATS
-		/*if (PlayerController->bInfiniteAmmo)
-		{
-			Inventory::UpdateInventory(PlayerController->WorldInventory);
-			return;
-		}*/
-#endif // CHEATS
-
 		Inventory::ModifyLoadedAmmoItem(PlayerController, ItemGuid, CorrectAmmo);
 		Inventory::UpdateInventory(PlayerController->WorldInventory);
 
 		ModifyLoadedAmmo(a1, ItemGuid, CorrectAmmo);
+	}
+
+	void (*OnEnterAircraft)(AFortPlayerControllerAthena* PlayerController, AFortAthenaAircraft* AthenaAircraft);
+	void OnEnterAircraftHook(AFortPlayerControllerAthena* PlayerController, AFortAthenaAircraft* AthenaAircraft)
+	{
+		if (!PlayerController)
+		{
+			FN_LOG(LogPlayerController, Error, "[AFortPlayerControllerAthena::OnEnterAircraft] Failed to get PlayerController!");
+			return;
+		}
+
+		Inventory::RemoveAllItemsFromInventory(PlayerController);
+		Inventory::UpdateInventory(PlayerController->WorldInventory);
+
+		OnEnterAircraft(PlayerController, AthenaAircraft);
 	}
 
 	void InitPlayerController()
@@ -1179,22 +1301,16 @@ namespace PlayerController
 
 		auto IdkDefault = (void*)(__int64(FortPlayerControllerAthenaDefault) + IdkOffset);
 
-		/*MinHook::HookVTable((UObject*)IdkDefault, 0xC, sub_7FF66F80EEF0Hook, (LPVOID*)(&sub_7FF66F80EEF0), "sub_7FF66F80EEF0Hook");
-
-		MinHook::HookVTable((UObject*)IdkDefault, 0x2, return_1_1, nullptr, "return_1_1");
-		MinHook::HookVTable((UObject*)IdkDefault, 0x4, return_1_2, nullptr, "return_1_2");
-
-		MinHook::HookVTable((UObject*)IdkDefault, 0x18, return_0_1, nullptr, "return_0_1");
-
-		MinHook::HookVTable((UObject*)IdkDefault, 0x16, nullsub_1, nullptr, "nullsub_1");*/
-
 		uintptr_t AddressRemoveInventoryItem = MinHook::FindPattern(Patterns::RemoveInventoryItem);
 		uintptr_t AddressModifyLoadedAmmo = MinHook::FindPattern(Patterns::ModifyLoadedAmmo);
+		uintptr_t AddressOnEnterAircraft = MinHook::FindPattern(Patterns::OnEnterAircraft);
 
 		MH_CreateHook((LPVOID)(AddressRemoveInventoryItem), RemoveInventoryItemHook, nullptr);
 		MH_EnableHook((LPVOID)(AddressRemoveInventoryItem));
 		MH_CreateHook((LPVOID)(AddressModifyLoadedAmmo), ModifyLoadedAmmoHook, (LPVOID*)(&ModifyLoadedAmmo));
 		MH_EnableHook((LPVOID)(AddressModifyLoadedAmmo));
+		MH_CreateHook((LPVOID)(AddressOnEnterAircraft), OnEnterAircraftHook, (LPVOID*)(&OnEnterAircraft));
+		MH_EnableHook((LPVOID)(AddressOnEnterAircraft));
 
 		uintptr_t AddressGetRepairResourceAmount = MinHook::FindPattern(Patterns::GetRepairResourceAmount);
 		uintptr_t AddressGetCreateResourceAmount = MinHook::FindPattern(Patterns::GetCreateResourceAmount);
