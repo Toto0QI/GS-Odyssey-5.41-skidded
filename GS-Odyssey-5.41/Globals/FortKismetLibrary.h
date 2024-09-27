@@ -1,133 +1,124 @@
 #pragma once
 
+/*
+	- GiveItemToInventoryOwner
+	- K2_GiveBuildingResource
+	- K2_GiveItemToAllPlayers
+	- K2_GiveItemToPlayer
+	- K2_RemoveItemFromAllPlayers
+	- K2_RemoveItemFromPlayer
+	- K2_RemoveItemFromPlayerByGuid
+	- K2_SpawnPickupInWorld
+	- PickLootDrops
+*/
+
 namespace FortKismetLibrary
 {
-	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms)
+	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms, bool* bCallOG)
 	{
 		if (!Object || !Function)
 			return;
 
+		if (!Object->IsA(UFortKismetLibrary::StaticClass()))
+			return;
+
 		const std::string& FunctionName = Function->GetName();
 
-		if (FunctionName.contains("K2_GiveBuildingResource"))
+		if (FunctionName.contains("GiveItemToInventoryOwner"))
+		{
+			auto Params = (Params::FortKismetLibrary_GiveItemToInventoryOwner*)Parms;
+
+			TScriptInterface<IFortInventoryOwnerInterface> InventoryOwner = Params->InventoryOwner;
+			UFortWorldItemDefinition* ItemDefinition = Params->ItemDefinition;
+			int32 NumberToGive = Params->NumberToGive;
+			bool bNotifyPlayer = Params->bNotifyPlayer;
+
+			if (bNotifyPlayer)
+			{
+
+			}
+			else
+			{
+
+			}
+		}
+		else if (FunctionName.contains("K2_GiveBuildingResource")) // Rewrite
 		{
 			auto Params = (Params::FortKismetLibrary_K2_GiveBuildingResource*)Parms;
 
+			UFortResourceItemDefinition* ResourceItemDefinition = UFortKismetLibrary::K2_GetResourceItemDefinition(Params->ResourceType);
 			AFortPlayerController* Controller = Params->Controller;
 
-			if (!Controller)
+			if (ResourceItemDefinition && Controller)
 			{
-				FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::K2_GiveBuildingResource] failed to get Controller!");
-				return;
+				const int32 ResourceAmount = Params->ResourceAmount;
+
+				UFortKismetLibrary::K2_GiveItemToPlayer(Controller, ResourceItemDefinition, ResourceAmount, true);
 			}
-
-			const EFortResourceType& ResourceType = Params->ResourceType;
-
-			UFortResourceItemDefinition* ResourceItemDefinition = UFortKismetLibrary::K2_GetResourceItemDefinition(ResourceType);
-
-			if (!ResourceItemDefinition)
-			{
-				FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::K2_GiveBuildingResource] failed to get ResourceItemDefinition!");
-				return;
-			}
-
-			int32 ResourceAmount = Params->ResourceAmount;
-
-			UFortKismetLibrary::K2_GiveItemToPlayer(Controller, ResourceItemDefinition, ResourceAmount, true);
 		}
-		else if (FunctionName.contains("K2_GiveItemToAllPlayers"))
+		else if (FunctionName.contains("K2_GiveItemToAllPlayers")) // Rewrite
 		{
 			auto Params = (Params::FortKismetLibrary_K2_GiveItemToAllPlayers*)Parms;
 
 			UObject* WorldContextObject = Params->WorldContextObject;
 			UFortWorldItemDefinition* ItemDefinition = Params->ItemDefinition;
 
-			if (!WorldContextObject || !ItemDefinition)
+			if (WorldContextObject && ItemDefinition)
 			{
-				FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::K2_GiveItemToAllPlayers] failed to get WorldContextObject/ItemDefinition!");
-				return;
-			}
+				TArray<AFortPlayerController*> PlayerControllers = UFortKismetLibrary::GetAllFortPlayerControllers(WorldContextObject, true, false);
 
-			TArray<AFortPlayerController*> AllFortPlayerControllers = UFortKismetLibrary::GetAllFortPlayerControllers(WorldContextObject, true, false);
+				for (int32 i = 0; i < PlayerControllers.Num(); i++)
+				{
+					AFortPlayerController* PlayerController = PlayerControllers[i];
+					if (!PlayerController) continue;
 
-			int32 NumberToGive = Params->NumberToGive;
-			bool bNotifyPlayer = Params->bNotifyPlayer;
-
-			for (int32 i = 0; i < AllFortPlayerControllers.Num(); i++)
-			{
-				AFortPlayerController* PlayerController = AllFortPlayerControllers[i];
-				if (!PlayerController) continue;
-
-				UFortKismetLibrary::K2_GiveItemToPlayer(PlayerController, ItemDefinition, NumberToGive, bNotifyPlayer);
+					UFortKismetLibrary::K2_GiveItemToPlayer(PlayerController, ItemDefinition, Params->NumberToGive, Params->bNotifyPlayer);
+				}
 			}
 		}
-		else if (FunctionName.contains("K2_GiveItemToPlayer"))
+		else if (FunctionName.contains("K2_GiveItemToPlayer")) // Rewrite
 		{
 			auto Params = (Params::FortKismetLibrary_K2_GiveItemToPlayer*)Parms;
 
 			AFortPlayerController* PlayerController = Params->PlayerController;
 			UFortWorldItemDefinition* ItemDefinition = Params->ItemDefinition;
-
-			if (!PlayerController || !ItemDefinition)
-			{
-				FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::K2_GiveItemToPlayer] failed to get PlayerController/ItemDefinition!");
-				return;
-			}
-
-			int32 NumberToGive = Params->NumberToGive;
-			bool bNotifyPlayer = Params->bNotifyPlayer;
-
-			FFortItemEntry ItemEntry;
-			Inventory::MakeItemEntry(&ItemEntry, ItemDefinition, NumberToGive, -1, -1, 0.f);
-
-			if (bNotifyPlayer && PlayerController->MyFortPawn)
-			{
-				AFortPickup* Pickup = Inventory::CreateSimplePickup(PlayerController, &ItemEntry, PlayerController->MyFortPawn->K2_GetActorLocation(), FRotator());
-
-				if (!Pickup)
-				{
-					FN_LOG(LogInventory, Error, "[UFortKismetLibrary::K2_GiveItemToPlayer] failed to spawn Pickup!");
-					return;
-				}
-
-				Pawn::SetPickupTarget(Pickup, PlayerController->MyFortPawn, -1.0f, FVector());
-			}
-			else
-			{
-				FGuid CurrentWeaponGuid;
-
-				if (PlayerController->MyFortPawn)
-					CurrentWeaponGuid = PlayerController->MyFortPawn->CurrentWeapon ? PlayerController->MyFortPawn->CurrentWeapon->ItemEntryGuid : FGuid();
-
-				Inventory::AddInventoryItem(PlayerController, &ItemEntry, CurrentWeaponGuid);
-			}
-		}
-		else if (FunctionName.contains("GiveItemToInventoryOwner"))
-		{
-			auto Params = (Params::FortKismetLibrary_GiveItemToInventoryOwner*)Parms;
-
-			UFortWorldItemDefinition* ItemDefinition = Params->ItemDefinition;
-
-			if (!ItemDefinition)
-			{
-				FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::GiveItemToInventoryOwner] failed to get ItemDefinition!");
-				return;
-			}
-
-			TScriptInterface<IFortInventoryOwnerInterface> InventoryOwner = Params->InventoryOwner;
-
-			UObject* ObjectRef = InventoryOwner.GetObjectRef();
 			
-			if (!ObjectRef)
+			if (PlayerController && ItemDefinition)
 			{
-				FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::GiveItemToInventoryOwner] failed to get ObjectRef!");
-				return;
+				FFortItemEntry ItemEntry;
+				Inventory::MakeItemEntry(&ItemEntry, ItemDefinition, Params->NumberToGive, -1, -1, -1.0f);
+
+				if (Params->bNotifyPlayer && PlayerController->MyFortPawn)
+				{
+					FVector SpawnLocation = PlayerController->MyFortPawn->K2_GetActorLocation();
+					FRotator SpawnRotation = FRotator({ 0, 0, 0 });
+
+					UWorld* World = Functions::GetWorldFromContextObject(Globals::GetFortEngine(), PlayerController, EGetWorldErrorMode::LogAndReturnNull);
+
+					FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
+					CreatePickupData.World = World;
+					CreatePickupData.ItemEntry = &ItemEntry;
+					CreatePickupData.SpawnLocation = &SpawnLocation;
+					CreatePickupData.SpawnRotation = &SpawnRotation;
+					CreatePickupData.PlayerController = nullptr;
+					CreatePickupData.OverrideClass = nullptr;
+					CreatePickupData.NullptrIdk = nullptr;
+					CreatePickupData.bRandomRotation = true;
+					CreatePickupData.PickupSourceTypeFlags = 0;
+
+					AFortPickup* Pickup = Inventory::CreatePickupFromData(&CreatePickupData);
+
+					if (Pickup)
+					{
+						FVector StartDirection = FVector({ 0, 0, 0 });
+						Pawn::SetPickupTarget(Pickup, PlayerController->MyFortPawn, -1.0f, StartDirection, true);
+					}
+				}
+				else
+				{
+					Inventory::AddInventoryItem(PlayerController, ItemEntry);
+				}
 			}
-
-			int32 NumberToGive = Params->NumberToGive;
-			bool bNotifyPlayer = Params->bNotifyPlayer;
-
-			FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::GiveItemToInventoryOwner] ObjectRef: %s", ObjectRef->GetName().c_str());
 		}
 		else if (FunctionName.contains("K2_RemoveItemFromAllPlayers"))
 		{
@@ -136,48 +127,17 @@ namespace FortKismetLibrary
 			UObject* WorldContextObject = Params->WorldContextObject;
 			UFortWorldItemDefinition* ItemDefinition = Params->ItemDefinition;
 
-			if (!WorldContextObject || !ItemDefinition)
+			if (WorldContextObject && ItemDefinition)
 			{
-				FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::K2_GiveItemToAllPlayers] failed to get WorldContextObject/ItemDefinition!");
-				return;
-			}
+				TArray<AFortPlayerController*> PlayerControllers = UFortKismetLibrary::GetAllFortPlayerControllers(WorldContextObject, true, false);
 
-			TArray<AFortPlayerController*> AllFortPlayerControllers = UFortKismetLibrary::GetAllFortPlayerControllers(WorldContextObject, true, false);
+				for (int32 i = 0; i < PlayerControllers.Num(); i++)
+				{
+					AFortPlayerController* PlayerController = PlayerControllers[i];
+					if (!PlayerController) continue;
 
-			int32 AmountToRemove = Params->AmountToRemove;
-
-			for (int32 i = 0; i < AllFortPlayerControllers.Num(); i++)
-			{
-				AFortPlayerController* PlayerController = AllFortPlayerControllers[i];
-				if (!PlayerController) continue;
-
-				UFortKismetLibrary::K2_RemoveItemFromPlayer(PlayerController, ItemDefinition, AmountToRemove, true);
-			}
-		}
-		else if (FunctionName.contains("K2_RemoveItemFromPlayerByGuid"))
-		{
-			auto Params = (Params::FortKismetLibrary_K2_RemoveItemFromPlayerByGuid*)Parms;
-
-			AFortPlayerController* PlayerController = Params->PlayerController;
-
-			if (!PlayerController)
-			{
-				FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::K2_RemoveItemFromPlayerByGuid] failed to get PlayerController!");
-				return;
-			}
-
-			const FGuid& ItemGuid = Params->ItemGuid;
-
-			UFortWorldItem* ItemInstance = Inventory::GetItemInstance(PlayerController, ItemGuid);
-
-			if (ItemInstance)
-			{
-				int32 AmountToRemove = Params->AmountToRemove;
-
-				bool bSuccess = Inventory::RemoveInventoryItem(PlayerController, ItemInstance->GetItemGuid(), AmountToRemove);
-
-				if (bSuccess)
-					Inventory::UpdateInventory(PlayerController->WorldInventory);
+					UFortKismetLibrary::K2_RemoveItemFromPlayer(PlayerController, ItemDefinition, Params->AmountToRemove, true);
+				}
 			}
 		}
 		else if (FunctionName.contains("K2_RemoveItemFromPlayer"))
@@ -187,23 +147,59 @@ namespace FortKismetLibrary
 			AFortPlayerController* PlayerController = Params->PlayerController;
 			UFortWorldItemDefinition* ItemDefinition = Params->ItemDefinition;
 
-			if (!PlayerController || !ItemDefinition)
+			Params->ReturnValue = 0;
+
+			if (PlayerController && ItemDefinition)
 			{
-				FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::K2_RemoveItemFromPlayer] failed to get PlayerController/ItemDefinition!");
-				return;
+				UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_FindExistingItemForDefinition(ItemDefinition, false));
+
+				if (WorldItem)
+				{
+					bool bForceRemoval = Params->bForceRemoval;
+
+					int32 ItemCount = WorldItem->ItemEntry.Count;
+					int32 FinalCount = ItemCount - Params->AmountToRemove;
+
+					if (FinalCount < 0)
+						FinalCount = 0;
+
+					Params->ReturnValue = FinalCount;
+
+					Inventory::RemoveInventoryItem(PlayerController, WorldItem->ItemEntry.ItemGuid, Params->AmountToRemove);
+				}
 			}
 
-			UFortWorldItem* ItemInstance = Inventory::GetItemInstance(PlayerController, ItemDefinition);
+			*bCallOG = false;
+		}
+		else if (FunctionName.contains("K2_RemoveItemFromPlayerByGuid"))
+		{
+			auto Params = (Params::FortKismetLibrary_K2_RemoveItemFromPlayerByGuid*)Parms;
 
-			if (ItemInstance)
+			AFortPlayerController* PlayerController = Params->PlayerController;
+
+			Params->ReturnValue = 0;
+
+			if (PlayerController)
 			{
-				int32 AmountToRemove = Params->AmountToRemove;
+				UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_GetInventoryItemWithGuid(Params->ItemGuid));
 
-				bool bSuccess = Inventory::RemoveInventoryItem(PlayerController, ItemInstance->GetItemGuid(), AmountToRemove);
+				if (WorldItem)
+				{
+					bool bForceRemoval = Params->bForceRemoval;
 
-				if (bSuccess)
-					Inventory::UpdateInventory(PlayerController->WorldInventory);
+					int32 ItemCount = WorldItem->ItemEntry.Count;
+					int32 FinalCount = ItemCount - Params->AmountToRemove;
+
+					if (FinalCount < 0)
+						FinalCount = 0;
+
+					Params->ReturnValue = FinalCount;
+
+					Inventory::RemoveInventoryItem(PlayerController, WorldItem->ItemEntry.ItemGuid, Params->AmountToRemove);
+				}
 			}
+
+			*bCallOG = false;
 		}
 		else if (FunctionName.contains("K2_SpawnPickupInWorld"))
 		{
@@ -212,37 +208,63 @@ namespace FortKismetLibrary
 			UObject* WorldContextObject = Params->WorldContextObject;
 			UFortWorldItemDefinition* ItemDefinition = Params->ItemDefinition;
 
-			if (!WorldContextObject || !ItemDefinition)
+			Params->ReturnValue = nullptr;
+
+			if (WorldContextObject && ItemDefinition)
 			{
-				FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::K2_SpawnPickupInWorld] failed to get WorldContextObject/ItemDefinition!");
-				return;
+				UWorld* World = Functions::GetWorldFromContextObject(Globals::GetFortEngine(), WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
+
+				FFortItemEntry ItemEntry;
+				Inventory::MakeItemEntry(&ItemEntry, ItemDefinition, Params->NumberToSpawn, -1, -1, -1.0f);
+
+				FVector SpawnLocation = Params->Position;
+				FRotator SpawnRotation = FRotator({ 0, 0, 0 });
+
+				FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
+				CreatePickupData.World = World;
+				CreatePickupData.ItemEntry = &ItemEntry;
+				CreatePickupData.SpawnLocation = &SpawnLocation;
+				CreatePickupData.SpawnRotation = &SpawnRotation;
+				CreatePickupData.PlayerController = nullptr;
+				CreatePickupData.OverrideClass = nullptr;
+				CreatePickupData.NullptrIdk = nullptr;
+				CreatePickupData.bRandomRotation = Params->bRandomRotation;
+				CreatePickupData.PickupSourceTypeFlags = 0;
+
+				AFortPickup* Pickup = Inventory::CreatePickupFromData(&CreatePickupData);
+
+				if (Pickup)
+				{
+					Pickup->bWeaponsCanBeAutoPickups = !Params->bBlockedFromAutoPickup;
+
+					FVector StartDirection = Params->Direction;
+					Pickup->TossPickup(StartDirection, nullptr, Params->OverrideMaxStackCount, Params->bToss);
+				}
+
+				Params->ReturnValue = Pickup;
 			}
 
-			int32 NumberToSpawn = Params->NumberToSpawn;
+			*bCallOG = false;
+		}
+		else if (FunctionName.contains("PickLootDrops"))
+		{
+			auto Params = (Params::FortKismetLibrary_PickLootDrops*)Parms;
 
-			FFortItemEntry ItemEntry;
-			Inventory::MakeItemEntry(&ItemEntry, ItemDefinition, NumberToSpawn, -1, -1, 0.f);
+			Params->ReturnValue = false;
 
-			const FVector& Position = Params->Position;
-			const FVector& Direction = Params->Direction;
+			int32 WorldLevel = Params->WorldLevel;
 
-			AFortPickup* Pickup = Inventory::CreateSimplePickup(WorldContextObject, &ItemEntry, Position, FRotator());
+			FName LootTierKey = FName(0);
+			int32 LootTier = -1;
 
-			if (!Pickup)
+			bool bResult = Loots::PickLootTierKeyAndLootTierFromTierGroup(&LootTierKey, &LootTier, Params->TierGroupName, WorldLevel, 0, Params->ForcedLootTier, FGameplayTagContainer());
+
+			if (bResult)
 			{
-				FN_LOG(LogKismetLibrary, Error, "[UFortKismetLibrary::K2_SpawnPickupInWorld] failed to spawn Pickup!");
-				return;
+				Params->ReturnValue = Loots::PickLootDrops(&Params->OutLootToDrop, WorldLevel, LootTierKey, 0, 0, FGameplayTagContainer(), false, false);
 			}
 
-			int32 OverrideMaxStackCount = Params->OverrideMaxStackCount;
-			bool bToss = Params->bToss;
-
-			Pickup->TossPickup(Position, nullptr, OverrideMaxStackCount, bToss);
-
-			bool bRandomRotation = Params->bRandomRotation;
-			bool bBlockedFromAutoPickup = Params->bBlockedFromAutoPickup;
-
-			Pickup->bRandomRotation = bRandomRotation;
+			*bCallOG = false;
 		}
 	}
 

@@ -1,6 +1,6 @@
 #pragma once
 
-inline bool bDebugLog = true;
+inline bool bDebugLog = false;
 
 enum LogLevel {
     Log,
@@ -134,7 +134,7 @@ public:
         return (ActorType*)Actor;
     }
 
-    static AFortPlayerPawn* SpawnPlayer(AFortPlayerControllerAthena* PlayerController, const FVector& Location, const FRotator& Rotation, bool NewPlayer = true)
+    static AFortPlayerPawn* SpawnPlayer(AFortPlayerController* PlayerController, const FVector& Location, const FRotator& Rotation, bool NewPlayer = true)
     {
         APlayerPawn_Athena_C* PlayerPawn = SpawnActor<APlayerPawn_Athena_C>(APlayerPawn_Athena_C::StaticClass(), Location, Rotation);
 
@@ -162,7 +162,7 @@ public:
 
         if (NewPlayer)
         {
-            AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
+            AFortPlayerState* PlayerState = Cast<AFortPlayerState>(PlayerController->PlayerState);
             PlayerState->bHasFinishedLoading = true;
             PlayerState->bHasStartedPlaying = true;
             PlayerState->OnRep_bHasStartedPlaying();

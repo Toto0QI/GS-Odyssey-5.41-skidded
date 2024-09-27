@@ -10,6 +10,54 @@ namespace GameMode
 	bool bPreReadyToStartMatch = false;
 	bool bWorldReady = false;
 
+	AFortPlayerPawn* SpawnDefaultPawnForHook(AFortGameMode* GameModeBase, AController* NewPlayer, AActor* StartSpot)
+	{
+		AFortPlayerController* PlayerController = Cast<AFortPlayerController>(NewPlayer);
+		AFortPlayerState* PlayerState = Cast<AFortPlayerState>(NewPlayer->PlayerState);
+
+		if (!PlayerController || !PlayerState)
+		{
+			FN_LOG(LogGameMode, Error, "[AGameModeBase::SpawnDefaultPawnFor] failed to get PlayerController/PlayerState!");
+			return nullptr;
+		}
+
+		// 7FF66F49A3C0
+		AFortPlayerPawn* (*SpawnDefaultPawnFor)(AFortGameMode* GameMode, AFortPlayerController* PlayerController, AActor* StartSpot) = decltype(SpawnDefaultPawnFor)(0xE4A3C0 + uintptr_t(GetModuleHandle(0)));
+		AFortPlayerPawn* PlayerPawn = SpawnDefaultPawnFor(GameModeBase, PlayerController, StartSpot);
+
+		if (!PlayerPawn)
+		{
+			FN_LOG(LogGameMode, Error, "[AGameModeBase::SpawnDefaultPawnFor] failed to spawn PlayerPawn!");
+			return nullptr;
+		}
+
+		PlayerPawn->SetMaxHealth(100);
+		PlayerPawn->SetHealth(100);
+		PlayerPawn->SetMaxShield(100);
+
+		// 7FF66F7BC760 (Je suis sévèrement autiste)
+		void (*SetShield)(AFortPawn * Pawn, float NewShieldValue) = decltype(SetShield)(0x116C760 + uintptr_t(GetModuleHandle(0)));
+
+		SetShield(PlayerPawn, 0);
+
+		GameMode::ApplyCharacterCustomization(PlayerState, PlayerPawn);
+
+		UFortWeaponMeleeItemDefinition* WeaponMeleeItemDefinition = FindObjectFast<UFortWeaponMeleeItemDefinition>("/Game/Athena/Items/Weapons/WID_Harvest_Pickaxe_Athena_C_T01.WID_Harvest_Pickaxe_Athena_C_T01");
+		AFortPlayerControllerAthena* PlayerControllerAthena = Cast<AFortPlayerControllerAthena>(PlayerController);
+
+		if (PlayerControllerAthena)
+		{
+			UAthenaPickaxeItemDefinition* Pickaxe = PlayerControllerAthena->CustomizationLoadout.Pickaxe;
+
+			if (Pickaxe->WeaponDefinition)
+				WeaponMeleeItemDefinition = Pickaxe->WeaponDefinition;
+		}
+
+		Inventory::SetupInventory(PlayerController, WeaponMeleeItemDefinition);
+
+		return PlayerPawn;
+	}
+
 	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms)
 	{
 		if (!Object || !Function)
@@ -30,8 +78,8 @@ namespace GameMode
 			}
 			else if (bPreReadyToStartMatch && bWorldReady)
 			{
-				AFortGameModeAthena* GameMode = Globals::GetGameMode();
-				AFortGameStateAthena* GameState = Globals::GetGameState();
+				AFortGameModeAthena* GameMode = Cast<AFortGameModeAthena>(Globals::GetGameMode());
+				AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
 
 				if (!GameMode || !GameState)
 					return;
@@ -43,7 +91,7 @@ namespace GameMode
 				{
 					FName InProgress = UKismetStringLibrary::Conv_StringToName(L"InProgress");
 
-					HandleMatchHasStarted(Globals::GetGameMode());
+					HandleMatchHasStarted(GameMode);
 
 					GameMode->MatchState = InProgress;
 					GameMode->K2_OnSetMatchState(InProgress);
@@ -58,18 +106,18 @@ namespace GameMode
 		}
 		else if (FunctionName.contains("HandleStartingNewPlayer"))
 		{
-			AGameModeBase* GameMode = (AGameModeBase*)Object;
+			AGameModeBase* GameModeBase = (AGameModeBase*)Object;
 			auto Params = (Params::GameModeBase_HandleStartingNewPlayer*)Parms;
 
-			if (!GameMode || !Params->NewPlayer)
+			if (!GameModeBase || !Params->NewPlayer)
 			{
-				FN_LOG(LogGameMode, Error, "[AGameModeBase::HandleStartingNewPlayer] Failed to get GameMode/NewPlayer");
+				FN_LOG(LogGameMode, Error, "[AGameModeBase::HandleStartingNewPlayer] Failed to get GameModeBase/NewPlayer");
 				return;
 			}
 
 			if (bWorldReady)
 			{
-				AActor* PlayerStart = GameMode->ChoosePlayerStart(Params->NewPlayer);
+				AActor* PlayerStart = GameModeBase->ChoosePlayerStart(Params->NewPlayer);
 
 				if (!PlayerStart)
 				{
@@ -77,40 +125,30 @@ namespace GameMode
 					return;
 				}
 
+				/*AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Params->NewPlayer);
+				
+				if (PlayerController)
+				{
+					UFortWeaponMeleeItemDefinition* WeaponMeleeItemDefinition = FindObjectFast<UFortWeaponMeleeItemDefinition>("/Game/Athena/Items/Weapons/WID_Harvest_Pickaxe_Athena_C_T01.WID_Harvest_Pickaxe_Athena_C_T01");
+					AFortPlayerControllerAthena* PlayerControllerAthena = Cast<AFortPlayerControllerAthena>(PlayerController);
+
+					if (PlayerControllerAthena)
+					{
+						UAthenaPickaxeItemDefinition* Pickaxe = PlayerControllerAthena->CustomizationLoadout.Pickaxe;
+
+						if (Pickaxe->WeaponDefinition)
+							WeaponMeleeItemDefinition = Pickaxe->WeaponDefinition;
+					}
+
+					Inventory::SetupInventory(PlayerController, WeaponMeleeItemDefinition);
+				}*/
+
 				const FVector& PlayerStartLocation = PlayerStart->K2_GetActorLocation();
 				const FRotator& PlayerStartRotation = PlayerStart->K2_GetActorRotation();
 
-				Util::SpawnPlayer((AFortPlayerControllerAthena*)Params->NewPlayer, PlayerStartLocation, PlayerStartRotation, true);
+				Util::SpawnPlayer((AFortPlayerController*)Params->NewPlayer, PlayerStartLocation, PlayerStartRotation, true);
 			}
 		}
-	}
-
-	APlayerPawn_Athena_C* SpawnDefaultPawnForHook(AGameModeBase* GameMode, AController* NewPlayer, AActor* StartSpot)
-	{
-		FTransform SpawnTransform = StartSpot->GetTransform();
-
-		APlayerPawn_Athena_C* PlayerPawn = (APlayerPawn_Athena_C*)GameMode->SpawnDefaultPawnAtTransform(NewPlayer, SpawnTransform);
-
-		if (!PlayerPawn)
-		{
-			FN_LOG(LogGameMode, Error, "[AGameModeBase::SpawnDefaultPawnFor] failed to spawn PlayerPawn!");
-			return nullptr;
-		}
-
-		PlayerPawn->SetMaxHealth(100);
-		PlayerPawn->SetHealth(100);
-		PlayerPawn->SetMaxShield(100);
-
-		// 7FF66F7BC760 (Je suis sévèrement autiste)
-		void (*SetShield)(AFortPawn* Pawn, float NewShieldValue) = decltype(SetShield)(0x116C760 + uintptr_t(GetModuleHandle(0)));
-
-		SetShield(PlayerPawn, 0);
-
-		GameMode::ApplyCharacterCustomization((AFortPlayerState*)NewPlayer->PlayerState, PlayerPawn);
-
-		FN_LOG(LogGameMode, Error, "[AGameModeBase::SpawnDefaultPawnFor] called!");
-
-		return PlayerPawn;
 	}
 
 	void InitGameMode()

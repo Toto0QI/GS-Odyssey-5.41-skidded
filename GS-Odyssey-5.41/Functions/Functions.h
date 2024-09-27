@@ -4,11 +4,12 @@
 namespace Functions
 {
 	AFortAthenaSupplyDrop* (*SpawnSupplyDrop)(AFortAthenaMapInfo* MapInfo, const FVector& Location, const FRotator& Rotation, UClass* SupplyDropClass, float TraceStartZ, float TraceEndZ);
+	FVector (*PickSupplyDropLocation)(AFortAthenaMapInfo* MapInfo, FVector* OutSpawnLocation, FVector* CenterLocation, float Radius);
 	UWorld* (*GetWorldFromContextObject)(UEngine* Engine, const UObject* Object, EGetWorldErrorMode ErrorMode);
 
 	bool IsPlayerBuildableClasse(UClass* BuildableClasse)
 	{
-		AFortGameStateAthena* GameState = Globals::GetGameState();
+		AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
 
 		if (!BuildableClasse || !GameState)
 			return false;
@@ -25,9 +26,24 @@ namespace Functions
 				if (BuildingActorClasse.Get() == BuildableClasse)
 					return true;
 			}
-
-			return false;
 		}
+
+		return false;
+	}
+
+	bool IsOnSameTeam(AFortPlayerStateAthena* PlayerState, ABuildingSMActor* BuildingSMActor)
+	{
+		if (!PlayerState || !BuildingSMActor)
+			return false;
+
+		EFortTeam PlayerTeam = PlayerState->TeamIndex;
+		EFortTeam BuildingTeam = BuildingSMActor->Team;
+
+		if (PlayerTeam == BuildingTeam)
+			return true;
+
+		if (BuildingTeam == EFortTeam::Spectator && !BuildingSMActor->bPlayerPlaced)
+			return true;
 
 		return false;
 	}
@@ -70,67 +86,99 @@ namespace Functions
 		return dist(gen);
 	}
 
-	void SummonFloorLoots()
+	void SpawnLootOnFloorLoot(ABuildingContainer* BuildingContainer)
 	{
-		UBlueprintGeneratedClass* FloorLootClass = FindObjectFast<UBlueprintGeneratedClass>("/Game/Athena/Environments/Blueprints/Tiered_Athena_FloorLoot_01.Tiered_Athena_FloorLoot_01_C");
-		UBlueprintGeneratedClass* FloorLootWarmupClass = FindObjectFast<UBlueprintGeneratedClass>("/Game/Athena/Environments/Blueprints/Tiered_Athena_FloorLoot_Warmup.Tiered_Athena_FloorLoot_Warmup_C");
-
-		if (FloorLootClass && FloorLootWarmupClass)
+		if (!BuildingContainer->bAlreadySearched)
 		{
-			TArray<AActor*> FloorLootsResult;
-			UGameplayStatics::GetAllActorsOfClass(Globals::GetWorld(), FloorLootClass, &FloorLootsResult);
+			int32 LootLevel = UFortKismetLibrary::GetLootLevel(BuildingContainer);
 
-			TArray<AActor*> FloorLootWarmupResult;
-			UGameplayStatics::GetAllActorsOfClass(Globals::GetWorld(), FloorLootWarmupClass, &FloorLootWarmupResult);
+			TArray<FFortItemEntry> LootToDrops;
+			Loots::PickLootDrops(&LootToDrops, LootLevel, BuildingContainer->ContainerLootTierKey, 0, 0, BuildingContainer->StaticGameplayTags, true, false);
 
-			TArray<AActor*> FloorLoots;
+			BuildingContainer->HighestRarity = EFortRarity::Handmade;
 
-			for (int i = 0; i < FloorLootsResult.Num(); i++)
-				FloorLoots.Add(FloorLootsResult[i]);
-
-			if (FloorLootsResult.Num() > 0)
-				FloorLootsResult.Free();
-
-			for (int i = 0; i < FloorLootWarmupResult.Num(); i++)
-				FloorLoots.Add(FloorLootWarmupResult[i]);
-
-			if (FloorLootWarmupResult.Num() > 0)
-				FloorLootWarmupResult.Free();
-
-			for (int i = 0; i < FloorLoots.Num(); i++)
+			if (LootToDrops.Num() > 0)
 			{
-				ABuildingContainer* FloorLoot = (ABuildingContainer*)FloorLoots[i];
-				if (!FloorLoot) continue;
-
-				bool bSuccess;
-				std::vector<FFortItemEntry> LootToDrops = Loots::ChooseLootToDrops(FloorLoot->SearchLootTierGroup, 0, &bSuccess);
-
-				if (!bSuccess)
-					continue;
-
-				FVector FloorLootLoc = FloorLoot->K2_GetActorLocation();
-
-				FloorLootLoc.Z += 50;
-
-				for (auto& LootToDrop : LootToDrops)
+				for (int32 i = 0; i < LootToDrops.Num(); i++)
 				{
-					if (LootToDrop.Count <= 0)
-						continue;
+					FFortItemEntry LootToDrop = LootToDrops[i];
+					UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(LootToDrop.ItemDefinition);
 
-					Inventory::SpawnPickup(nullptr, &LootToDrop, FloorLootLoc, true);
+					if (!WorldItemDefinition)
+					{
+						UFortItemDefinition* ItemDefinition = LootToDrop.ItemDefinition;
+						FN_LOG(LogBuildingActor, Warning, "Attempted to spawn non-world item %s!", ItemDefinition->GetName().c_str());
+						continue;
+					}
+
+					EFortRarity Rarity = BuildingContainer->HighestRarity;
+
+					if (WorldItemDefinition->bCalculateRarityFromQualityAndTier)
+					{
+						unsigned __int8 Tier = (unsigned __int8)WorldItemDefinition->Tier;
+						unsigned __int8 Quality = (unsigned __int8)WorldItemDefinition->Quality;
+
+						if (Tier > 0)
+							Quality += (Tier - 1) / 2;
+
+						Rarity = EFortRarity::Legendary;
+
+						if (Quality <= 9)
+							Rarity = (EFortRarity)Quality;
+					}
+					else
+					{
+						Rarity = WorldItemDefinition->Rarity;
+					}
+
+					EFortRarity HighestRarity = BuildingContainer->HighestRarity;
+
+					if (HighestRarity < Rarity)
+						BuildingContainer->HighestRarity = Rarity;
+
+					if (WorldItemDefinition->ItemType == EFortItemType::WeaponMelee || WorldItemDefinition->ItemType == EFortItemType::WeaponRanged)
+					{
+						int32 ItemLevel = LootToDrop.Level;
+
+						float NewDurability = 1.0f * BuildingContainer->LootedWeaponsDurabilityModifier;
+
+						Inventory::SetDurability(&LootToDrop, NewDurability);
+						Inventory::SetStateValue(&LootToDrop, EFortItemEntryState::DurabilityInitialized, 1);
+					}
+
+					FVector SpawnLocation = BuildingContainer->K2_GetActorLocation();
+
+					SpawnLocation.Z += 45;
+
+					FRotator SpawnRotation = FRotator({ 0, 0, 0 });
+
+					FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
+					CreatePickupData.World = Globals::GetWorld();
+					CreatePickupData.ItemEntry = &LootToDrop;
+					CreatePickupData.SpawnLocation = &SpawnLocation;
+					CreatePickupData.SpawnRotation = &SpawnRotation;
+					CreatePickupData.PlayerController = nullptr;
+					CreatePickupData.OverrideClass = nullptr;
+					CreatePickupData.NullptrIdk = nullptr;
+					CreatePickupData.bRandomRotation = true;
+					CreatePickupData.PickupSourceTypeFlags = 0;
+
+					AFortPickup* Pickup = Inventory::CreatePickupFromData(&CreatePickupData);
+
+					if (Pickup)
+					{
+						Pickup->TossPickup(SpawnLocation, nullptr, 0, true);
+					}
 				}
 			}
 
-			FN_LOG(LogFunctions, Log, "Successful summon FloorLoots!");
-
-			if (FloorLoots.Num() > 0)
-				FloorLoots.Free();
+			BuildingContainer->K2_DestroyActor();
 		}
 	}
 
 	void FillVendingMachines()
 	{
-		AFortGameStateAthena* GameState = Globals::GetGameState();
+		AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
 
 		if (GameState && GameState->MapInfo)
 		{
@@ -195,10 +243,12 @@ namespace Functions
 					UFortWorldItemDefinition* InputItem = ItemCollection.InputItem;
 					if (!InputItem) continue;
 
-					Retry:
+					int32 LootLevel = UFortKismetLibrary::GetLootLevel(VendingMachine);
 
-					bool bSuccess;
-					std::vector<FFortItemEntry> LootToDrops = Loots::ChooseLootToDrops(LootTierGroup, RandomRarity, &bSuccess);
+					FName LootTierKey = FName(0);
+					int32 LootTier = -1;
+
+					bool bSuccess = Loots::PickLootTierKeyAndLootTierFromTierGroup(&LootTierKey, &LootTier, LootTierGroup, LootLevel, 0, RandomRarity, VendingMachine->StaticGameplayTags);
 
 					if (!bSuccess)
 					{
@@ -206,25 +256,8 @@ namespace Functions
 						continue;
 					}
 
-					for (int32 k = j; k >= 0; k--)
-					{
-						FColletorUnitInfo ItemCollectionCheck = ItemCollections[k];
-
-						UFortWorldItemDefinition* InputItemCheck = ItemCollectionCheck.InputItem;
-						if (!InputItemCheck) continue;
-
-						if (!ItemCollections[j].OutputItemEntry.IsValid())
-							continue;
-
-						UFortItemDefinition* ItemDefinitionCheck = ItemCollections[j].OutputItemEntry[0].ItemDefinition;
-						if (!ItemDefinitionCheck || !LootToDrops[0].ItemDefinition) continue;
-
-						if (ItemDefinitionCheck == LootToDrops[0].ItemDefinition)
-						{
-							LootToDrops.clear();
-							goto Retry;
-						}
-					}
+					TArray<FFortItemEntry> LootToDrops;
+					Loots::PickLootDrops(&LootToDrops, LootLevel, LootTierKey, 0, 0, VendingMachine->StaticGameplayTags, false, false);
 
 					if (ItemCollections[j].OutputItemEntry.Num() > 0)
 						ItemCollections[j].OutputItemEntry.Free();
@@ -243,7 +276,7 @@ namespace Functions
 
 	void InitializeTreasureChests()
 	{
-		AFortGameStateAthena* GameState = Globals::GetGameState();
+		AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
 
 		if (GameState && GameState->MapInfo)
 		{
@@ -282,7 +315,7 @@ namespace Functions
 
 	void InitializeAmmoBoxs()
 	{
-		AFortGameStateAthena* GameState = Globals::GetGameState();
+		AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
 
 		if (GameState && GameState->MapInfo)
 		{
@@ -321,7 +354,9 @@ namespace Functions
 
 	void InitializeLlamas()
 	{
-		AFortGameStateAthena* GameState = Globals::GetGameState();
+		return;
+
+		AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
 
 		if (GameState && GameState->MapInfo)
 		{
@@ -354,34 +389,31 @@ namespace Functions
 
 			TSubclassOf<AFortAthenaSupplyDrop> LlamaClass = MapInfo->LlamaClass;
 
+			QuantityNumToSpawn = 1000;
+
 			int32 Recurcives = 0;
-
-			QuantityNumToSpawn = 10000;
-
 			for (int32 i = 0; i < QuantityNumToSpawn; i++)
 			{
-				FVector Location = FVector(0, 0, 10000);
-			
-				// Fortnite use SafeZone
-				Location.X = UKismetMathLibrary::RandomFloatInRange(-100000.f, 100000.f);
-				Location.Y = UKismetMathLibrary::RandomFloatInRange(-100000.f, 100000.f);
+				FVector SpawnCenter = FVector(1, 1, 10000);
 
-				FRotator Rotation = FRotator();
+				FVector SpawnLocation = FVector(0, 0, 0);
+				PickSupplyDropLocation(MapInfo, &SpawnLocation, &SpawnCenter, 100000.0f);
 
-				// Random Rotation
-				Rotation.Yaw = UKismetMathLibrary::RandomFloatInRange(0.f, 360.f);
+				FN_LOG(LogFunctions, Log, "%i - PickSupplyDropLocation - SpawnLocation: [X: %.2f, Y: %.2f, Z: %.2f]", i, SpawnLocation.X, SpawnLocation.Y, SpawnLocation.Z);
 
-				AFortAthenaSupplyDrop* Llama = SpawnSupplyDrop(MapInfo, Location, Rotation, LlamaClass, MaxPlacementHeight, MinPlacementHeight);
-
-				if (!Llama || Llama->K2_GetActorLocation().Z <= 0)
+				if (SpawnLocation.IsZero())
 				{
-					if (Recurcives > 500)
+					if (Recurcives >= 100)
 						break;
 
-					Recurcives++;
 					QuantityNumToSpawn++;
-					continue;
+					Recurcives++;
 				}
+
+				FRotator SpawnRotation = FRotator(0, 0, 0);
+				SpawnRotation.Yaw = UKismetMathLibrary::RandomFloatInRange(0.0f, 360.0f);
+
+				SpawnSupplyDrop(MapInfo, SpawnLocation, SpawnRotation, LlamaClass, MaxPlacementHeight, MinPlacementHeight);
 			}
 		}
 	}
@@ -393,7 +425,7 @@ namespace Functions
 		if (AllAthenaItems.Num() > 0)
 			return AllAthenaItems;
 
-		for (int i = 0; i < AllItems.Num(); i++)
+		for (int32 i = 0; i < AllItems.Num(); i++)
 		{
 			UFortWorldItemDefinition* ItemDefinition = AllItems[i];
 
@@ -418,7 +450,7 @@ namespace Functions
 		if (AllItems.Num() > 0)
 			return bOnlyAthena ? PickOnlyAthena(AllItems) : AllItems;
 
-		for (int i = 0; i < UObject::GObjects->Num(); i++)
+		for (int32 i = 0; i < UObject::GObjects->Num(); i++)
 		{
 			UObject* GObject = UObject::GObjects->GetByIndex(i);
 
@@ -446,9 +478,11 @@ namespace Functions
 	{
 		uintptr_t AddressGetWorldFromContextObject = MinHook::FindPattern(Patterns::GetWorldFromContextObject);
 		uintptr_t AddressSpawnSupplyDrop = MinHook::FindPattern(Patterns::SpawnSupplyDrop);
+		uintptr_t AddressPickSupplyDropLocation = MinHook::FindPattern(Patterns::PickSupplyDropLocation);
 
 		GetWorldFromContextObject = decltype(GetWorldFromContextObject)(AddressGetWorldFromContextObject);
 		SpawnSupplyDrop = decltype(SpawnSupplyDrop)(AddressSpawnSupplyDrop);
+		PickSupplyDropLocation = decltype(PickSupplyDropLocation)(AddressPickSupplyDropLocation);
 
 		FN_LOG(LogInit, Log, "InitFunctions Success!");
 	}

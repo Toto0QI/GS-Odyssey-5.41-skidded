@@ -51,7 +51,7 @@ namespace Cheats
 
                     if (Action == "listplayers")
                     {
-                        AFortGameModeAthena* GameMode = Globals::GetGameMode();
+                        AFortGameMode* GameMode = Globals::GetGameMode();
 
                         if (GameMode)
                         {
@@ -219,6 +219,36 @@ namespace Cheats
                             Message = L"Pawn not found!";
                         }
                     }
+                    else if (Action == "setsprintspeed" && ParsedCommand.size() >= 2)
+                    {
+                        if (Pawn)
+                        {
+                            try
+                            {
+                                float NewSprintSpeedVal = std::stof(ParsedCommand[1]);
+
+                                Pawn->MovementSet->SprintSpeed.BaseValue = NewSprintSpeedVal;
+                                Pawn->MovementSet->SprintSpeed.CurrentValue = NewSprintSpeedVal;
+
+                                Pawn->MovementSet->SprintSpeed.Minimum = NewSprintSpeedVal;
+                                Pawn->MovementSet->SprintSpeed.Maximum = NewSprintSpeedVal;
+
+                                Message = L"SetSprintSpeed command executed successfully!";
+                            }
+                            catch (const std::invalid_argument& e)
+                            {
+                                Message = L"Invalid NewSprintSpeedVal provided!";
+                            }
+                            catch (const std::out_of_range& e)
+                            {
+                                Message = L"NewSprintSpeedVal out of range!";
+                            }
+                        }
+                        else
+                        {
+                            Message = L"Pawn not found!";
+                        }
+                    }
                     else if (Action == "god")
                     {
                         if (CheatManager)
@@ -266,31 +296,6 @@ namespace Cheats
                             MarkerPosition.Z = 10000;
 
                             CheatManager->BugItGo(MarkerPosition.X, MarkerPosition.Y, MarkerPosition.Z, 0.f, 0.f, 0.f);
-                        }
-                    }
-                    else if (Action == "changesize" && ParsedCommand.size() >= 2)
-                    {
-                        if (CheatManager)
-                        {
-                            try
-                            {
-                                float NewSize = std::stof(ParsedCommand[1]);
-
-                                CheatManager->ChangeSize(NewSize);
-                                Message = L"ChangeSize command executed successfully!";
-                            }
-                            catch (const std::invalid_argument& e)
-                            {
-                                Message = L"Invalid NewSize provided!";
-                            }
-                            catch (const std::out_of_range& e)
-                            {
-                                Message = L"NewSize out of range!";
-                            }
-                        }
-                        else
-                        {
-                            Message = L"CheatManager not found!";
                         }
                     }
                     else if (Action == "bugitgo" && ParsedCommand.size() >= 4)
@@ -363,21 +368,33 @@ namespace Cheats
                         }
                     }
 #ifdef DEBUGS
-                    else if (Action == "simulateloot" && ParsedCommand.size() >= 3)
+                    else if (Action == "simulateloot" && ParsedCommand.size() >= 2)
                     {
                         std::string& LootTierGroup = ParsedCommand[1];
-                        int32 LootTier = 0;
+                        int32 WorldLevel = -1;
+                        int32 ForcedLootTier = -1;
 
-                        bool bIsLootTierInt = std::all_of(ParsedCommand[2].begin(), ParsedCommand[2].end(), ::isdigit);
+                        bool bIsWorldLevelInt = false;
+                        bool bIsForcedLootTierInt = false;
 
-                        if (CheatManager && bIsLootTierInt)
+                        if (ParsedCommand.size() >= 3)
+                            bIsWorldLevelInt = std::all_of(ParsedCommand[2].begin(), ParsedCommand[2].end(), ::isdigit);
+
+                        if (ParsedCommand.size() >= 4)
+                            bIsForcedLootTierInt = std::all_of(ParsedCommand[3].begin(), ParsedCommand[3].end(), ::isdigit);
+
+                        if (bIsWorldLevelInt)
+                            WorldLevel = std::stoi(ParsedCommand[2]);
+
+                        if (bIsForcedLootTierInt)
+                            ForcedLootTier = std::stoi(ParsedCommand[3]);
+
+                        if (CheatManager)
                         {
-                            FName TierGroup = UKismetStringLibrary::Conv_StringToName(std::wstring(LootTierGroup.begin(), LootTierGroup.end()).c_str());
+                            FName TierGroupName = UKismetStringLibrary::Conv_StringToName(std::wstring(LootTierGroup.begin(), LootTierGroup.end()).c_str());
 
-                            LootTier = std::stoi(ParsedCommand[2]);
-
-                            bool bSuccess;
-                            std::vector<FFortItemEntry> LootToDrops = Loots::ChooseLootToDrops(TierGroup, LootTier, &bSuccess);
+                            TArray<FFortItemEntry> LootToDrops;
+                            bool bSuccess = UFortKismetLibrary::PickLootDrops(PlayerController, &LootToDrops, TierGroupName, WorldLevel, ForcedLootTier);
 
                             if (bSuccess)
                             {
@@ -386,28 +403,39 @@ namespace Cheats
                                     if (!LootToDrop.ItemDefinition)
                                         continue;
 
-                                    std::string LootMessage = "SimulateLoot | ItemDefinition: [" + LootToDrop.ItemDefinition->GetName() + "] - Count: [" + std::to_string(LootToDrop.Count) + "]";
+                                    std::string LootMessage = "SimulateLoot | ItemDefinition: [" +
+                                        LootToDrop.ItemDefinition->GetName() + "] - Count: [" +
+                                        std::to_string(LootToDrop.Count) + "] - Level: [" + 
+                                        std::to_string(LootToDrop.Level) + "]";
+
                                     FString FLootMessage = std::wstring(LootMessage.begin(), LootMessage.end()).c_str();
                                     PlayerController->ClientMessage(FLootMessage, FName(), 1);
                                 }
 
-                                Message = L"SimulateLoot success!";
+                                std::string LootMessage = "SimulateLoot success with TierGroupName: " + 
+                                    TierGroupName.ToString() + ", WorldLevel: " +
+                                    std::to_string(WorldLevel) + ", ForcedLootTier: " +
+                                    std::to_string(ForcedLootTier) + ".";
+
+                                Message = std::wstring(LootMessage.begin(), LootMessage.end()).c_str();
                             }
                             else
                             {
-                                Message = L"Failed SimulateLoot!";
+                                std::string LootMessage = "SimulateLoot failed with TierGroupName: " +
+                                    TierGroupName.ToString() + ", WorldLevel: " +
+                                    std::to_string(WorldLevel) + ", ForcedLootTier: " +
+                                    std::to_string(ForcedLootTier) + ".";
+
+
+                                Message = std::wstring(LootMessage.begin(), LootMessage.end()).c_str();
                             }
+
+                            if (LootToDrops.IsValid())
+                                LootToDrops.Free();
                         }
                         else
                         {
-                            if (!CheatManager)
-                            {
-                                Message = L"CheatManager not found!";
-                            }
-                            else if (!bIsLootTierInt)
-                            {
-                                Message = L"Invalid LootTier provided!";
-                            }
+                            Message = L"CheatManager not found!";
                         }
                     }
 #endif // DEBUGS
@@ -415,19 +443,39 @@ namespace Cheats
                     {
                         std::string& LootTierGroup = ParsedCommand[1];
 
-                        FName SearchLootTierGroup = UKismetStringLibrary::Conv_StringToName(std::wstring(LootTierGroup.begin(), LootTierGroup.end()).c_str());
+                        FName TierGroupName = UKismetStringLibrary::Conv_StringToName(std::wstring(LootTierGroup.begin(), LootTierGroup.end()).c_str());
 
-                        bool bSuccess;
-                        std::vector<FFortItemEntry> LootToDrops = Loots::ChooseLootToDrops(SearchLootTierGroup, 0, &bSuccess);
+                        TArray<FFortItemEntry> LootToDrops;
+                        bool bSuccess = UFortKismetLibrary::PickLootDrops(PlayerController, &LootToDrops, TierGroupName, -1, -1);
 
                         if (bSuccess && Pawn)
                         {
                             for (auto& LootToDrop : LootToDrops)
                             {
-                                Inventory::SpawnPickup(nullptr, &LootToDrop, Pawn->K2_GetActorLocation(), true);
+                                FVector SpawnLocation = Pawn->K2_GetActorLocation();
+                                FRotator SpawnRotation = FRotator({ 0, 0, 0 });
+
+                                FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
+                                CreatePickupData.World = Globals::GetWorld();
+                                CreatePickupData.ItemEntry = &LootToDrop;
+                                CreatePickupData.SpawnLocation = &SpawnLocation;
+                                CreatePickupData.SpawnRotation = &SpawnRotation;
+                                CreatePickupData.PlayerController = nullptr;
+                                CreatePickupData.OverrideClass = nullptr;
+                                CreatePickupData.NullptrIdk = nullptr;
+                                CreatePickupData.bRandomRotation = true;
+                                CreatePickupData.PickupSourceTypeFlags = 0;
+
+                                AFortPickup* Pickup = Inventory::CreatePickupFromData(&CreatePickupData);
+
+                                if (Pickup)
+                                {
+                                    Pickup->bWeaponsCanBeAutoPickups = false;
+                                    Pickup->TossPickup(SpawnLocation, nullptr, 0, true);
+                                }
                             }
 
-                            Message = L"LootTierGroup success spawn!";
+                            Message = L"TierGroupName success spawn!";
                         }
                         else
                         {
@@ -437,31 +485,38 @@ namespace Cheats
                             }
                             else
                             {
-                                Message = L"Failed to find this LootTierGroup!";
+                                Message = L"Failed to find this TierGroupName!";
                             }
                         }
+
+                        if (LootToDrops.IsValid())
+                            LootToDrops.Free();
                     }
-                    else if (Action == "spawnpickup" && ParsedCommand.size() >= 3)
+                    else if (Action == "spawnpickup" && ParsedCommand.size() >= 2)
                     {
                         std::string ItemDefinitionName = ParsedCommand[1];
 
                         std::transform(ItemDefinitionName.begin(), ItemDefinitionName.end(), ItemDefinitionName.begin(),
                             [](unsigned char c) { return std::tolower(c); });
 
-                        int32 NumberToSpawn = 0;
+                        int32 NumberToSpawn = 1;
 
-                        bool bIsNumberToSpawnInt = std::all_of(ParsedCommand[2].begin(), ParsedCommand[2].end(), ::isdigit);
+                        if (ParsedCommand.size() >= 3)
+                        {
+                            bool bIsNumberToSpawnInt = std::all_of(ParsedCommand[2].begin(), ParsedCommand[2].end(), ::isdigit);
+
+                            if (bIsNumberToSpawnInt)
+                                NumberToSpawn = std::stoi(ParsedCommand[2]);
+                        }
 
                         TArray<UFortWorldItemDefinition*> AllItems = Functions::GetAllItems();
 
-                        bool bItemFound = false;
-
-                        if (Pawn && bIsNumberToSpawnInt)
+                        if (Pawn)
                         {
-                            NumberToSpawn = std::stoi(ParsedCommand[2]);
-
                             if (NumberToSpawn <= 10000 && NumberToSpawn > 0)
                             {
+                                bool bItemFound = false;
+
                                 for (int32 i = 0; i < AllItems.Num(); i++)
                                 {
                                     UFortWorldItemDefinition* ItemDefinition = AllItems[i];
@@ -477,7 +532,8 @@ namespace Cheats
                                     if (ItemDefinitionName2 != ItemDefinitionName)
                                         continue;
 
-                                    UFortKismetLibrary::K2_SpawnPickupInWorld(PlayerController, ItemDefinition, NumberToSpawn, Pawn->K2_GetActorLocation(), FVector(), 0, true, true, false);
+                                    FVector StartDirection = Pawn->K2_GetActorLocation();
+                                    UFortKismetLibrary::K2_SpawnPickupInWorld(PlayerController, ItemDefinition, NumberToSpawn, Pawn->K2_GetActorLocation(), StartDirection, 0, true, true, true);
                                     bItemFound = true;
                                     break;
                                 }
@@ -498,15 +554,140 @@ namespace Cheats
                         }
                         else
                         {
-                            if (!Pawn)
+                            Message = L"Pawn not found!";
+                        }
+
+                        if (AllItems.IsValid())
+                            AllItems.Free();
+                    }
+                    else if (Action == "giveitem" && ParsedCommand.size() >= 2)
+                    {
+                        std::string ItemDefinitionName = ParsedCommand[1];
+
+                        std::transform(ItemDefinitionName.begin(), ItemDefinitionName.end(), ItemDefinitionName.begin(),
+                            [](unsigned char c) { return std::tolower(c); });
+
+                        int32 NumberToGive = 1;
+                        bool bNotifyPlayer = true;
+
+                        if (ParsedCommand.size() >= 3)
+                        {
+                            bool bIsNumberToGiveInt = std::all_of(ParsedCommand[2].begin(), ParsedCommand[2].end(), ::isdigit);
+
+                            if (bIsNumberToGiveInt)
+                                NumberToGive = std::stoi(ParsedCommand[2]);
+                        }
+
+                        if (ParsedCommand.size() >= 4)
+                        {
+                            bool bIsNotifyPlayerInt = std::all_of(ParsedCommand[3].begin(), ParsedCommand[3].end(), ::isdigit);
+
+                            if (bIsNotifyPlayerInt)
+                                bNotifyPlayer = std::stoi(ParsedCommand[3]);
+                        }
+
+                        TArray<UFortWorldItemDefinition*> AllItems = Functions::GetAllItems();
+
+                        if (NumberToGive <= 10000 && NumberToGive > 0)
+                        {
+                            bool bItemFound = false;
+
+                            for (int32 i = 0; i < AllItems.Num(); i++)
                             {
-                                Message = L"Pawn not found!";
+                                UFortWorldItemDefinition* ItemDefinition = AllItems[i];
+
+                                if (!ItemDefinition)
+                                    continue;
+
+                                std::string ItemDefinitionName2 = ItemDefinition->GetName();
+
+                                std::transform(ItemDefinitionName2.begin(), ItemDefinitionName2.end(), ItemDefinitionName2.begin(),
+                                    [](unsigned char c) { return std::tolower(c); });
+
+                                if (ItemDefinitionName2 != ItemDefinitionName)
+                                    continue;
+
+                                UFortKismetLibrary::K2_GiveItemToPlayer(PlayerController, ItemDefinition, NumberToGive, bNotifyPlayer);
+                                bItemFound = true;
+                                break;
                             }
-                            else if (!bIsNumberToSpawnInt)
+
+                            if (bItemFound)
                             {
-                                Message = L"Invalid number to spawn!";
+                                Message = L"Item give success!";
+                            }
+                            else
+                            {
+                                Message = L"Item definition not found!";
                             }
                         }
+                        else
+                        {
+                            Message = L"Invalid number to give (NumberToGive <= 10000 && NumberToGive > 0)";
+                        }
+
+                        if (AllItems.IsValid())
+                            AllItems.Free();
+                    }
+                    else if (Action == "removeitem" && ParsedCommand.size() >= 2)
+                    {
+                        std::string ItemDefinitionName = ParsedCommand[1];
+
+                        std::transform(ItemDefinitionName.begin(), ItemDefinitionName.end(), ItemDefinitionName.begin(),
+                            [](unsigned char c) { return std::tolower(c); });
+
+                        int32 AmountToRemove = 1;
+
+                        if (ParsedCommand.size() >= 3)
+                        {
+                            bool bIsAmountToRemoveInt = std::all_of(ParsedCommand[2].begin(), ParsedCommand[2].end(), ::isdigit);
+
+                            if (bIsAmountToRemoveInt)
+                                AmountToRemove = std::stoi(ParsedCommand[2]);
+                        }
+
+                        TArray<UFortWorldItemDefinition*> AllItems = Functions::GetAllItems();
+
+                        if (AmountToRemove <= 10000 && AmountToRemove > 0)
+                        {
+                            bool bItemFound = false;
+
+                            for (int32 i = 0; i < AllItems.Num(); i++)
+                            {
+                                UFortWorldItemDefinition* ItemDefinition = AllItems[i];
+
+                                if (!ItemDefinition)
+                                    continue;
+
+                                std::string ItemDefinitionName2 = ItemDefinition->GetName();
+
+                                std::transform(ItemDefinitionName2.begin(), ItemDefinitionName2.end(), ItemDefinitionName2.begin(),
+                                    [](unsigned char c) { return std::tolower(c); });
+
+                                if (ItemDefinitionName2 != ItemDefinitionName)
+                                    continue;
+
+                                UFortKismetLibrary::K2_RemoveItemFromPlayer(PlayerController, ItemDefinition, AmountToRemove, true);
+                                bItemFound = true;
+                                break;
+                            }
+
+                            if (bItemFound)
+                            {
+                                Message = L"Item remove success!";
+                            }
+                            else
+                            {
+                                Message = L"Item definition not found!";
+                            }
+                        }
+                        else
+                        {
+                            Message = L"Invalid number to remove (AmountToRemove <= 10000 && AmountToRemove > 0)";
+                        }
+
+                        if (AllItems.IsValid())
+                            AllItems.Free();
                     }
                     else if (Action == "rtx" && ParsedCommand.size() >= 1)
                     {
@@ -514,7 +695,7 @@ namespace Cheats
 
                         if (AllItems.Num() > 0 && Pawn)
                         {
-                            for (int i = 0; i < AllItems.Num(); i++)
+                            for (int32 i = 0; i < AllItems.Num(); i++)
                             {
                                 UFortWorldItemDefinition* ItemDefinition = AllItems[i];
 
@@ -540,6 +721,9 @@ namespace Cheats
                                 Message = L"No items found to spawn!";
                             }
                         }
+
+                        if (AllItems.IsValid())
+                            AllItems.Free();
                     }
 #endif // CHEATS
                     if (Message != L"null")

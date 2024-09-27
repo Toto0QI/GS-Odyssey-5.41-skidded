@@ -970,7 +970,7 @@ public:
 	void ServerCheat(const class FString& Msg);
 	void ServerCheatAll(const class FString& Msg);
 	void ServerClientPawnLoaded(bool bIsPawnLoaded);
-	void ServerCombineInventoryItems(const struct FGuid& TargetItemGuid, const struct FGuid& SourceItemGuid);
+	void ServerCombineInventoryItems(const struct FGuid& TargetItemGuid, const struct FGuid& SourceItemGuid); // à hook, peut être utile
 	void ServerCraftSchematic(const class FString& ItemId, int32 PostCraftSlot, bool bIsQuickCrafted);
 	void ServerCreateAIDirectorDataManager();
 	void ServerCreateBuildingActor(const struct FBuildingClassData& BuildingClassData, const struct FVector_NetQuantize10& BuildLoc, const struct FRotator& BuildRot, bool bMirrored, float SyncKey);
@@ -1085,6 +1085,8 @@ public:
 	bool IsUsingTouch() const;
 	class UFortItem* K2_FindExistingItemForDefinition(const class UFortItemDefinition* ItemDefinition, bool bInStorageVault) const;
 	class UFortItem* K2_GetInventoryItemWithGuid(const struct FGuid& ItemGuid) const;
+
+
 
 public:
 	static class UClass* StaticClass()
@@ -4071,7 +4073,7 @@ public:
 	UMulticastDelegateProperty_                   OnItemChanged;                                     // 0x0030(0x0010)(ZeroConstructor, InstancedReference, BlueprintAssignable, NativeAccessSpecifierPublic)
 	uint8                                         Pad_179F[0x18];                                    // 0x0040(0x0018)(Fixing Size After Last Property [ Dumper-7 ])
 	UMulticastDelegateProperty_                   OnItemDestroyed;                                   // 0x0058(0x0010)(ZeroConstructor, InstancedReference, BlueprintAssignable, NativeAccessSpecifierPublic)
-	uint8                                         Pad_17A0[0x8];                                     // 0x0068(0x0008)(Fixing Size After Last Property [ Dumper-7 ])
+	TWeakObjectPtr<AFortPlayerController>		  OwningController;                                  // 0x0068(0x0008)(NO IN SDK!!!!!!!!!!)
 	uint8                                         bLoadedFromSave : 1;                               // 0x0070(0x0001)(BitIndex: 0x00, PropSize: 0x0001 (Transient, NoDestructor, Protected, HasGetValueTypeHash, NativeAccessSpecifierProtected))
 	uint8                                         bTemporaryItemOwningController : 1;                // 0x0070(0x0001)(BitIndex: 0x01, PropSize: 0x0001 (Transient, NoDestructor, Protected, HasGetValueTypeHash, NativeAccessSpecifierProtected))
 	uint8                                         Pad_17A1[0x7];                                     // 0x0071(0x0007)(Fixing Struct Size After Last Property [ Dumper-7 ])

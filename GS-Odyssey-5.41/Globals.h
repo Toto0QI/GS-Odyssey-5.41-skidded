@@ -16,11 +16,32 @@ static T* Cast(UObject* Object)
 	return nullptr;
 }
 
+// 0x0040 (0x0040 - 0x0000)
+struct FFortCreatePickupData final
+{
+public:
+	UWorld*										  World;					                         // 0x0000(0x0008)()
+	FFortItemEntry*								  ItemEntry;									     // 0x0008(0x0008)()
+	const FVector*								  SpawnLocation;									 // 0x0010(0x0008)()
+	const FRotator*								  SpawnRotation;                                     // 0x0018(0x0008)()
+	AFortPlayerController*						  PlayerController;									 // 0x0020(0x0008)()
+	UClass*										  OverrideClass;									 // 0x0028(0x0008)()
+	void*									      NullptrIdk;										 // 0x0030(0x0008)()
+	bool										  bRandomRotation;									 // 0x0038(0x0001)()
+	uint8                                         Pad_1[0x3];                                        // 0x0039(0x0003)()
+	uint32										  PickupSourceTypeFlags;						     // 0x003C(0x0004)()
+};
+
 namespace Globals
 {
+	UFortEngine* GetFortEngine()
+	{
+		return *(UFortEngine**)(uintptr_t(GetModuleHandleW(0)) + 0x5524898); // GEngine
+	}
+
 	UWorld* GetWorld(bool SkipCheck = false)
 	{
-		UEngine* Engine = UEngine::GetEngine();
+		UEngine* Engine = GetFortEngine();
 
 		if (Engine)
 		{
@@ -33,7 +54,7 @@ namespace Globals
 
 	TArray<ULocalPlayer*> GetLocalPlayers()
 	{
-		UGameEngine* Engine = Cast<UGameEngine>(UEngine::GetEngine());
+		UGameEngine* Engine = GetFortEngine();
 
 		if (Engine)
 		{
@@ -42,18 +63,18 @@ namespace Globals
 		}
 	}
 
-	AFortPlayerControllerAthena* GetServerPlayerController()
+	AFortPlayerController* GetServerPlayerController()
 	{
-		return Cast<AFortPlayerControllerAthena>(UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0));
+		return Cast<AFortPlayerController>(UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0));
 	}
 
-	AFortGameModeAthena* GetGameMode()
+	AFortGameMode* GetGameMode()
 	{
 		UWorld* World = GetWorld();
 
 		if (World)
 		{
-			AFortGameModeAthena* GameMode = Cast<AFortGameModeAthena>(World->AuthorityGameMode);
+			AFortGameMode* GameMode = Cast<AFortGameMode>(World->AuthorityGameMode);
 
 			if (GameMode)
 				return GameMode;
@@ -62,13 +83,13 @@ namespace Globals
 		return nullptr;
 	}
 
-	AFortGameStateAthena* GetGameState()
+	AFortGameState* GetGameState()
 	{
 		UWorld* World = GetWorld();
 
 		if (World)
 		{
-			AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(World->GameState);
+			AFortGameState* GameState = Cast<AFortGameState>(World->GameState);
 
 			if (GameState)
 				return GameState;
@@ -79,7 +100,7 @@ namespace Globals
 
 	UFortPlaylistAthena* GetPlaylist()
 	{
-		AFortGameStateAthena* GameState = GetGameState();
+		AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(GetGameState());
 
 		if (GameState)
 		{
@@ -94,7 +115,7 @@ namespace Globals
 
 	UFortGameData* GetGameData()
 	{
-		UFortAssetManager* AssetManager = Cast<UFortAssetManager>(UEngine::GetEngine()->AssetManager);
+		UFortAssetManager* AssetManager = Cast<UFortAssetManager>(GetFortEngine()->AssetManager);
 
 		if (AssetManager)
 		{

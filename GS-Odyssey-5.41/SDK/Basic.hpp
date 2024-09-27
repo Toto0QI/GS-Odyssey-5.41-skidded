@@ -345,6 +345,11 @@ public:
 	{
 		return ComparisonIndex != Other.ComparisonIndex || Number != Other.Number;
 	}
+
+	FORCEINLINE bool operator<(const FName& Rhs) const
+	{
+		return ComparisonIndex == Rhs.ComparisonIndex ? Number < Rhs.Number : ComparisonIndex < Rhs.ComparisonIndex;
+	}
 };
 
 template<typename ClassType>

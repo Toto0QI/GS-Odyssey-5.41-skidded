@@ -73,7 +73,7 @@ namespace Threads
 		{
 			FFortItemEntry NewItemEntry;
 			Inventory::MakeItemEntry(&NewItemEntry, ItemDefinition, CountToRemove, PrimaryItemEntry->Durability, PrimaryItemEntry->Level, PrimaryItemEntry->LoadedAmmo);
-			Inventory::SpawnPickup(nullptr, &NewItemEntry, PickupToCombine->K2_GetActorLocation(), true);
+			// Inventory::SpawnPickup(nullptr, &NewItemEntry, PickupToCombine->K2_GetActorLocation(), true);
 		}
 
 		CombineItemEntry->Count = NewCount;

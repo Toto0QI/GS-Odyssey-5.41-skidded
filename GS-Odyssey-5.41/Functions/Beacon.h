@@ -32,7 +32,7 @@ namespace Beacon
 
 		if (World && IdaAddress == 0x7FF670F1F3C9ULL) // Pu sa grand mère
 		{
-			UEngine* Engine = UEngine::GetEngine();
+			UEngine* Engine = Globals::GetFortEngine();
 
 			if (Engine)
 			{

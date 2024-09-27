@@ -11,6 +11,9 @@ namespace PlayerController
 	int32 (*PayBuildingCosts)(AFortPlayerController* PlayerController, const FBuildingClassData& BuildingClassData);
 	void (*ModifyLoadedAmmo)(void* a1, const FGuid& ItemGuid, int32 CorrectAmmo);
 	EDeathCause (*ToDeathCause)(FGameplayTagContainer TagContainer, char bWasDBNOIg);
+	bool (*EquipWeaponDefinition)(UFortWeaponItemDefinition* WeaponItemDefinition, UFortWorldItem* WorldItem, AFortPlayerController* PlayerController);
+	bool (*EquipDecoDefinition)(UFortDecoItemDefinition* DecoItemDefinition, UFortWorldItem* WorldItem, AFortPlayerController* PlayerController);
+	bool (*EquipContextTrapDefinition)(UFortContextTrapItemDefinition* ContextTrapItemDefinition, UFortWorldItem* WorldItem, AFortPlayerController* PlayerController);
 
 	void ServerBeginEditingBuildingActor(AFortPlayerController* PlayerController, ABuildingSMActor* BuildingActorToEdit)
 	{
@@ -18,33 +21,33 @@ namespace PlayerController
 			PlayerController->MyFortPawn &&
 			CheckBeginEditBuildingActor(BuildingActorToEdit, PlayerController))
 		{
-			AFortPlayerStateZone* PlayerState = (AFortPlayerStateZone*)PlayerController->PlayerState;
+			AFortPlayerStateZone* PlayerState = Cast<AFortPlayerStateZone>(PlayerController->PlayerState);
 
 			if (PlayerState)
 			{
 				Functions::SetEditingPlayer(BuildingActorToEdit, PlayerState);
 
-				TSoftObjectPtr<UFortEditToolItemDefinition> EditToolItem = Globals::GetGameData()->EditToolItem;
+				UFortGameData* GameData = Globals::GetGameData();
+				TSoftObjectPtr<UFortEditToolItemDefinition> EditToolItem = GameData->EditToolItem;
+				UFortEditToolItemDefinition* EditToolItemDefinition = EditToolItem.Get();
 
-				UFortEditToolItemDefinition* EditTool = EditToolItem.Get();
-
-				if (!EditTool)
+				if (!EditToolItemDefinition)
 				{
-					std::string ItemPath = EditToolItem.ObjectID.SubPathString.ToString();
-					EditTool = StaticLoadObject<UFortEditToolItemDefinition>(std::wstring(ItemPath.begin(), ItemPath.end()).c_str());
+					std::string AssetPathName = EditToolItem.ObjectID.AssetPathName.ToString();
+					EditToolItemDefinition = StaticLoadObject<UFortEditToolItemDefinition>(std::wstring(AssetPathName.begin(), AssetPathName.end()).c_str());
 				}
 
-				//__int64 Outer = sub_7FF61CD35B30(Idk, EditTool, 0);
-				if (/*Outer &&*/ EditTool /*&& sub_7FF61CE48920(EditTool, Outer, PlayerController)*/)
+				UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_FindExistingItemForDefinition(EditToolItemDefinition, false));
+
+				// 7FF66F5D3F40
+				bool (*sub_7FF66F985640)(UFortWeaponItemDefinition* WeaponItemDefinition, UFortWorldItem* WorldItem, AFortPlayerController* PlayerController) = decltype(sub_7FF66F985640)(0xF83F40 + uintptr_t(GetModuleHandle(0)));
+
+				if (WorldItem && EditToolItemDefinition && sub_7FF66F985640(EditToolItemDefinition, WorldItem, PlayerController))
 				{
-					AFortWeapon* CurrentWeapon = PlayerController->MyFortPawn->CurrentWeapon;
+					AFortWeap_EditingTool* EditingTool = Cast<AFortWeap_EditingTool>(PlayerController->MyFortPawn->CurrentWeapon);
 
-					if (CurrentWeapon && CurrentWeapon->IsA(AFortWeap_EditingTool::StaticClass()))
-					{
-						AFortWeap_EditingTool* EditingTool = (AFortWeap_EditingTool*)CurrentWeapon;
-
+					if (EditingTool)
 						Functions::SetEditingActor(EditingTool, BuildingActorToEdit);
-					}
 				}
 			}
 		}
@@ -52,8 +55,8 @@ namespace PlayerController
 
 	void ServerEditBuildingActor(AFortPlayerController* PlayerController, ABuildingSMActor* BuildingActorToEdit, TSubclassOf<ABuildingSMActor> NewBuildingClass, int32 RotationIterations, bool bMirrored)
 	{
-		if (BuildingActorToEdit && 
-			BuildingActorToEdit->EditingPlayer == PlayerController->PlayerState && 
+		if (BuildingActorToEdit &&
+			BuildingActorToEdit->EditingPlayer == PlayerController->PlayerState &&
 			!BuildingActorToEdit->bDestroyed)
 		{
 			Functions::SetEditingPlayer(BuildingActorToEdit, nullptr);
@@ -61,13 +64,12 @@ namespace PlayerController
 			int32 CurrentBuildingLevel = BuildingActorToEdit->CurrentBuildingLevel;
 			ReplaceBuildingActor(BuildingActorToEdit, 1, NewBuildingClass, CurrentBuildingLevel, RotationIterations, bMirrored, PlayerController);
 
-			// sub_7FF61C89CE20(PlayerController, "Edit", BuildingActorToEdit, 0);
-
 			AFortGameMode* GameMode = Globals::GetGameMode();
 
 			if (GameMode)
 			{
-				//sub_7FF61CAA91E0(GameMode, 4u, PlayerController, BuildingActorToEdit);
+				// 7FF61CAA91D0
+				//void (*sub_7FF61CAA91D0)(AFortGameMode* GameMode, AFortPlayerController* PlayerController, ABuildingSMActor* BuildingActorToEdit) = decltype(sub_7FF61CAA91D0)(0xF83F40 + uintptr_t(GetModuleHandle(0)));
 			}
 		}
 	}
@@ -81,97 +83,29 @@ namespace PlayerController
 		{
 			Functions::SetEditingPlayer(BuildingActorToStopEditing, nullptr);
 
-			TSoftObjectPtr<UFortEditToolItemDefinition> EditToolItem = Globals::GetGameData()->EditToolItem;
+			UFortGameData* GameData = Globals::GetGameData();
+			TSoftObjectPtr<UFortEditToolItemDefinition> EditToolItem = GameData->EditToolItem;
+			UFortEditToolItemDefinition* EditToolItemDefinition = EditToolItem.Get();
 
-			UFortEditToolItemDefinition* EditTool = EditToolItem.Get();
-
-			if (!EditTool)
+			if (!EditToolItemDefinition)
 			{
-				std::string ItemPath = EditToolItem.ObjectID.SubPathString.ToString();
-				EditTool = StaticLoadObject<UFortEditToolItemDefinition>(std::wstring(ItemPath.begin(), ItemPath.end()).c_str());
+				std::string AssetPathName = EditToolItem.ObjectID.AssetPathName.ToString();
+				EditToolItemDefinition = StaticLoadObject<UFortEditToolItemDefinition>(std::wstring(AssetPathName.begin(), AssetPathName.end()).c_str());
 			}
 
-			//__int64 v6 = sub_7FF61CD35B30(Idk, EditTool, nullptr);
+			UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_FindExistingItemForDefinition(EditToolItemDefinition, false));
 
-			if (/*v6 &&*/ EditTool /*&& sub_7FF61CE48920(EditTool, v6, PlayerController)*/)
+			// 7FF66F5D3F40
+			bool (*sub_7FF66F985640)(UFortWeaponItemDefinition * WeaponItemDefinition, UFortWorldItem* WorldItem, AFortPlayerController* PlayerController) = decltype(sub_7FF66F985640)(0xF83F40 + uintptr_t(GetModuleHandle(0)));
+
+			if (WorldItem && EditToolItemDefinition && sub_7FF66F985640(EditToolItemDefinition, WorldItem, PlayerController))
 			{
-				AFortWeapon* CurrentWeapon = PlayerController->MyFortPawn->CurrentWeapon;
+				AFortWeap_EditingTool* EditingTool = Cast<AFortWeap_EditingTool>(PlayerController->MyFortPawn->CurrentWeapon);
 
-				if (CurrentWeapon && CurrentWeapon->IsA(AFortWeap_EditingTool::StaticClass()))
-				{
-					AFortWeap_EditingTool* EditingTool = (AFortWeap_EditingTool*)CurrentWeapon;
-
+				if (EditingTool)
 					Functions::SetEditingActor(EditingTool, nullptr);
-				}
 			}
 		}
-	}
-
-
-
-	void SelfCompletedUpdatedQuest(UFortQuestManager* QuestManager, AFortPlayerController* QuestOwner, const UFortQuestItemDefinition* QuestDef, FName BackendName, int32 CompletionCount, int32 DeltaChange)
-	{
-		if (QuestDef)
-		{
-			UFortQuestItem* QuestWithDefinition = QuestManager->GetQuestWithDefinition(QuestDef);
-
-			if (QuestWithDefinition)
-			{
-				if (QuestOwner && QuestOwner->IsA(AFortPlayerControllerAthena::StaticClass()))
-				{
-					uint64_t v47 = ((uint64_t)DeltaChange << 32) | (uint32_t)CompletionCount;
-					uint64_t v46 = reinterpret_cast<uint64_t>(QuestDef);
-					v46 |= static_cast<uint64_t>(BackendName.ComparisonIndex) << 32;
-
-					uint64_t v45[2];
-					v45[1] = v47;
-					v45[0] = v46;
-
-					// sub_7FF6B9D4B650(reinterpret_cast<int64_t*>(QuestOwner), v45);
-				}
-			}
-		}
-	}
-
-	int32 GetAircraftIndex(AFortGameStateAthena* GameState, AFortPlayerStateAthena* PlayerState)
-	{
-		int32 result; // rax
-		__int64 v10; // [rsp+40h] [rbp+8h] BYREF
-
-		if (!GameState->CurrentPlaylistData || GameState->AirCraftBehavior != EAirCraftBehavior::OpposingAirCraftForEachTeam)
-			return 0;
-
-		if (!Cast<AFortPlayerStateAthena>(PlayerState))
-		{
-			FN_LOG(LogGameState, Error, "AFortGameStateAthena::GetAircraftIndex called with an invalid PlayerState.");
-			return 0;
-		}
-
-		auto IdkPlayerState = (void*)(__int64(PlayerState) + 0x3F0);
-
-		int32 (*IdkFunc)(void* IdkPlayerState, __int64* OutIdk, __int64* Idk) = decltype(IdkFunc)(((UObject*)IdkPlayerState)->VTable[0x5]);
-
-		__int64* (*IdkFunc2)(UFortPlaylistAthena* CurrentPlaylistData) = decltype(IdkFunc2)(GameState->CurrentPlaylistData->VTable[0xE]);
-
-		result = IdkFunc(IdkPlayerState, &v10, IdkFunc2(GameState->CurrentPlaylistData));
-
-		/*result = *(unsigned __int8*)(*(__int64(__fastcall**)(__int64, __int64*))(*(__int64*)(PlayerState + 0x3F0) + 40i64))(
-			__int64(PlayerState) + 0x3F0,
-			&v10)
-			- (unsigned int)*(unsigned __int8*)(GameState->CurrentPlaylistData + 112i64);*/
-
-		if ((EAthenaGamePhase)((int)GameState->GamePhase - 1) <= EAthenaGamePhase::Setup)
-		{
-			if (result >= 0)
-				return result;
-
-			return 0;
-		}
-
-		if (result < 0 || result >= GameState->Aircrafts.Num())
-			return 0;
-
-		return result;
 	}
 
 	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms)
@@ -193,10 +127,15 @@ namespace PlayerController
 			}
 
 			AFortPlayerPawn* Pawn = PlayerController->MyFortPawn;
+			AFortPlayerState* PlayerState = Cast<AFortPlayerState>(PlayerController->PlayerState);
 
-			if (Pawn && PlayerController->PlayerState)
+			if (Pawn && PlayerState)
 			{
-				static UFortAbilitySet* DefaultAbilities = FindObjectFast<UFortAbilitySet>("/Game/Abilities/Player/Generic/Traits/DefaultPlayer/GAS_DefaultPlayer.GAS_DefaultPlayer");
+				// 7FF66EC68170
+				void (*ClearAllAbilities)(UAbilitySystemComponent* AbilitySystemComponent) = decltype(ClearAllAbilities)(0x618170 + uintptr_t(GetModuleHandle(0)));
+				ClearAllAbilities(PlayerState->AbilitySystemComponent);
+
+				static UFortAbilitySet* DefaultAbilities = Globals::GetGameData()->GenericPlayerAbilitySet.Get();
 
 #ifdef DEBUGS
 				TArray<TSoftObjectPtr<UFortGameplayModifierItemDefinition>> ModifierList = Playlist->ModifierList;
@@ -206,7 +145,7 @@ namespace PlayerController
 
 				Abilities::GrantGameplayAbility(DefaultAbilities, Pawn);
 				Abilities::GrantGameplayEffect(DefaultAbilities, Pawn);
-				GameMode::ApplyCharacterCustomization((AFortPlayerState*)Pawn->PlayerState, Pawn);
+				GameMode::ApplyCharacterCustomization(PlayerState, Pawn);
 			}
 
 			FFortAthenaLoadout CustomizationLoadout = PlayerController->CustomizationLoadout;
@@ -220,7 +159,11 @@ namespace PlayerController
 			if (Pickaxe->WeaponDefinition)
 				PickaxeDefinition = Pickaxe->WeaponDefinition;
 
-			// Setup Inventory
+			/*FFortItemEntry ItemEntry;
+			Inventory::MakeItemEntry(&ItemEntry, PickaxeDefinition, 1, 0, 0, 0.f);
+
+			Inventory::AddInventoryItem(PlayerController, ItemEntry);*/
+
 			Inventory::SetupInventory(PlayerController, PickaxeDefinition);
 
 #ifdef CHEATS
@@ -240,52 +183,133 @@ namespace PlayerController
 
 #endif // CHEATS
 		}
-		else if (FunctionName.contains("ServerAttemptAircraftJump"))
+		else if (FunctionName.contains("ServerDropAllItems"))
 		{
-			AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)Object;
+			FN_LOG(LogPlayerController, Log, "[AFortPlayerController::ServerDropAllItems] call!");
+		}
+		else if (FunctionName.contains("ServerModDurability"))
+		{
+			FN_LOG(LogPlayerController, Log, "[AFortPlayerController::ServerModDurability] call!");
+		}
+		else if (FunctionName.contains("ServerModifyStat"))
+		{
+			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
+			auto Params = (Params::FortPlayerController_ServerModifyStat*)Parms;
+
+			FN_LOG(LogPlayerController, Log, "[AFortPlayerController::ServerModifyStat] StatName: %s, Amount: %i, ModType: %i, bForceStatSave: %i",
+				Params->StatName.ToString().c_str(), Params->Amount, Params->ModType, Params->bForceStatSave);
+
+			// PlayerController->ModifyStat(Params->StatName, Params->Amount, Params->ModType, Params->bForceStatSave); // appelle ServerModifyStat
+		}
+		else if (FunctionName.contains("ServerRemoveInventoryItem"))
+		{
+			FN_LOG(LogPlayerController, Log, "[AFortPlayerController::ServerRemoveInventoryItem] call!");
+		}
+		else if (FunctionName.contains("ServerRemoveInventoryStateValue"))
+		{
+			FN_LOG(LogPlayerController, Log, "[AFortPlayerController::ServerRemoveInventoryStateValue] call!");
+		}
+		else if (FunctionName.contains("ServerSetInventoryStateValue"))
+		{
+			FN_LOG(LogPlayerController, Log, "[AFortPlayerController::ServerSetInventoryStateValue] call!");
+		}
+		else if (FunctionName.contains("ServerCombineInventoryItems"))
+		{
+			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
+			auto Params = (Params::FortPlayerController_ServerCombineInventoryItems*)Parms;
+
+			if (!PlayerController)
+			{
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerCombineInventoryItems] Failed to get PlayerController!");
+				return;
+			}
+
+			UFortWorldItem* TargetWorldItem = Cast<UFortWorldItem>(PlayerController->K2_GetInventoryItemWithGuid(Params->TargetItemGuid));
+			UFortWorldItem* SourceWorldItem = Cast<UFortWorldItem>(PlayerController->K2_GetInventoryItemWithGuid(Params->SourceItemGuid));
+			
+			if (!TargetWorldItem || !SourceWorldItem)
+			{
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerCombineInventoryItems] Failed to get TargetWorldItem/SourceWorldItem!");
+				return;
+			}
+
+			UFortWorldItemDefinition* TargetItemDefinition = Cast<UFortWorldItemDefinition>(TargetWorldItem->ItemEntry.ItemDefinition);
+			UFortWorldItemDefinition* SourceItemDefinition = Cast<UFortWorldItemDefinition>(SourceWorldItem->ItemEntry.ItemDefinition);
+
+			if (!TargetItemDefinition || !SourceItemDefinition)
+			{
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerCombineInventoryItems] Failed to get TargetItemDefinition/SourceItemDefinition!");
+				return;
+			}
+
+			if (TargetItemDefinition == SourceItemDefinition && TargetWorldItem->ItemEntry.Count < TargetItemDefinition->MaxStackSize)
+			{
+				int32 NewTargetCount = TargetWorldItem->ItemEntry.Count + SourceWorldItem->ItemEntry.Count;
+
+				if (NewTargetCount > TargetItemDefinition->MaxStackSize)
+				{
+					int32 NewSourceCount = NewTargetCount - TargetItemDefinition->MaxStackSize;
+
+					Inventory::ModifyCountItem(PlayerController->WorldInventory, SourceWorldItem->ItemEntry.ItemGuid, NewSourceCount);
+
+					NewTargetCount = TargetItemDefinition->MaxStackSize;
+				}
+				else
+				{
+					Inventory::RemoveItem(PlayerController->WorldInventory, SourceWorldItem->ItemEntry.ItemGuid);
+				}
+
+				Inventory::ModifyCountItem(PlayerController->WorldInventory, TargetWorldItem->ItemEntry.ItemGuid, NewTargetCount);
+			}
+		}
+		else if (FunctionName.contains("ServerItemWillBeDestroyed"))
+		{
+			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
+			auto Params = (Params::FortPlayerController_ServerItemWillBeDestroyed*)Parms;
+
+			if (!PlayerController)
+			{
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerItemWillBeDestroyed] Failed to get PlayerController!");
+				return;
+			}
+
+			UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_GetInventoryItemWithGuid(Params->DestroyedItemGuid));
+
+			if (!WorldItem)
+			{
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerItemWillBeDestroyed] Failed to get WorldItem!");
+				return;
+			}
+
+			FN_LOG(LogPlayerController, Log, "[AFortPlayerController::ServerItemWillBeDestroyed] ItemDefinition: %s, Count: %i", WorldItem->ItemEntry.ItemDefinition->GetName().c_str(), Params->Count);
+		}
+		else if (FunctionName.contains("ServerAttemptAircraftJump")) // Rewrite
+		{
+			AFortPlayerControllerAthena* PlayerController = Cast<AFortPlayerControllerAthena>(Object);
 			auto Params = (Params::FortPlayerControllerAthena_ServerAttemptAircraftJump*)Parms;
 
-			if (!PlayerController || !PlayerController->PlayerState)
+			if (!PlayerController)
 			{
 				FN_LOG(LogPlayerController, Error, "[AFortPlayerControllerAthena::ServerAttemptAircraftJump] Failed to get PlayerController!");
 				return;
 			}
 
-			AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
+			AFortPlayerStateAthena* PlayerState = Cast<AFortPlayerStateAthena>(PlayerController->PlayerState);
+
+			if (!PlayerState)
+			{
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerControllerAthena::ServerAttemptAircraftJump] Failed to get PlayerState!");
+				return;
+			}
 
 			if (PlayerController->IsInAircraft() && !PlayerController->Pawn)
 			{
-				AFortGameModeAthena* GameMode = Globals::GetGameMode();
-				AFortGameStateAthena* GameState = Globals::GetGameState();
+				AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
 
-				if (!GameMode || !GameState)
+				if (!GameState)
 				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerControllerAthena::ServerAttemptAircraftJump] Failed to get GameMode/GameState!");
+					FN_LOG(LogPlayerController, Error, "[AFortPlayerControllerAthena::ServerAttemptAircraftJump] Failed to get GameState!");
 					return;
-				}
-
-				if (GameState->MapInfo)
-				{
-					AFortAthenaMapInfo* MapInfo = GameState->MapInfo;
-
-					for (int32 i = 0; i < MapInfo->FlightInfos.Num(); i++)
-					{
-						FAircraftFlightInfo FlightInfo = MapInfo->FlightInfos[i];
-
-						FVector_NetQuantize100 FlightStartLocation = FlightInfo.FlightStartLocation;
-						FRotator FlightStartRotation = FlightInfo.FlightStartRotation;
-						float FlightSpeed = FlightInfo.FlightSpeed;
-						float TimeTillFlightEnd = FlightInfo.TimeTillFlightEnd;
-						float TimeTillDropStart = FlightInfo.TimeTillDropStart;
-						float TimeTillDropEnd = FlightInfo.TimeTillDropEnd;
-
-						FN_LOG(LogPlayerController, Debug, "FlightStartLocation: [X: %.2f, Y: %.2f, Z: %.2f]", FlightStartLocation.X, FlightStartLocation.Y, FlightStartLocation.Z);
-						FN_LOG(LogPlayerController, Debug, "FlightStartRotation: [Pitch: %.2f, Yaw: %.2f, Roll: %.2f]", FlightStartRotation.Pitch, FlightStartRotation.Yaw, FlightStartRotation.Roll);
-						FN_LOG(LogPlayerController, Debug, "FlightSpeed: [%.2f]", FlightSpeed);
-						FN_LOG(LogPlayerController, Debug, "TimeTillFlightEnd: [%.2f]", TimeTillFlightEnd);
-						FN_LOG(LogPlayerController, Debug, "TimeTillDropStart: [%.2f]", TimeTillDropStart);
-						FN_LOG(LogPlayerController, Debug, "TimeTillDropEnd: [%.2f]", TimeTillDropEnd);
-					}
 				}
 
 				// 7FF66F239300
@@ -304,12 +328,27 @@ namespace PlayerController
 
 				Util::SpawnPlayer(PlayerController, AircraftLocation, FRotator(), false);
 
+				GameMode::SpawnDefaultPawnForHook(Globals::GetGameMode(), PlayerController, Aircraft);
+
 				PlayerController->SetControlRotation(Params->ClientRotation);
+
+				/*FFortAthenaLoadout CustomizationLoadout = PlayerController->CustomizationLoadout;
+				UAthenaPickaxeItemDefinition* Pickaxe = CustomizationLoadout.Pickaxe;
+
+				UFortWeaponMeleeItemDefinition* PickaxeDefinition = nullptr;
+
+				if (!Pickaxe || !Pickaxe->WeaponDefinition)
+					PickaxeDefinition = FindObjectFast<UFortWeaponMeleeItemDefinition>("/Game/Athena/Items/Weapons/WID_Harvest_Pickaxe_Athena_C_T01.WID_Harvest_Pickaxe_Athena_C_T01");
+
+				if (Pickaxe->WeaponDefinition)
+					PickaxeDefinition = Pickaxe->WeaponDefinition;
+
+				Inventory::SetupInventory(PlayerController, PickaxeDefinition);*/
 			}
 		}
-		else if (FunctionName.contains("ServerExecuteInventoryItem"))
+		else if (FunctionName.contains("ServerExecuteInventoryItem")) // Rewrite
 		{
-			AFortPlayerController* PlayerController = (AFortPlayerController*)Object;
+			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
 			auto Params = (Params::FortPlayerController_ServerExecuteInventoryItem*)Parms;
 
 			if (!PlayerController)
@@ -318,49 +357,40 @@ namespace PlayerController
 				return;
 			}
 
-			AFortPlayerPawn* Pawn = PlayerController->MyFortPawn;
+			UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_GetInventoryItemWithGuid(Params->ItemGuid));
 
-			if (!Pawn)
+			if (!WorldItem)
 			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerExecuteInventoryItem] Failed to get Pawn!");
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerExecuteInventoryItem] Failed to get WorldItem!");
 				return;
 			}
 
-			UFortWorldItem* ItemInstance = Inventory::GetItemInstance(PlayerController, Params->ItemGuid);
+			UFortWeaponItemDefinition* WeaponItemDefinition = Cast<UFortWeaponItemDefinition>(WorldItem->ItemEntry.ItemDefinition);
 
-			if (!ItemInstance)
+			if (WeaponItemDefinition)
 			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerExecuteInventoryItem] Failed to get ItemInstance!");
-				return;
-			}
+				UFortDecoItemDefinition* DecoItemDefinition = Cast<UFortDecoItemDefinition>(WeaponItemDefinition);
 
-			UFortWeaponItemDefinition* ItemDefinition = (UFortWeaponItemDefinition*)ItemInstance->GetItemDefinitionBP();
-
-			if (ItemDefinition)
-			{
-				if (ItemDefinition->IsA(UFortDecoItemDefinition::StaticClass()))
+				if (DecoItemDefinition)
 				{
-					UFortDecoItemDefinition* DecoItemDefinition = (UFortDecoItemDefinition*)ItemDefinition;
+					UFortContextTrapItemDefinition* ContextTrapItemDefinition = Cast<UFortContextTrapItemDefinition>(DecoItemDefinition);
 
-					Pawn->PickUpActor(nullptr, DecoItemDefinition);
-					Pawn->CurrentWeapon->ItemEntryGuid = ItemInstance->GetItemGuid();
-
-					if (Pawn->CurrentWeapon->IsA(AFortDecoTool_ContextTrap::StaticClass()))
+					if (ContextTrapItemDefinition)
 					{
-						AFortDecoTool_ContextTrap* CurrentContextTrap = (AFortDecoTool_ContextTrap*)Pawn->CurrentWeapon;
-
-						CurrentContextTrap->ContextTrapItemDefinition = (UFortContextTrapItemDefinition*)DecoItemDefinition;
+						EquipContextTrapDefinition(ContextTrapItemDefinition, WorldItem, PlayerController);
+						return;
 					}
 
+					EquipDecoDefinition(DecoItemDefinition, WorldItem, PlayerController);
 					return;
 				}
 
-				Pawn->EquipWeaponDefinition(ItemDefinition, ItemInstance->GetItemGuid());
-			} 
+				EquipWeaponDefinition(WeaponItemDefinition, WorldItem, PlayerController);
+			}
 		}
-		else if (FunctionName.contains("ServerAttemptInventoryDrop"))
+		else if (FunctionName.contains("ServerAttemptInventoryDrop")) // Rewrite
 		{
-			AFortPlayerController* PlayerController = (AFortPlayerController*)Object;
+			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
 			auto Params = (Params::FortPlayerController_ServerAttemptInventoryDrop*)Parms;
 
 			if (!PlayerController)
@@ -369,68 +399,60 @@ namespace PlayerController
 				return;
 			}
 
-			AFortPlayerPawn* Pawn = PlayerController->MyFortPawn;
+			UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_GetInventoryItemWithGuid(Params->ItemGuid));
+			AFortPlayerPawn* PlayerPawn = PlayerController->MyFortPawn;
 
-			if (!Pawn)
+			if (WorldItem && PlayerPawn)
 			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerAttemptInventoryDrop] Failed to get Pawn");
-				return;
-			}
+				UFortWorldItemDefinition* ItemDefinition = Cast<UFortWorldItemDefinition>(WorldItem->ItemEntry.ItemDefinition);
 
-			UFortWorldItem* ItemInstance = Inventory::GetItemInstance(PlayerController, Params->ItemGuid);
+				const FVector& SpawnLocation = PlayerPawn->K2_GetActorLocation();
 
-			if (!ItemInstance)
-			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerSpawnInventoryDrop] Failed to get ItemInstance!");
-				return;
-			}
-
-			UFortWorldItemDefinition* ItemDefinition = (UFortWorldItemDefinition*)ItemInstance->GetItemDefinitionBP();
-			FFortItemEntry ItemEntry = ItemInstance->ItemEntry;
-
-			if (ItemDefinition && ItemDefinition->bCanBeDropped)
-			{
-				const FGuid& ItemGuid = ItemInstance->GetItemGuid();
-
-				if (ItemEntry.Count <= 0)
+				if (ItemDefinition && ItemDefinition->bCanBeDropped)
 				{
-					Inventory::RemoveItemFromInventory(PlayerController, ItemGuid);
+					const FGuid& ItemGuid = WorldItem->ItemEntry.ItemGuid;
 
-					FN_LOG(LogPlayerController, Warning, "[AFortPlayerController::ServerSpawnInventoryDrop] The item [%s] has a count of [%i] deletion of the item.", ItemDefinition->GetName().c_str(), ItemEntry.Count);
-				}
-				else if (ItemEntry.Count == Params->Count)
-				{
-					Inventory::SpawnPickup(Pawn, &ItemEntry, Pawn->K2_GetActorLocation(), true, true, ItemInstance->ItemEntry.ItemGuid);
-					Inventory::RemoveItemFromInventory(PlayerController, ItemGuid);
-				}
-				else if (Params->Count < ItemEntry.Count)
-				{
-					int NewCount = ItemEntry.Count - Params->Count;
-
-					if (NewCount > 0)
+					if (WorldItem->ItemEntry.Count <= 0)
 					{
-						Inventory::ModifyCountItem(PlayerController, ItemGuid, NewCount);
+						FN_LOG(LogPlayerController, Warning, "[AFortPlayerController::ServerAttemptInventoryDrop] The item [%s] has a count of [%i] deletion of the item.", ItemDefinition->GetName().c_str(), WorldItem->ItemEntry.Count);
+						Inventory::RemoveItem(PlayerController->WorldInventory, ItemGuid);
+					}
+					else if (WorldItem->ItemEntry.Count == Params->Count)
+					{
+						Inventory::RemoveItem(PlayerController->WorldInventory, ItemGuid);
 
 						FFortItemEntry NewItemEntry;
-						Inventory::MakeItemEntry(&NewItemEntry, ItemDefinition, Params->Count, ItemEntry.Level, ItemEntry.LoadedAmmo, ItemEntry.Durability);
-						Inventory::SpawnPickup(Pawn, &NewItemEntry, Pawn->K2_GetActorLocation(), true);
+						Inventory::CreateItemEntry(&NewItemEntry);
+						Inventory::CopyItemEntry(&NewItemEntry, &WorldItem->ItemEntry);
+
+						Inventory::SetStateValue(&NewItemEntry, EFortItemEntryState::FromDroppedPickup, 1);
+
+						Inventory::SpawnPickup(PlayerPawn, NewItemEntry, SpawnLocation, true);
+						Inventory::FreeItemEntry(&NewItemEntry);
 					}
-					else
+					else if (WorldItem->ItemEntry.Count >= Params->Count)
 					{
-						FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerSpawnInventoryDrop] The item [%s] has an invalid new count [%i].", ItemDefinition->GetName().c_str(), NewCount);
-						return;
+						int32 NewCount = WorldItem->ItemEntry.Count - Params->Count;
+
+						Inventory::ModifyCountItem(PlayerController->WorldInventory, ItemGuid, NewCount);
+
+						FFortItemEntry NewItemEntry;
+						Inventory::MakeItemEntry(&NewItemEntry, ItemDefinition, Params->Count, WorldItem->ItemEntry.Level, WorldItem->ItemEntry.LoadedAmmo, WorldItem->ItemEntry.Durability);
+
+						Inventory::SetStateValue(&NewItemEntry, EFortItemEntryState::FromDroppedPickup, 1);
+
+						Inventory::SpawnPickup(PlayerPawn, NewItemEntry, SpawnLocation, true);
+						Inventory::FreeItemEntry(&NewItemEntry);
 					}
 				}
-
-				Inventory::UpdateInventory(PlayerController->WorldInventory);
 			}
 		}
 		else if (FunctionName.contains("ServerAttemptInteract"))
 		{
-			AFortPlayerController* PlayerController = (AFortPlayerController*)Object;
+			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
 			auto Params = (Params::FortPlayerController_ServerAttemptInteract*)Parms;
 
-			ABuildingContainer* ReceivingActor = (ABuildingContainer*)Params->ReceivingActor;
+			AActor* ReceivingActor = Params->ReceivingActor;
 
 			if (!PlayerController || !ReceivingActor)
 			{
@@ -438,251 +460,93 @@ namespace PlayerController
 				return;
 			}
 
-			if (ReceivingActor->HasAuthority())
+			AAthenaSupplyDrop_C* AthenaSupplyDrop = Cast<AAthenaSupplyDrop_C>(ReceivingActor);
+
+			// Remake: Function'AthenaSupplyDrop_C:SpawnLoot'
+			if (AthenaSupplyDrop)
 			{
-				if (ReceivingActor->IsA(AFortAthenaSupplyDrop::StaticClass()))
+				FVector LootSpawnLocation;
+				AthenaSupplyDrop->GetLootSpawnLocation(&LootSpawnLocation);
+
+				int32 LootLevel = UFortKismetLibrary::GetLootLevel(AthenaSupplyDrop);
+
+				TArray<FFortItemEntry> LootToDrops;
+				bool bSuccess = UFortKismetLibrary::PickLootDrops(AthenaSupplyDrop, &LootToDrops, AthenaSupplyDrop->LootTableName, LootLevel, -1);
+
+				if (!bSuccess)
 				{
-					static UClass* AthenaSupplyDropClass = FindObjectFast<UClass>("/Game/Athena/SupplyDrops/AthenaSupplyDrop.AthenaSupplyDrop_C");
-
-					FName SearchLootTierGroup;
-					
-					if (ReceivingActor->IsA(AthenaSupplyDropClass))
-					{
-						SearchLootTierGroup = UKismetStringLibrary::Conv_StringToName(L"Loot_AthenaSupplyDrop");
-					}
-
-					if (SearchLootTierGroup.IsValid())
-					{
-						bool bSuccess;
-						std::vector<FFortItemEntry> LootToDrops = Loots::ChooseLootToDrops(SearchLootTierGroup, -1, &bSuccess);
-
-						if (!bSuccess)
-						{
-							FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerAttemptInteract] Failed to get LootToDrops!");
-							return;
-						}
-
-						for (auto& LootToDrop : LootToDrops)
-							Inventory::SpawnPickup(nullptr, &LootToDrop, ReceivingActor->K2_GetActorLocation(), true);
-					}
+					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerAttemptInteract] Failed PickLootDrops!");
+					return;
 				}
-				else if (ReceivingActor->IsA(ABuildingItemCollectorActor::StaticClass()))
+
+				for (int32 i = 0; i < LootToDrops.Num(); i++)
 				{
-					ABuildingItemCollectorActor* BuildingItemCollector = (ABuildingItemCollectorActor*)ReceivingActor;
-					UFortWorldItemDefinition* ActiveInputItem = BuildingItemCollector->ActiveInputItem;
+					FFortItemEntry LootToDrop = LootToDrops[i];
+					UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(LootToDrop.ItemDefinition);
+					if (!WorldItemDefinition) continue;
 
-					if (!ActiveInputItem)
-					{
-						FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerAttemptInteract] Failed to get ActiveInputItem!");
-						return;
-					}
-
-					FVector ItemCollectorLocation = BuildingItemCollector->K2_GetActorLocation();
-					FVector ItemCollectorRightVector = BuildingItemCollector->GetActorRightVector() * 70.f;
-
-					FVector LootToDropLocation = ItemCollectorLocation + ItemCollectorRightVector;
-
-					LootToDropLocation.Z += 40;
-
-					FString ContextString;
-					EEvaluateCurveTableResult Result;
-
-					TArray<FColletorUnitInfo> ItemCollections = BuildingItemCollector->ItemCollections;
-
-					for (int32 i = 0; i < ItemCollections.Num(); i++)
-					{
-						FColletorUnitInfo ItemCollection = ItemCollections[i];
-
-						UFortWorldItemDefinition* InputItem = ItemCollection.InputItem;
-						if (!InputItem) continue;
-
-						if (InputItem != ActiveInputItem)
-							continue;
-
-						UFortWorldItem* ItemInstance = Inventory::GetItemInstance(PlayerController, InputItem);
-						if (!ItemInstance) continue;
-
-						FScalableFloat InputCount = ItemCollection.InputCount;
-
-						float InputCostXY;
-						UDataTableFunctionLibrary::EvaluateCurveTableRow(InputCount.Curve.CurveTable, InputCount.Curve.RowName, BuildingItemCollector->StartingGoalLevel, &Result, &InputCostXY, ContextString);
-
-						int32 InputCost = (InputCostXY * InputCount.Value);
-
-#ifdef CHEATS
-						if (PlayerController->bInfiniteAmmo)
-							InputCost = 0;
-#endif // CHEATS
-
-						if (InputCost > ItemInstance->GetNumInStack())
-						{
-							FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerAttemptInteract] the price of %s is %i while it only has %i",
-								InputItem->GetDisplayName(false).ToString().c_str(), InputCost, ItemInstance->GetNumInStack());
-
-							break;
-						}
-
-						if (Inventory::RemoveInventoryItem(PlayerController, ItemInstance->GetItemGuid(), InputCost))
-						{
-							TArray<FFortItemEntry> OutputItemEntry = ItemCollection.OutputItemEntry;
-
-							for (auto& ItemEntry : OutputItemEntry)
-							{
-								UFortWorldItemDefinition* ItemDefinition = (UFortWorldItemDefinition*)ItemEntry.ItemDefinition;
-								if (!ItemDefinition) continue;
-
-								FFortItemEntry NewItemEntry;
-								Inventory::MakeItemEntry(&NewItemEntry, ItemDefinition, ItemEntry.Count, ItemEntry.Level, ItemEntry.LoadedAmmo, ItemEntry.Durability);
-
-								Inventory::SpawnPickup(nullptr, &NewItemEntry, LootToDropLocation, true);
-							}
-
-							Inventory::UpdateInventory(PlayerController->WorldInventory);
-							BuildingItemCollector->bCurrentInteractionSuccess = true;
-						}
-
-						break;
-					}
+					FVector LootSpawnDirection = FVector({ 0, 0, 0 });
+					AthenaSupplyDrop->SpawnPickup(WorldItemDefinition, LootToDrop.Count, nullptr, LootSpawnLocation, LootSpawnDirection);
 				}
+			}
+
+			ABuildingItemCollectorActor* ItemCollectorActor = Cast<ABuildingItemCollectorActor>(ReceivingActor);
+
+			if (ItemCollectorActor)
+			{
+
+			}
+
 #ifdef DEBUGS
-				else if (ReceivingActor->IsA(ABuildingProp::StaticClass()))
+			ABuildingProp* BuildingProp = Cast<ABuildingProp>(ReceivingActor);
+
+			if (BuildingProp)
+			{
+				static UClass* HiddenStarClass = StaticLoadObject<UClass>(L"/Game/Athena/Items/QuestInteractables/HiddenStars/Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C");
+
+				if (HiddenStarClass)
 				{
-					ABuildingProp* BuildingProp = (ABuildingProp*)ReceivingActor;
-
-					static UClass* JigsawClass = StaticLoadObject<UClass>(L"/Game/Athena/Items/QuestInteractables/Llama_Puzzle/Prop_QuestInteractable_Jigsaw_Parent.Prop_QuestInteractable_Jigsaw_Parent_C");
-					static UClass* HiddenStarClass = StaticLoadObject<UClass>(L"/Game/Athena/Items/QuestInteractables/HiddenStars/Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C");
-
-					/*
-						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.UserConstructionScript
-						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Bob and Spin__FinishedFunc
-						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Bob and Spin__UpdateFunc
-						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Reveal__FinishedFunc
-						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Reveal__UpdateFunc
-						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Disappear__FinishedFunc
-						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Disappear__UpdateFunc
-						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Fade Out__FinishedFunc
-						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Fade Out__UpdateFunc
-						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.QuestInitializedAndValid
-						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Star Reveal
-						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.ThisQuestObjectiveComplete
-						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.DeactivateHiddenStar
-						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.ReceiveBeginPlay
-						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.Star Hide
-						Function Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C.ExecuteUbergraph_Prop_QuestInteractable_HiddenStar_Parent
-					*/
-
-					if (BuildingProp->IsA(JigsawClass))
+					if (true)
 					{
-						if (true)
+						static UFunction* Func = nullptr;
+
+						if (Func == nullptr)
+							Func = BuildingProp->Class->GetFunction("Prop_QuestInteractable_HiddenStar_Parent_C", "ThisQuestObjectiveComplete");
+
+						if (Func)
 						{
-							static UFunction* Func = nullptr;
-
-							if (Func == nullptr)
-								Func = BuildingProp->Class->GetFunction("Prop_QuestInteractable_Jigsaw_Parent_C", "StartRattle");
-
-							BuildingProp->ProcessEvent(Func, nullptr);
-
-							FN_LOG(LogPlayerController, Debug, "JigsawClass - Func: %s", Func->GetName().c_str());
-						}
-
-						if (true)
-						{
-							static UFunction* Func = nullptr;
-
-							if (Func == nullptr)
-								Func = BuildingProp->Class->GetFunction("Prop_QuestInteractable_Jigsaw_Parent_C", "Set Letter at Beginning");
-
-							BuildingProp->ProcessEvent(Func, nullptr);
-
-							FN_LOG(LogPlayerController, Debug, "JigsawClass - Func: %s", Func->GetName().c_str());
-						}
-
-						if (true)
-						{
-							static UFunction* Func = nullptr;
-
-							if (Func == nullptr)
-								Func = BuildingProp->Class->GetFunction("Prop_QuestInteractable_Jigsaw_Parent_C", "QuestUpdatedFromAnywhere");
-
-							BuildingProp->ProcessEvent(Func, nullptr);
-
-							FN_LOG(LogPlayerController, Debug, "JigsawClass - Func: %s", Func->GetName().c_str());
-						}
-
-						if (true)
-						{
-							static UFunction* Func = nullptr;
-
-							if (Func == nullptr)
-								Func = BuildingProp->Class->GetFunction("Prop_QuestInteractable_Jigsaw_Parent_C", "ThisQuestObjectiveComplete");
-
-							BuildingProp->ProcessEvent(Func, &PlayerController->MyFortPawn);
-
-							FN_LOG(LogPlayerController, Debug, "JigsawClass - Func: %s", Func->GetName().c_str());
-						}
-
-						if (true)
-						{
-							static UFunction* Func = nullptr;
-
-							if (Func == nullptr)
-								Func = BuildingProp->Class->GetFunction("Prop_QuestInteractable_Jigsaw_Parent_C", "PieceRattle");
-
-							BuildingProp->ProcessEvent(Func, nullptr);
-
-							FN_LOG(LogPlayerController, Debug, "JigsawClass - Func: %s", Func->GetName().c_str());
-						}
-
-						FN_LOG(LogPlayerController, Debug, "JigsawClass - BuildingProp: %s", BuildingProp->GetName().c_str());
-					}
-					else if (BuildingProp->IsA(HiddenStarClass))
-					{
-						if (true)
-						{
-							static UFunction* Func = nullptr;
-
-							if (Func == nullptr)
-								Func = BuildingProp->Class->GetFunction("Prop_QuestInteractable_HiddenStar_Parent_C", "ThisQuestObjectiveComplete");
-
 							BuildingProp->ProcessEvent(Func, &PlayerController->MyFortPawn);
 
 							FN_LOG(LogPlayerController, Debug, "HiddenStarClass - Func: %s", Func->GetName().c_str());
 						}
-	
-						FN_LOG(LogPlayerController, Debug, "HiddenStarClass - BuildingProp: %s", BuildingProp->GetName().c_str());
+						
 					}
 
-					for (UStruct* Clss = BuildingProp->Class; Clss; Clss = Clss->Super)
-					{
-						for (UField* Field = Clss->Children; Field; Field = Field->Next)
-						{
-							if (Field->HasTypeFlag(EClassCastFlags::Function))
-							{
-								UFunction* Test = (UFunction*)Field;
-
-								FN_LOG(LogHooks, Debug, "Test: %s", Test->GetFullName().c_str());
-							}
-						}
-					}
+					FN_LOG(LogPlayerController, Debug, "HiddenStarClass - BuildingProp: %s", BuildingProp->GetName().c_str());
 				}
-#endif // DEBUGS
-
-				ReceivingActor->ForceNetUpdate();
 			}
+#endif // DEBUGS
+			ReceivingActor->ForceNetUpdate();
 		}
-		else if (FunctionName.contains("ServerCreateBuildingActor"))
+		else if (FunctionName.contains("ServerCreateBuildingActor")) // Rewrite
 		{
 			AFortPlayerController* PlayerController = (AFortPlayerController*)Object;
 			auto Params = (Params::FortPlayerController_ServerCreateBuildingActor*)Parms;
 
-			if (!PlayerController || !PlayerController->MyFortPawn || !PlayerController->PlayerState)
+			if (!PlayerController)
 			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerCreateBuildingActor] Failed to get PlayerController/Pawn/PlayerState!");
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerCreateBuildingActor] Failed to get PlayerController!");
 				return;
 			}
 
-			AFortPlayerPawn* MyFortPawn = PlayerController->MyFortPawn;
-			AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
+			AFortPlayerPawn* PlayerPawn = PlayerController->MyFortPawn;
+			AFortPlayerStateAthena* PlayerState = Cast<AFortPlayerStateAthena>(PlayerController->PlayerState);
+
+			if (!PlayerPawn || !PlayerState)
+			{
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerCreateBuildingActor] Failed to get PlayerPawn/PlayerState!");
+				return;
+			}
 
 			const FBuildingClassData& BuildingClassData = Params->BuildingClassData;
 
@@ -710,9 +574,8 @@ namespace PlayerController
 					return;
 				}
 
-				const float Distance = MyFortPawn->GetDistanceTo(BuildingActor);
+				const float Distance = PlayerPawn->GetDistanceTo(BuildingActor);
 
-				// Ban Def
 				if (Distance > 1750)
 				{
 					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerCreateBuildingActor] Maximum distance is 1750, your distance is %.2f.", Distance);
@@ -724,10 +587,10 @@ namespace PlayerController
 				if (!PlayerController->bBuildFree)
 #endif // CHEATS
 				{
-					UFortWorldItem* ItemInstance = Inventory::GetItemInstance(PlayerController, UFortKismetLibrary::K2_GetResourceItemDefinition(BuildingActor->ResourceType));
+					UFortResourceItemDefinition* ResourceItemDefinition = UFortKismetLibrary::K2_GetResourceItemDefinition(BuildingActor->ResourceType);
+					UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_FindExistingItemForDefinition(ResourceItemDefinition, false));
 
-					// Ban Def
-					if (!ItemInstance)
+					if (!WorldItem)
 					{
 						BuildingActor->SilentDie();
 						return;
@@ -735,9 +598,9 @@ namespace PlayerController
 
 					int32 ResourceAmount = GetCreateResourceAmount(PlayerController, BuildingClassData);
 
-					if (ResourceAmount > ItemInstance->GetNumInStack())
+					if (ResourceAmount > WorldItem->ItemEntry.Count)
 					{
-						FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerCreateBuildingActor] Failed to create BuildingActor, resource amount [%i] while player only has [%i]", ResourceAmount, ItemInstance->GetNumInStack());
+						FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerCreateBuildingActor] Failed to create BuildingActor, resource amount [%i] while player only has [%i]", ResourceAmount, WorldItem->ItemEntry.Count);
 						BuildingActor->SilentDie();
 						return;
 					}
@@ -775,87 +638,94 @@ namespace PlayerController
 					ExistingBuildings.Free();
 			}
 		}
-		else if (FunctionName.contains("ServerRepairBuildingActor"))
+		else if (FunctionName.contains("ServerRepairBuildingActor")) // Rewrite
 		{
 			AFortPlayerController* PlayerController = (AFortPlayerController*)Object;
 			auto Params = (Params::FortPlayerController_ServerRepairBuildingActor*)Parms;
 
 			ABuildingSMActor* BuildingActorToRepair = Params->BuildingActorToRepair;
 
-			if (!PlayerController || !PlayerController->MyFortPawn || !BuildingActorToRepair || !PlayerController->PlayerState)
+			if (!PlayerController || !BuildingActorToRepair)
 			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] Failed to get PlayerController/Pawn/BuildingActorToRepair/PlayerState!");
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] Failed to get PlayerController/BuildingActorToRepair!");
 				return;
 			}
 
-			AFortPlayerPawn* MyFortPawn = PlayerController->MyFortPawn;
-			AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
+			AFortPlayerPawn* PlayerPawn = PlayerController->MyFortPawn;
+			AFortPlayerStateAthena* PlayerState = Cast<AFortPlayerStateAthena>(PlayerController->PlayerState);
 
-			if (BuildingActorToRepair->HasAuthority())
+			if (!PlayerPawn || !PlayerState)
 			{
-				if (!UFortKismetLibrary::OnSameTeam(PlayerController, BuildingActorToRepair))
-				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] PlayerController (team: [%i]) and BuildingActorToRepair (team [%i]) is not on the same team!",
-						PlayerState->TeamIndex, BuildingActorToRepair->Team);
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] Failed to get PlayerPawn/PlayerState!");
+				return;
+			}
 
-					return;
-				}
+			if (!Functions::IsOnSameTeam(PlayerState, BuildingActorToRepair))
+			{
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] PlayerController (team: [%i]) and BuildingActorToRepair (team [%i]) is not on the same team!",
+					PlayerState->TeamIndex, BuildingActorToRepair->Team);
 
-				const float Distance = MyFortPawn->GetDistanceTo(BuildingActorToRepair);
+				return;
+			}
 
-				// Ban Def Player
-				if (Distance > 1000)
-				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] Maximum distance is 1000, your distance is %.2f.", Distance);
-					return;
-				}
+			const float Distance = PlayerPawn->GetDistanceTo(BuildingActorToRepair);
+
+			if (Distance > 1000)
+			{
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] Maximum distance is 1000, your distance is %.2f.", Distance);
+				return;
+			}
 
 #ifdef CHEATS
-				if (!PlayerController->bBuildFree)
+			if (!PlayerController->bBuildFree)
 #endif // CHEATS
+			{
+				UFortResourceItemDefinition* ResourceItemDefinition = UFortKismetLibrary::K2_GetResourceItemDefinition(BuildingActorToRepair->ResourceType);
+				UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_FindExistingItemForDefinition(ResourceItemDefinition, false));
+
+				if (!WorldItem)
 				{
-					UFortWorldItem* ItemInstance = Inventory::GetItemInstance(PlayerController, UFortKismetLibrary::K2_GetResourceItemDefinition(BuildingActorToRepair->ResourceType));
-
-					// Ban Def Player
-					if (!ItemInstance)
-					{
-						FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] Failed to get Resource Item Definition!");
-						return;
-					}
-
-					int32 ResourceAmount = GetRepairResourceAmount(BuildingActorToRepair, PlayerController);
-
-					// Ban Def Player
-					if (ResourceAmount > ItemInstance->GetNumInStack())
-					{
-						FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] Failed to repair BuildingActor, resource amount [%i] while player only has [%i]", ResourceAmount, ItemInstance->GetNumInStack());
-						return;
-					}
+					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] Failed to get Resource Item Definition!");
+					return;
 				}
 
-				int32 ResourcesSpent = PayRepairCosts(PlayerController, BuildingActorToRepair);
-				BuildingActorToRepair->RepairBuilding(PlayerController, ResourcesSpent);
+				int32 ResourceAmount = GetRepairResourceAmount(BuildingActorToRepair, PlayerController);
+
+				if (ResourceAmount > WorldItem->ItemEntry.Count)
+				{
+					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] Failed to repair BuildingActor, resource amount [%i] while player only has [%i]", ResourceAmount, WorldItem->ItemEntry.Count);
+					return;
+				}
 			}
+
+			int32 ResourcesSpent = PayRepairCosts(PlayerController, BuildingActorToRepair);
+			BuildingActorToRepair->RepairBuilding(PlayerController, ResourcesSpent);
 		}
-		else if (FunctionName.contains("ServerBeginEditingBuildingActor"))
+		/*else if (FunctionName.contains("ServerBeginEditingBuildingActor")) // Rewrite
 		{
 			AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)Object;
 			auto Params = (Params::FortPlayerController_ServerBeginEditingBuildingActor*)Parms;
 
 			ABuildingSMActor* BuildingActorToEdit = Params->BuildingActorToEdit;
 
-			if (!PlayerController || !BuildingActorToEdit || !PlayerController->MyFortPawn || !PlayerController->PlayerState)
+			if (!PlayerController || !BuildingActorToEdit)
 			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerBeginEditingBuildingActor] Failed to get PlayerController/BuildingActorToEdit/Pawn/PlayerState!");
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerBeginEditingBuildingActor] Failed to get PlayerController/BuildingActorToEdit!");
 				return;
 			}
 
-			AFortPlayerPawn* MyFortPawn = PlayerController->MyFortPawn;
-			AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
+			AFortPlayerPawn* PlayerPawn = PlayerController->MyFortPawn;
+			AFortPlayerStateAthena* PlayerState = Cast<AFortPlayerStateAthena>(PlayerController->PlayerState);
 
-			if (BuildingActorToEdit->HasAuthority() && CheckBeginEditBuildingActor(BuildingActorToEdit, PlayerController))
+			if (!PlayerPawn || !PlayerState)
 			{
-				if (!UFortKismetLibrary::OnSameTeam(PlayerController, BuildingActorToEdit))
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerBeginEditingBuildingActor] Failed to get PlayerPawn/PlayerState!");
+				return;
+			}
+
+			if (CheckBeginEditBuildingActor(BuildingActorToEdit, PlayerController))
+			{
+				if (!Functions::IsOnSameTeam(PlayerState, BuildingActorToEdit))
 				{
 					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerBeginEditingBuildingActor] PlayerController (team: [%i]) and BuildingActorToEdit (team [%i]) is not on the same team!",
 						PlayerState->TeamIndex, BuildingActorToEdit->Team);
@@ -863,17 +733,15 @@ namespace PlayerController
 					return;
 				}
 
-				float Distance = MyFortPawn->GetDistanceTo(BuildingActorToEdit);
+				float Distance = PlayerPawn->GetDistanceTo(BuildingActorToEdit);
 
-				// Kick Player
 				if (Distance > 1000)
 				{
 					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] Maximum distance is 1000, your distance is %.2f.", Distance);
 					return;
 				}
 
-				static UFortEditToolItemDefinition* EditToolDefinition = FindObjectFast<UFortEditToolItemDefinition>("/Game/Items/Weapons/BuildingTools/EditTool.EditTool");
-				// static UFortEditToolItemDefinition* EditToolDefinition = Globals::GetGameData()->EditToolItem.Get();
+				static UFortEditToolItemDefinition* EditToolDefinition = Globals::GetGameData()->EditToolItem.Get();
 
 				if (!EditToolDefinition)
 				{
@@ -881,15 +749,15 @@ namespace PlayerController
 					return;
 				}
 
-				UFortWorldItem* ItemInstance = Inventory::GetItemInstance(PlayerController, EditToolDefinition);
+				UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_FindExistingItemForDefinition(EditToolDefinition, false));
 
-				if (!ItemInstance)
+				if (!WorldItem)
 				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerBeginEditingBuildingActor] Failed to get ItemInstance!");
+					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerBeginEditingBuildingActor] Failed to get WorldItem!");
 					return;
 				}
 
-				AFortWeap_EditingTool* EditTool = (AFortWeap_EditingTool*)MyFortPawn->EquipWeaponDefinition(EditToolDefinition, ItemInstance->GetItemGuid());
+				AFortWeap_EditingTool* EditTool = Cast<AFortWeap_EditingTool>(PlayerPawn->EquipWeaponDefinition(EditToolDefinition, WorldItem->ItemEntry.ItemGuid));
 
 				if (!EditTool)
 				{
@@ -897,52 +765,41 @@ namespace PlayerController
 					return;
 				}
 
-				Functions::SetEditingPlayer(BuildingActorToEdit, (AFortPlayerStateZone*)PlayerController->PlayerState);
+				Functions::SetEditingPlayer(BuildingActorToEdit, PlayerState);
 				Functions::SetEditingActor(EditTool, BuildingActorToEdit);
 			}
 		}
-		else if (FunctionName.contains("ServerEditBuildingActor"))
+		else if (FunctionName.contains("ServerEditBuildingActor")) // Rewrite
 		{
 			AFortPlayerController* PlayerController = (AFortPlayerController*)Object;
 			auto Params = (Params::FortPlayerController_ServerEditBuildingActor*)Parms;
 
 			ABuildingSMActor* BuildingActorToEdit = Params->BuildingActorToEdit;
 
-			if (!PlayerController || !PlayerController->MyFortPawn || !BuildingActorToEdit || !PlayerController->PlayerState)
+			if (!PlayerController || !BuildingActorToEdit)
 			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] Failed to get PlayerController/Pawn/BuildingActorToEdit/PlayerState!");
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] Failed to get PlayerController/BuildingActorToEdit!");
 				return;
 			}
 
-			AFortPlayerPawn* MyFortPawn = PlayerController->MyFortPawn;
-			AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
+			AFortPlayerPawn* PlayerPawn = PlayerController->MyFortPawn;
+			AFortPlayerStateAthena* PlayerState = Cast<AFortPlayerStateAthena>(PlayerController->PlayerState);
 
-			if (BuildingActorToEdit->HasAuthority() && !BuildingActorToEdit->bDestroyed)
+			if (!PlayerPawn || !PlayerState)
 			{
-				if (PlayerState != BuildingActorToEdit->EditingPlayer)
-				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] PlayerController (EditingPlayer: [%s]) and BuildingActorToEdit (EditingPlayer [%s]) is not the same!",
-						PlayerState->GetName().c_str(), BuildingActorToEdit->EditingPlayer->GetName().c_str());
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] Failed to get PlayerPawn/PlayerState!");
+				return;
+			}
 
-					return;
-				}
-
-				if (!UFortKismetLibrary::OnSameTeam(PlayerController, BuildingActorToEdit))
-				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] PlayerController (team: [%i]) and BuildingActorToEdit (team [%i]) is not on the same team!",
-						PlayerState->TeamIndex, BuildingActorToEdit->Team);
-
-					return;
-				}
-
-				// Ban Def Player
+			if (PlayerState == BuildingActorToEdit->EditingPlayer && !BuildingActorToEdit->bDestroyed)
+			{
 				if (!Functions::IsPlayerBuildableClasse(Params->NewBuildingClass.Get()))
 				{
 					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] Failed to get BuildingClass or is not the player buildable classe!");
 					return;
 				}
 
-				if (!MyFortPawn->CurrentWeapon || !MyFortPawn->CurrentWeapon->IsA(AFortWeap_EditingTool::StaticClass()))
+				if (!PlayerPawn->CurrentWeapon || !PlayerPawn->CurrentWeapon->IsA(AFortWeap_EditingTool::StaticClass()))
 				{
 					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] Failed to get CurrentWeapon or is not the Editing Tool!");
 					return;
@@ -959,42 +816,31 @@ namespace PlayerController
 				}
 			}
 		}
-		else if (FunctionName.contains("ServerEndEditingBuildingActor"))
+		else if (FunctionName.contains("ServerEndEditingBuildingActor")) // Rewrite
 		{
 			AFortPlayerController* PlayerController = (AFortPlayerController*)Object;
 			auto Params = (Params::FortPlayerController_ServerEndEditingBuildingActor*)Parms;
 
 			ABuildingSMActor* BuildingActorToStopEditing = Params->BuildingActorToStopEditing;
 
-			if (!PlayerController || !BuildingActorToStopEditing || !PlayerController->MyFortPawn || !PlayerController->PlayerState)
+			if (!PlayerController || !BuildingActorToStopEditing)
 			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEndEditingBuildingActor] Failed to get PlayerController/BuildingActorToStopEditing/Pawn/PlayerState!");
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEndEditingBuildingActor] Failed to get PlayerController/BuildingActorToStopEditing!");
 				return;
 			}
 
-			AFortPlayerPawn* MyFortPawn = PlayerController->MyFortPawn;
-			AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
+			AFortPlayerPawn* PlayerPawn = PlayerController->MyFortPawn;
+			AFortPlayerStateAthena* PlayerState = Cast<AFortPlayerStateAthena>(PlayerController->PlayerState);
 
-			if (BuildingActorToStopEditing->HasAuthority())
+			if (!PlayerPawn || !PlayerState)
 			{
-				if (PlayerState != BuildingActorToStopEditing->EditingPlayer)
-				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] PlayerController (EditingPlayer: [%s]) and BuildingActorToStopEditing (EditingPlayer [%s]) is not the same!",
-						PlayerState->GetName().c_str(), BuildingActorToStopEditing->EditingPlayer->GetName().c_str());
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEndEditingBuildingActor] Failed to get PlayerPawn/PlayerState!");
+				return;
+			}
 
-					return;
-				}
-
-				if (!UFortKismetLibrary::OnSameTeam(PlayerController, BuildingActorToStopEditing))
-				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEndEditingBuildingActor] PlayerController (team: [%i]) and BuildingActorToStopEditing (team [%i]) is not on the same team!",
-						PlayerState->TeamIndex, BuildingActorToStopEditing->Team);
-
-					return;
-				}
-
-				static UFortEditToolItemDefinition* EditToolDefinition = FindObjectFast<UFortEditToolItemDefinition>("/Game/Items/Weapons/BuildingTools/EditTool.EditTool");
-				// static UFortEditToolItemDefinition* EditToolDefinition = Globals::GetGameData()->EditToolItem.Get();
+			if (PlayerState == BuildingActorToStopEditing->EditingPlayer && !BuildingActorToStopEditing->bDestroyed)
+			{
+				static UFortEditToolItemDefinition* EditToolDefinition = Globals::GetGameData()->EditToolItem.Get();
 
 				if (!EditToolDefinition)
 				{
@@ -1002,7 +848,7 @@ namespace PlayerController
 					return;
 				}
 
-				AFortWeap_EditingTool* EditTool = (AFortWeap_EditingTool*)MyFortPawn->CurrentWeapon;
+				AFortWeap_EditingTool* EditTool = Cast<AFortWeap_EditingTool>(PlayerPawn->CurrentWeapon);
 
 				if (!EditTool)
 				{
@@ -1013,7 +859,7 @@ namespace PlayerController
 				Functions::SetEditingPlayer(BuildingActorToStopEditing, nullptr);
 				Functions::SetEditingActor(EditTool, nullptr);
 			}
-		}
+		}*/
 		else if (FunctionName.contains("ClientOnPawnDied"))
 		{
 			AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)Object;
@@ -1066,10 +912,11 @@ namespace PlayerController
 			if (!Pawn->bIsDBNO)
 			{
 				UAthenaPlayerMatchReport* MatchReport = PlayerController->GetMatchReport();
+				AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
 
 				FAthenaMatchTeamStats TeamStats;
-				TeamStats.Place = Globals::GetGameState()->PlayersLeft;
-				TeamStats.TotalPlayers = Globals::GetGameState()->TotalPlayers;
+				TeamStats.Place = GameState->PlayersLeft;
+				TeamStats.TotalPlayers = GameState->TotalPlayers;
 
 				FAthenaRewardResult EndOfMatchResults;
 				EndOfMatchResults.LevelsGained = 999;
@@ -1096,7 +943,7 @@ namespace PlayerController
 				PlayerController->ClientSendEndBattleRoyaleMatchForPlayer(true, EndOfMatchResults);
 				PlayerController->ClientSendTeamStatsForPlayer(TeamStats);
 
-				AFortGameModeAthena* GameMode = Globals::GetGameMode();
+				// AFortGameModeAthena* GameMode = Globals::GetGameMode();
 
 				AFortPlayerStateAthena* CorrectPlayerState = (PlayerState == KillerPlayerState) ? nullptr : KillerPlayerState;
 
@@ -1237,7 +1084,7 @@ namespace PlayerController
 		}
 	}
 
-	bool RemoveInventoryItemHook(void* a1, const FGuid& ItemGuid, int32 Count, int a4, char a5)
+	bool RemoveInventoryItemHook(void* a1, const FGuid& ItemGuid, int32 AmountToRemove, bool bForceRemoveFromQuickBars, bool bForceRemoval)
 	{
 		AFortPlayerController* PlayerController = (AFortPlayerController*)(__int64(a1) - IdkOffset);
 
@@ -1250,17 +1097,19 @@ namespace PlayerController
 #ifdef CHEATS
 		if (PlayerController->bInfiniteAmmo)
 		{
-			Inventory::UpdateInventory(PlayerController->WorldInventory);
+			PlayerController->WorldInventory->HandleInventoryLocalUpdate();
 			return true;
 		}
 #endif // CHEATS
 
-		bool bResult = Inventory::RemoveInventoryItem(PlayerController, ItemGuid, Count);
 
-		if (bResult)
-			Inventory::UpdateInventory(PlayerController->WorldInventory);
+#ifdef DEBUGS
+		//int TestEgal3 = (int)(__int64(a1) - 0x568);
 
-		return bResult;
+		//FN_LOG(LogPlayerController, Log, "[AFortPlayerController::RemoveInventoryItem] TestEgal3: %i", TestEgal3);
+#endif // DEBUGS
+
+		return Inventory::RemoveInventoryItem(PlayerController, ItemGuid, AmountToRemove);
 	}
 
 	// Call in 7FF66F979AF0
@@ -1274,8 +1123,7 @@ namespace PlayerController
 			return;
 		}
 
-		Inventory::ModifyLoadedAmmoItem(PlayerController, ItemGuid, CorrectAmmo);
-		Inventory::UpdateInventory(PlayerController->WorldInventory);
+		Inventory::ModifyLoadedAmmoItem(PlayerController->WorldInventory, ItemGuid, CorrectAmmo);
 
 		ModifyLoadedAmmo(a1, ItemGuid, CorrectAmmo);
 	}
@@ -1289,8 +1137,8 @@ namespace PlayerController
 			return;
 		}
 
-		Inventory::RemoveAllItemsFromInventory(PlayerController);
-		Inventory::UpdateInventory(PlayerController->WorldInventory);
+		if (PlayerController->WorldInventory)
+			Inventory::ResetInventory(PlayerController->WorldInventory);
 
 		OnEnterAircraft(PlayerController, AthenaAircraft);
 	}
@@ -1300,6 +1148,10 @@ namespace PlayerController
 		static auto FortPlayerControllerAthenaDefault = AFortPlayerControllerAthena::GetDefaultObj();
 
 		auto IdkDefault = (void*)(__int64(FortPlayerControllerAthenaDefault) + IdkOffset);
+
+		MinHook::HookVTable(FortPlayerControllerAthenaDefault, 0x216, ServerBeginEditingBuildingActor, nullptr, "AFortPlayerController::ServerBeginEditingBuildingActor");
+		MinHook::HookVTable(FortPlayerControllerAthenaDefault, 0x212, ServerEditBuildingActor, nullptr, "AFortPlayerController::ServerEditBuildingActor");
+		MinHook::HookVTable(FortPlayerControllerAthenaDefault, 0x214, ServerEndEditingBuildingActor, nullptr, "AFortPlayerController::ServerEndEditingBuildingActor");
 
 		uintptr_t AddressRemoveInventoryItem = MinHook::FindPattern(Patterns::RemoveInventoryItem);
 		uintptr_t AddressModifyLoadedAmmo = MinHook::FindPattern(Patterns::ModifyLoadedAmmo);
@@ -1320,6 +1172,9 @@ namespace PlayerController
 		uintptr_t AddressCheckBeginEditBuildingActor = MinHook::FindPattern(Patterns::CheckBeginEditBuildingActor);
 		uintptr_t AddressReplaceBuildingActor = MinHook::FindPattern(Patterns::ReplaceBuildingActor);
 		uintptr_t AddressToDeathCause = MinHook::FindPattern(Patterns::ToDeathCause);
+		uintptr_t AddressEquipWeaponDefinition = MinHook::FindPattern(Patterns::EquipWeaponDefinition);
+		uintptr_t AddressEquipDecoDefinition = MinHook::FindPattern(Patterns::EquipDecoDefinition);
+		uintptr_t AddressEquipContextTrapDefinition = MinHook::FindPattern(Patterns::EquipContextTrapDefinition);
 
 		GetRepairResourceAmount = decltype(GetRepairResourceAmount)(AddressGetRepairResourceAmount);
 		GetCreateResourceAmount = decltype(GetCreateResourceAmount)(AddressGetCreateResourceAmount);
@@ -1329,6 +1184,9 @@ namespace PlayerController
 		CheckBeginEditBuildingActor = decltype(CheckBeginEditBuildingActor)(AddressCheckBeginEditBuildingActor);
 		ReplaceBuildingActor = decltype(ReplaceBuildingActor)(AddressReplaceBuildingActor);
 		ToDeathCause = decltype(ToDeathCause)(AddressToDeathCause);
+		EquipWeaponDefinition = decltype(EquipWeaponDefinition)(AddressEquipWeaponDefinition);
+		EquipDecoDefinition = decltype(EquipDecoDefinition)(AddressEquipDecoDefinition);
+		EquipContextTrapDefinition = decltype(EquipContextTrapDefinition)(AddressEquipContextTrapDefinition);
 
 		FN_LOG(LogInit, Log, "InitPlayerController Success!");
 	}

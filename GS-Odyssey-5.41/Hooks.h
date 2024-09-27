@@ -102,65 +102,6 @@ namespace Hooks
 		PickupCombine(Pickup);
 	}
 
-	UFortResourceItemDefinition* GetResourceItemDefinition(int ResourceType)
-	{
-		UFortGameData* GameData = Globals::GetGameData();
-
-		int v2; // edx
-		int v3; // edx
-
-		if (!ResourceType)
-			return GameData->WoodItemDefinition;
-		v2 = ResourceType - 1;
-		if (!v2)
-			return GameData->StoneItemDefinition;
-		v3 = v2 - 1;
-		if (!v3)
-			return GameData->MetalItemDefinition;
-		if (v3 == 1)
-			return GameData->PermaniteItemDefinition;
-		return nullptr;
-	}
-
-	float GenFlyTime()
-	{
-		float MaxTime; // [rsp+48h] [rbp+10h] BYREF
-		float MinTime; // [rsp+50h] [rbp+18h] BYREF
-
-		UCurveVector* PickupSplineCurve = Globals::GetGameData()->PickupSplineCurve;
-		if (!PickupSplineCurve)
-			return 1.5;
-		PickupSplineCurve->GetTimeRange(&MinTime, &MaxTime);
-		float PickupSplineRandomMax = Globals::GetGameData()->PickupSplineRandomMax;
-		return (float)(MaxTime - MinTime) * (float)((float)((float)((float)rand() * 0.000030518509) * (float)(PickupSplineRandomMax - 1.0)) + 1.0);
-	}
-
-	void sub_7FF66F5E1CA0(__int64 a1, FFortItemEntry* ItemEntry, UFortWorldItemDefinition* ItemDefinition, int32 MaxDecrement)
-	{
-		if (ItemEntry->ItemDefinition != ItemDefinition)
-			return;
-
-		int32 CurrentItemQuantity = ItemEntry->Count;
-		int32 DecrementAmount = std::min(CurrentItemQuantity, MaxDecrement);
-		int32 NewQuantity = CurrentItemQuantity - DecrementAmount;
-
-		if (NewQuantity < 0)
-			NewQuantity = 0;
-
-		if (NewQuantity != CurrentItemQuantity)
-		{
-			ItemEntry->Count = NewQuantity;
-
-			if (ItemEntry->ParentInventory.IsValid())
-			{
-				AFortInventory* ParentInventory = ItemEntry->ParentInventory.Get();
-				//UpdateItemEntry(ParentInventory, ItemEntry);
-			}
-
-			ItemEntry->bIsDirty = true;
-		}
-	}
-
 	int32 CubeIndex = 561;
 
 	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms)
@@ -171,13 +112,14 @@ namespace Hooks
 			return;
 		}
 
+		bool bCallOG = true;
+
 		GameMode::ProcessEventHook(Object, Function, Parms);
 		PlayerController::ProcessEventHook(Object, Function, Parms);
 		Pawn::ProcessEventHook(Object, Function, Parms);
-		BuildingActor::ProcessEventHook(Object, Function, Parms);
-		FortKismetLibrary::ProcessEventHook(Object, Function, Parms);
+		FortKismetLibrary::ProcessEventHook(Object, Function, Parms, &bCallOG);
 		Cheats::ProcessEventHook(Object, Function, Parms);
-		FortAthenaSupplyDrop::ProcessEventHook(Object, Function, Parms);
+		FortAthenaSupplyDrop::ProcessEventHook(Object, Function, Parms, &bCallOG);
 
 		const std::string& FunctionName = Function->GetName();
 
@@ -195,7 +137,24 @@ namespace Hooks
 				if (!Pawn)
 					return;
 
-				UFortResourceItemDefinition;
+				/*FFortItemEntry ItemEntry;
+				Inventory::MakeItemEntry(&ItemEntry, Globals::GetGameData()->WoodItemDefinition, 30, 0, 0, 1.0f);
+
+				FVector SpawnLocation = Pawn->K2_GetActorLocation();
+				FRotator SpawnRotation = FRotator({ 0, 0, 0 });
+
+				FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
+				CreatePickupData.World = Globals::GetWorld();
+				CreatePickupData.ItemEntry = &ItemEntry;
+				CreatePickupData.SpawnLocation = &SpawnLocation;
+				CreatePickupData.SpawnRotation = &SpawnRotation;
+				CreatePickupData.PlayerController = nullptr;
+				CreatePickupData.OverrideClass = nullptr;
+				CreatePickupData.NullptrIdk = nullptr;
+				CreatePickupData.bRandomRotation = true;
+				CreatePickupData.PickupSourceTypeFlags = 0;
+
+				Inventory::CreatePickupFromData(&CreatePickupData);*/
 			}
 
 			if (GetAsyncKeyState(VK_F2) & 0x1)
@@ -217,7 +176,7 @@ namespace Hooks
 
 					CubeIndex++;
 
-					FN_LOG(LogHooks, Debug, "CubeIndex: %i", CubeIndex);
+					FN_LOG(LogHooks, Log, "CubeIndex: %i", CubeIndex);
 				}
 
 				// 7FF66F6694B0
@@ -228,12 +187,62 @@ namespace Hooks
 				GameMode::bPreReadyToStartMatch = false;
 				GameMode::bWorldReady = false;
 
-				FN_LOG(LogHooks, Debug, "Restart called, Result: %i", Result);*/
+				FN_LOG(LogHooks, Log, "Restart called, Result: %i", Result);*/
 
 			}
 
 			if (GetAsyncKeyState(VK_F4) & 0x1)
 			{
+				FName LootTierGroup = UKismetStringLibrary::Conv_StringToName(L"Loot_AthenaTreasure"); // Activity_Crafting_Ore_High_MediumMats
+
+				TArray<FFortItemEntry> LootToDrops;
+				bool bSuccess = UFortKismetLibrary::PickLootDrops(Globals::GetWorld(), &LootToDrops, LootTierGroup, -1, -1);
+
+				for (auto& LootToDrop : LootToDrops)
+				{
+					if (!LootToDrop.ItemDefinition)
+						continue;
+
+					FN_LOG(LogBuildingActor, Log, "ItemDefinition: %s, Count: %i, Level: %i, Durability: %.2f", LootToDrop.ItemDefinition->GetName().c_str(), LootToDrop.Count, LootToDrop.Level, LootToDrop.Durability);
+				}
+
+				FN_LOG(LogBuildingActor, Log, "PickLootDrops - bSuccess: %i, LootToDrops: %i", bSuccess, LootToDrops.Num());
+
+				/*FFortLootTierDataCheck LootTierDataCheck;
+				LootTierDataCheck.TierGroup = LootTierGroup;
+				LootTierDataCheck.LootTier = -1;
+				LootTierDataCheck.QuotaLevel = ELootQuotaLevel::Unlimited;
+				LootTierDataCheck.GameplayTags = FGameplayTagContainer();
+				LootTierDataCheck.WorldLevel = -1;
+
+				float TotalWeight = 0.0f;
+
+				std::map<FName, FFortLootTierData*> LootTierDatas;
+
+				UFortGameData* GameData = Globals::GetGameData();
+				Loots::ChooseLootTierDatas(GameData, &LootTierDatas, &TotalWeight, LootTierDataCheck);
+
+				for (auto& [LootTierKey, LootTierData] : LootTierDatas)
+				{
+					FN_LOG(LogBuildingActor, Log, "LootTierKey: %s, TierGroup: %s, LootPackage: %s", LootTierKey.ToString().c_str(), LootTierData->TierGroup.ToString().c_str(), LootTierData->LootPackage.ToString().c_str());
+				}
+
+				FN_LOG(LogBuildingActor, Log, "ChooseLootTierDatas - TotalWeight: %.2f", TotalWeight);*/
+
+				// 1:1 mieux que Nathael OG God GS
+				/*bool bSuccess2 = Loots::PickLootDrops(&LootToDrops, -1, LootTierKey, 0, 0, FGameplayTagContainer(), false, false);
+
+				for (auto& LootToDrop : LootToDrops)
+				{
+					if (!LootToDrop.ItemDefinition)
+						continue;
+
+					FN_LOG(LogBuildingActor, Log, "ItemDefinition: %s, Count: %i, Level: %i, Durability: %.2f", LootToDrop.ItemDefinition->GetName().c_str(), LootToDrop.Count, LootToDrop.Level, LootToDrop.Durability);
+				}
+
+				FN_LOG(LogBuildingActor, Log, "PickLootDrops - bSuccess: %i, LootToDrops: %i", bSuccess2, LootToDrops.Num());*/
+				return;
+
 				AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
 				UFortPlaylistAthena* Playlist = Globals::GetPlaylist();
 
@@ -254,24 +263,24 @@ namespace Hooks
 
 				UFortKismetLibrary::FortShippingLog(PlayerController, L"erergergergergerg", true);
 
-				FN_LOG(LogHooks, Debug, "PlayerController: %s, RegisteredPlayerInfo: %s, AthenaProfile: %s", PlayerController->GetName().c_str(), RegisteredPlayerInfo->GetName().c_str(), AthenaProfile->GetName().c_str());
+				FN_LOG(LogHooks, Log, "PlayerController: %s, RegisteredPlayerInfo: %s, AthenaProfile: %s", PlayerController->GetName().c_str(), RegisteredPlayerInfo->GetName().c_str(), AthenaProfile->GetName().c_str());
 
 				UGameInstance* GameInstance = UGameplayStatics::GetGameInstance(PlayerController);
 				AGameModeBase* GameMode = UGameplayStatics::GetGameMode(PlayerController);
 				AGameStateBase* GameState = UGameplayStatics::GetGameState(PlayerController);
 
-				FN_LOG(LogHooks, Debug, "GameInstance: %s, GameMode: %s, GameState: %s", GameInstance->GetName().c_str(), GameMode->GetName().c_str(), GameState->GetName().c_str());
+				FN_LOG(LogHooks, Log, "GameInstance: %s, GameMode: %s, GameState: %s", GameInstance->GetName().c_str(), GameMode->GetName().c_str(), GameState->GetName().c_str());
 
 				TArray<UAthenaCosmeticItemDefinition*> AthenaCosmetics = UFortniteAutomationBlueprintLibrary::GetAllAthenaCosmetics(EFortItemType::AthenaCharacter);
 
-				FN_LOG(LogHooks, Debug, "AthenaCosmetics: %i", AthenaCosmetics.Num());
+				FN_LOG(LogHooks, Log, "AthenaCosmetics: %i", AthenaCosmetics.Num());
 
 				for (int32 i = 0; i < AthenaCosmetics.Num(); i++)
 				{
 					UAthenaCosmeticItemDefinition* AthenaCosmetic = AthenaCosmetics[i];
 					if (!AthenaCosmetic) continue;
 
-					FN_LOG(LogHooks, Debug, "[%i] - AthenaCosmetics - CosmeticItemDefinition: %s", i, AthenaCosmetic->GetName().c_str());
+					FN_LOG(LogHooks, Log, "[%i] - AthenaCosmetics - CosmeticItemDefinition: %s", i, AthenaCosmetic->GetName().c_str());
 				}
 
 				//UKismetGuidLibrary::NewGuid();
@@ -282,12 +291,12 @@ namespace Hooks
 
 				if (Season5)
 				{
-					FN_LOG(LogHooks, Debug, "SeasonNumber: %i", Season5->SeasonNumber);
-					FN_LOG(LogHooks, Debug, "NumSeasonLevels: %i", Season5->NumSeasonLevels);
-					FN_LOG(LogHooks, Debug, "NumBookLevels: %i", Season5->NumBookLevels);
-					FN_LOG(LogHooks, Debug, "SeasonStorefront: %s", Season5->SeasonStorefront.ToString().c_str());
-					FN_LOG(LogHooks, Debug, "FreeLevelsThatNavigateToBattlePass: %i", Season5->FreeLevelsThatNavigateToBattlePass.Num());
-					FN_LOG(LogHooks, Debug, "FreeLevelsThatAutoOpenTheAboutScreen: %i", Season5->FreeLevelsThatAutoOpenTheAboutScreen.Num());
+					FN_LOG(LogHooks, Log, "SeasonNumber: %i", Season5->SeasonNumber);
+					FN_LOG(LogHooks, Log, "NumSeasonLevels: %i", Season5->NumSeasonLevels);
+					FN_LOG(LogHooks, Log, "NumBookLevels: %i", Season5->NumBookLevels);
+					FN_LOG(LogHooks, Log, "SeasonStorefront: %s", Season5->SeasonStorefront.ToString().c_str());
+					FN_LOG(LogHooks, Log, "FreeLevelsThatNavigateToBattlePass: %i", Season5->FreeLevelsThatNavigateToBattlePass.Num());
+					FN_LOG(LogHooks, Log, "FreeLevelsThatAutoOpenTheAboutScreen: %i", Season5->FreeLevelsThatAutoOpenTheAboutScreen.Num());
 
 					TArray<FAthenaRewardScheduleLevel> BookXpScheduleFrees = Season5->BookXpScheduleFree.Levels;
 
@@ -302,7 +311,7 @@ namespace Hooks
 							if (!Reward.ItemDefinition.Get())
 								continue;
 
-							FN_LOG(LogHooks, Debug, "[%i] - BookXpScheduleFrees - ItemDefinition: %s, Quantity: %i", i, Reward.ItemDefinition.Get()->GetName().c_str(), Reward.Quantity);
+							FN_LOG(LogHooks, Log, "[%i] - BookXpScheduleFrees - ItemDefinition: %s, Quantity: %i", i, Reward.ItemDefinition.Get()->GetName().c_str(), Reward.Quantity);
 						}
 					}
 
@@ -319,7 +328,7 @@ namespace Hooks
 							if (!Reward.ItemDefinition.Get())
 								continue;
 
-							FN_LOG(LogHooks, Debug, "[%i] - BookXpSchedulePaids - ItemDefinition: %s, Quantity: %i", i, Reward.ItemDefinition.Get()->GetName().c_str(), Reward.Quantity);
+							FN_LOG(LogHooks, Log, "[%i] - BookXpSchedulePaids - ItemDefinition: %s, Quantity: %i", i, Reward.ItemDefinition.Get()->GetName().c_str(), Reward.Quantity);
 						}
 					}
 
@@ -332,33 +341,38 @@ namespace Hooks
 						if (!SeasonGrantsToEveryone.ItemDefinition.Get())
 							continue;
 
-						FN_LOG(LogHooks, Debug, "[%i] - BookXpSchedulePaids - ItemDefinition: %s, Quantity: %i, i", i, SeasonGrantsToEveryone.ItemDefinition.Get()->GetName().c_str(), SeasonGrantsToEveryone.Quantity);
+						FN_LOG(LogHooks, Log, "[%i] - BookXpSchedulePaids - ItemDefinition: %s, Quantity: %i, i", i, SeasonGrantsToEveryone.ItemDefinition.Get()->GetName().c_str(), SeasonGrantsToEveryone.Quantity);
 					}
 				}*/
 			}
 
 			if (GetAsyncKeyState(VK_F5) & 0x1)
 			{
-				static auto FortPlayerControllerAthenaDefault = AFortPlayerControllerAthena::GetDefaultObj();
+				AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
 
-				auto IdkDefault = (void*)(__int64(FortPlayerControllerAthenaDefault) + IdkOffset);
+				if (!PlayerController)
+					return;
 
-				auto IdkDefault2 = (void*)(__int64(IdkDefault) + 0xBC0);
+				AFortPlayerPawn* Pawn = PlayerController->MyFortPawn;
 
-				auto IdkDefault3 = (void*)(__int64(IdkDefault2) + 0x328);
+				if (!Pawn)
+					return;
 
-				uintptr_t FuncCallAddress = uintptr_t(((UObject*)IdkDefault3)->VTable[0x3]);
-				uintptr_t Offset = FuncCallAddress - InSDKUtils::GetImageBase();
+				static auto Tiered_Chest_6_ParentClass = FindObjectFast<UBlueprintGeneratedClass>("/Game/Building/ActorBlueprints/Containers/Tiered_Chest_6_Parent.Tiered_Chest_6_Parent_C");
+				static auto WID_Shotgun_Standard_Athena_UC_Ore_T03 = FindObjectFast<UFortWeaponRangedItemDefinition>("/Game/Athena/Items/Weapons/WID_Shotgun_Standard_Athena_UC_Ore_T03.WID_Shotgun_Standard_Athena_UC_Ore_T03");
 
-				uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
+				FVector SpawnLocation = Pawn->K2_GetActorLocation();
+				SpawnLocation.X += 50;
 
-				FN_LOG(LogHook, Debug, "Offset: 0x%llx, IdaAddress [%p]", (unsigned long long)Offset, IdaAddress);
+				ABuildingContainer* BuildingContainer = Util::SpawnActor<ABuildingContainer>(Tiered_Chest_6_ParentClass, SpawnLocation);
+
+				BuildingContainer->LootTestingData = WID_Shotgun_Standard_Athena_UC_Ore_T03;
 
 				/*
 					OdysseyLog: LogHook: Debug: Index not found: 0x0, Offset: 0xc17a88, IdaAddress [00007FF66F267A88] - Pleins de Free Memory
 					OdysseyLog: LogHook: Debug: Index not found: 0x1, Offset: 0xc3b978, IdaAddress [00007FF66F28B978] - Baka
 					OdysseyLog: LogHook: Debug: Index not found: 0x2, Offset: 0x2ccbb0, IdaAddress [00007FF66E91CBB0] - WITH_SERVER_CODE (return 1)
-					OdysseyLog: LogHook: Debug: Index not found: 0x3, Offset: 0xc26310, IdaAddress [00007FF66F276310] - Return un truc zebi jsp quoi
+					OdysseyLog: LogHook: Debug: Index not found: 0x3, Offset: 0xc26310, IdaAddress [00007FF66F276310] - Return un truc zebi jsp quoi ------- Return un role je crois
 					OdysseyLog: LogHook: Debug: Index not found: 0x4, Offset: 0x2ccbb0, IdaAddress [00007FF66E91CBB0] - WITH_SERVER_CODE (return 1)
 					OdysseyLog: LogHook: Debug: Index not found: 0x5, Offset: 0x3992a0, IdaAddress [00007FF66E9E92A0] - Return un truc zebi jsp quoi
 					OdysseyLog: LogHook: Debug: Index not found: 0x6, Offset: 0x3992a0, IdaAddress [00007FF66E9E92A0] - Return un truc zebi jsp quoi
@@ -367,17 +381,17 @@ namespace Hooks
 					OdysseyLog: LogHook: Debug: Index not found: 0x9, Offset: 0xc24970, IdaAddress [00007FF66F274970] - GetCurrentWeapon
 					OdysseyLog: LogHook: Debug: Index not found: 0xa, Offset: 0xc269f0, IdaAddress [00007FF66F2769F0] - Return un truc zebi jsp quoi
 					OdysseyLog: LogHook: Debug: Index not found: 0xb, Offset: 0xc28ad0, IdaAddress [00007FF66F278AD0] - Return un truc zebi jsp quoi
-					OdysseyLog: LogHook: Debug: Index not found: 0xc, Offset: 0x11beef0, IdaAddress [00007FF66F80EEF0] - Peut être intéressent ressemble à RemoveInventoryItem
+					OdysseyLog: LogHook: Debug: Index not found: 0xc, Offset: 0x11beef0, IdaAddress [00007FF66F80EEF0] - ModifyDurability
 					OdysseyLog: LogHook: Debug: Index not found: 0xd, Offset: 0x11d8640, IdaAddress [00007FF66F828640] - ModifyLoadedAmmo
 					OdysseyLog: LogHook: Debug: Index not found: 0xe, Offset: 0x11c60b0, IdaAddress [00007FF66F8160B0] - Un truc stw je crois
 					OdysseyLog: LogHook: Debug: Index not found: 0xf, Offset: 0x11c6010, IdaAddress [00007FF66F816010] - Un truc stw je crois
 					OdysseyLog: LogHook: Debug: Index not found: 0x10, Offset: 0xc28550, IdaAddress [00007FF66F278550] - La fonction est énorme
-					OdysseyLog: LogHook: Debug: Index not found: 0x11, Offset: 0x11a9910, IdaAddress [00007FF66F7F9910] - Prends 3 paramètres et fait un truc avec l'ItemDefinition et le FortItem
-					OdysseyLog: LogHook: Debug: Index not found: 0x12, Offset: 0x11a9c40, IdaAddress [00007FF66F7F9C40] - GetItemInstances
-					OdysseyLog: LogHook: Debug: Index not found: 0x13, Offset: 0x11ae410, IdaAddress [00007FF66F7FE410] - GetItemInstance
+					OdysseyLog: LogHook: Debug: Index not found: 0x11, Offset: 0x11a9910, IdaAddress [00007FF66F7F9910] - UFortItem* FindExistingItemForDefinition(void* idk, const UFortItemDefinition* ItemDefinition, bool bInStorageVault)
+					OdysseyLog: LogHook: Debug: Index not found: 0x12, Offset: 0x11a9c40, IdaAddress [00007FF66F7F9C40] - bool (*FindItemInstancesFromDefinition)(void* idk, UFortItemDefinition* ItemDefinition, TArray<UFortItem*>& ItemArray)
+					OdysseyLog: LogHook: Debug: Index not found: 0x13, Offset: 0x11ae410, IdaAddress [00007FF66F7FE410] - UFortItem* GetInventoryItemWithGuid(void* idk, const FGuid& ItemGuid)
 					OdysseyLog: LogHook: Debug: Index not found: 0x14, Offset: 0x11d1cc0, IdaAddress [00007FF66F821CC0] - RemoveInventoryItem
-					OdysseyLog: LogHook: Debug: Index not found: 0x15, Offset: 0xc17ba0, IdaAddress [00007FF66F267BA0] - Pleins de Free Memory
-					OdysseyLog: LogHook: Debug: Index not found: 0x16, Offset: 0x2ccb70, IdaAddress [00007FF66E91CB70] - WITH_SERVER_CODE (nullsub)
+					OdysseyLog: LogHook: Debug: Index not found: 0x15, Offset: 0xc17ba0, IdaAddress [00007FF66F267BA0] - Pleins de Free Memory ------------------------- Je crois qu'on change de class
+					OdysseyLog: LogHook: Debug: Index not found: 0x16, Offset: 0x2ccb70, IdaAddress [00007FF66E91CB70] - WITH_SERVER_CODE (nullsub) 
 					OdysseyLog: LogHook: Debug: Index not found: 0x17, Offset: 0x1841460, IdaAddress [00007FF66FE91460] - jsp wallah
 					OdysseyLog: LogHook: Debug: Index not found: 0x18, Offset: 0x2cccd0, IdaAddress [00007FF66E91CCD0] - WITH_SERVER_CODE (return 0)
 					OdysseyLog: LogHook: Debug: Index not found: 0x19, Offset: 0x22cfbd0, IdaAddress [00007FF67091FBD0] - Return un truc zebi jsp quoi
@@ -396,45 +410,44 @@ namespace Hooks
 
 			if (GetAsyncKeyState(VK_F6) & 0x1)
 			{
-				/*static UClass* HiddenStarClass = StaticLoadObject<UClass>(L"/Game/Athena/Items/QuestInteractables/HiddenStars/Prop_QuestInteractable_HiddenStar_Parent.Prop_QuestInteractable_HiddenStar_Parent_C");
+				TArray<AFortPlayerController*> PlayerControllers = UFortKismetLibrary::GetAllFortPlayerControllers(Globals::GetWorld(), true, true);
+				AFortGameModeAthena* GameMode = Cast<AFortGameModeAthena>(Globals::GetGameMode());
 
-				for (UStruct* Clss = HiddenStarClass; Clss; Clss = Clss->Super)
+				for (int32 i = 0; i < PlayerControllers.Num(); i++)
 				{
-					if (Clss->GetName() == "Prop_QuestInteractable_HiddenStar_Parent_C")
+					AFortPlayerControllerAthena* PlayerController = Cast<AFortPlayerControllerAthena>(PlayerControllers[i]);
+					if (!PlayerController) continue;
+
+					AFortPlayerStateAthena* PlayerState = Cast<AFortPlayerStateAthena>(PlayerController->PlayerState);
+
+					if (!PlayerController->Pawn && PlayerState)
 					{
-						for (UField* Field = Clss->Children; Field; Field = Field->Next)
-						{
-							if (Field->HasTypeFlag(EClassCastFlags::Function))
-							{
-								UFunction* Test = (UFunction*)Field;
+						GameMode->RestartPlayer(PlayerController);
 
-								FN_LOG(LogHooks, Debug, "Test: %s", Test->GetFullName().c_str());
-							}
-						}
-					}
-				}*/
+						GameMode->ShouldReset(PlayerState);
 
-				TArray<AActor*> Actors;
-				UGameplayStatics::GetAllActorsOfClass(Globals::GetWorld(), AFortPlayerControllerAthena::StaticClass(), &Actors);
+						FTransform Transform;
+						Transform.Rotation = FQuat({1, 1, 1, 1});
+						Transform.Translation = FVector({0, 0, 3000});
+						Transform.Scale3D = FVector({1, 1, 1});
 
-				for (int32 i = 0; i < Actors.Num(); i++)
-				{
-					auto PlayerController = (AFortPlayerControllerAthena*)Actors[i];
-					if (!PlayerController || PlayerController->Pawn) continue;
+						GameMode->RestartPlayerAtTransform(PlayerController, Transform);
 
-					AFortPlayerPawn* PlayerPawn = Util::SpawnPlayer(PlayerController, FVector(0,0,3000), FRotator());
+						AFortPlayerPawn* PlayerPawn = Util::SpawnPlayer(PlayerController, FVector({ 0, 0, 3000 }), FRotator(), false);
 
-					if (PlayerPawn)
-					{
-						PlayerController->bPlayerIsWaiting = true;
+						//UFortKismetLibrary::ApplyGlobalEnvironmentGameplayEffectToActor(PlayerPawn, UGE_Generic_Revive_C::StaticClass(), 0, FGameplayTagContainer());
 
-						PlayerController->RespawnPlayerAfterDeath();
+						PlayerState->AbilitySystemComponent->BP_ApplyGameplayEffectToSelf(UGE_Generic_Revive_C::StaticClass(), 0.0f, FGameplayEffectContextHandle());
+
 						PlayerController->OnPlayerStartedRespawn__DelegateSignature();
 
-						PlayerController->ClientOnPawnRevived(PlayerController);
-						PlayerController->ClientOnPawnSpawned();
+						PlayerController->ServerReadyToStartMatch();
 
-						PlayerController->ServerClientPawnLoaded(true);
+						PlayerController->ServerRestartPlayer();
+						PlayerController->ClientOnPawnRevived(PlayerController);
+
+						PlayerController->bEnterCameraModeOnDeath = false;
+						PlayerController->RespawnPlayerAfterDeath();
 
 						PlayerPawn->SetMaxHealth(100);
 						PlayerPawn->SetHealth(100);
@@ -442,26 +455,45 @@ namespace Hooks
 
 						// 7FF66F7BC760 (Je suis sévèrement autiste)
 						void (*SetShield)(AFortPawn* Pawn, float NewShieldValue) = decltype(SetShield)(0x116C760 + uintptr_t(GetModuleHandle(0)));
-
 						SetShield(PlayerPawn, 0);
 
-						PlayerPawn->bCanBeDamaged = true;
+						PlayerController->ClientReset();
+						PlayerController->ClientRestart(PlayerPawn);
+						PlayerController->ClientRetryClientRestart(PlayerPawn);	
 
-						GameMode::AddFromAlivePlayers(Globals::GetGameMode(), PlayerController);
+						GameMode::AddFromAlivePlayers(GameMode, PlayerController);
+
+						FN_LOG(LogHooks, Log, "IsDead [%i]", PlayerPawn->IsDead());
+						FN_LOG(LogHooks, Log, "IsDBNO [%i]", PlayerPawn->IsDBNO());
 					}
 				}
-
-				//PlayerController::SelfCompletedUpdatedQuest(PlayerController->GetQuestManager(ESubGame::Athena), PlayerController, nullptr, FName(0), 0, 0);
 			}
 
 			if (GetAsyncKeyState(VK_F7) & 0x1)
 			{
-				AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
+				TArray<AFortPlayerController*> PlayerControllers = UFortKismetLibrary::GetAllFortPlayerControllers(Globals::GetWorld(), true, true);
+
+				for (int32 i = 0; i < PlayerControllers.Num(); i++)
+				{
+					AFortPlayerController* PlayerController = PlayerControllers[i];
+					if (!PlayerController) continue;
+
+					AFortPlayerState* PlayerState = Cast<AFortPlayerState>(PlayerController->PlayerState);
+
+					if (PlayerState)
+					{
+						// 7FF66EC68170
+						void (*ClearAllAbilities)(UAbilitySystemComponent* AbilitySystemComponent) = decltype(ClearAllAbilities)(0x618170 + uintptr_t(GetModuleHandle(0)));
+						ClearAllAbilities(PlayerState->AbilitySystemComponent);
+					}
+				}
+
+				/*AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
 
 				if (!PlayerController)
 					return;
 
-				UKismetSystemLibrary::ExecuteConsoleCommand(PlayerController, L"SPAWNLLAMA", PlayerController);
+				UKismetSystemLibrary::ExecuteConsoleCommand(PlayerController, L"SPAWNLLAMA", PlayerController);*/
 			}
 
 			if (GetAsyncKeyState(VK_F9) & 0x1)
@@ -481,7 +513,7 @@ namespace Hooks
 			{
 				// 7FF66F23FBE0
 				void (*HandleMatchHasStarted)(AFortGameModeAthena* GameMode) = decltype(HandleMatchHasStarted)(0xBEFBE0 + uintptr_t(GetModuleHandle(0)));
-				HandleMatchHasStarted(Globals::GetGameMode());
+				HandleMatchHasStarted(Cast<AFortGameModeAthena>(Globals::GetGameMode()));
 			}
 		}
 		else if (FunctionName.contains("ServerUpdatePhysicsParams"))
@@ -518,8 +550,8 @@ namespace Hooks
 		{
 			if (!GameMode::bWorldReady)
 			{
-				AFortGameStateAthena* GameState = Globals::GetGameState();
-				AFortGameModeAthena* GameMode = Globals::GetGameMode();
+				AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
+				AFortGameModeAthena* GameMode = Cast<AFortGameModeAthena>(Globals::GetGameMode());
 
 				int32 PlaylistId = 2; // Solo
 				//int32 PlaylistId = 10; // Duo
@@ -532,7 +564,7 @@ namespace Hooks
 				// 7FF66F2504C0
 				void (*SetCurrentPlaylistId)(AFortGameModeAthena* GameMode, int32 NewPlaylistId) = decltype(SetCurrentPlaylistId)(0xC004C0 + uintptr_t(GetModuleHandle(0)));
 
-				SetCurrentPlaylistId(Globals::GetGameMode(), PlaylistId);
+				SetCurrentPlaylistId(GameMode, PlaylistId);
 
 				// 7FF66F52DEC0
 				UFortPlaylistAthena* (*GetPlaylistByPlaylistId)(UFortPlaylistManager* PlaylistManager, int32 PlaylistId) = decltype(GetPlaylistByPlaylistId)(0xEDDEC0 + uintptr_t(GetModuleHandle(0)));
@@ -544,23 +576,23 @@ namespace Hooks
 					GameState->CurrentPlaylistData = Playlist;
 					GameState->OnRep_CurrentPlaylistData();
 
-					FN_LOG(LogHooks, Debug, "AdditionalLevels.Num() [%i]", Playlist->AdditionalLevels.Num());
+					FN_LOG(LogHooks, Log, "AdditionalLevels.Num() [%i]", Playlist->AdditionalLevels.Num());
 
-					for (int i = 0; i < Playlist->AdditionalLevels.Num(); i++)
+					for (int32 i = 0; i < Playlist->AdditionalLevels.Num(); i++)
 					{
 						TSoftObjectPtr<UWorld> AdditionalLevel = Playlist->AdditionalLevels[i];
 
 						if (!AdditionalLevel.Get())
 							continue;
 
-						FN_LOG(LogHooks, Debug, "AdditionalLevel [%i]: %s", i, AdditionalLevel.Get()->GetFullName().c_str());
+						FN_LOG(LogHooks, Log, "AdditionalLevel [%i]: %s", i, AdditionalLevel.Get()->GetFullName().c_str());
 					}
 
 					// GameState->OnRep_AdditionalPlaylistLevelsStreamed();
 
 					GameState->AirCraftBehavior = Playlist->AirCraftBehavior;
 
-					AFortGameSessionDedicated* GameSession = (AFortGameSessionDedicated*)Globals::GetGameMode()->GameSession;
+					AFortGameSessionDedicated* GameSession = Cast<AFortGameSessionDedicated>(GameMode->GameSession);
 
 					GameSession->MaxPlayers = Playlist->MaxPlayers;
 					GameSession->MaxPartySize = Playlist->MaxSocialPartySize;
@@ -569,15 +601,16 @@ namespace Hooks
 					GameMode->CurrentZoneInstanceId;
 				}
 
-				Functions::SummonFloorLoots();
+				GameMode->DefaultPawnClass = APlayerPawn_Athena_C::StaticClass();
 
-				FN_LOG(LogHooks, Debug, "OnWorldReady called!");
+				FN_LOG(LogHooks, Log, "OnWorldReady called!");
 
 				GameMode::bWorldReady = true;
 			}
 		}
 
-		ProcessEvent(Object, Function, Parms);
+		if (bCallOG)
+			ProcessEvent(Object, Function, Parms);
 	}
 
 	ABuildingTrap* ServerSpawnDecoHook(AFortDecoTool* DecoTool, UClass* Class, const FVector& Location, const FRotator& Rotation, ABuildingSMActor* AttachedActor, EBuildingAttachmentType InBuildingAttachmentType)
@@ -655,20 +688,15 @@ namespace Hooks
 		}
 
 		UObject* (*GetObjectByAddress)(void* InterfaceAddress) = decltype(GetObjectByAddress)(((UObject*)InterfaceAddress)->VTable[0x1]);
-		UObject* Object = GetObjectByAddress(InterfaceAddress);
+		AFortPlayerController* PlayerController = Cast<AFortPlayerController>(GetObjectByAddress(InterfaceAddress));
 
-		if (!Object || !Object->IsA(AFortPlayerController::StaticClass()))
+		if (!PlayerController)
 		{
-			FN_LOG(LogHooks, Error, "[AFortPickup::PickupAddInventoryOwnerInterface] Failed to get Object or Object is not AFortPlayerController class!");
+			FN_LOG(LogHooks, Error, "[AFortPickup::PickupAddInventoryOwnerInterface] Failed to get PlayerController!");
 			return PickupAddInventoryOwnerInterface(Pickup, InterfaceAddress);
 		}
 
-		AFortPlayerController* PlayerController = (AFortPlayerController*)Object;
-
-		FGuid CurrentWepGuid = PickupLocationData->PickupGuid;
-
-		Inventory::AddInventoryItem(PlayerController, ItemEntry, CurrentWepGuid);
-		Inventory::UpdateInventory(PlayerController->WorldInventory);
+		Inventory::AddInventoryItem(PlayerController, *ItemEntry, PickupLocationData->PickupGuid);
 
 		return PickupAddInventoryOwnerInterface(Pickup, InterfaceAddress);
 	}
@@ -726,15 +754,16 @@ namespace Hooks
 		Restart(GameSession);
 	}
 
-	__int64 (*StartFlightPath)(AFortAthenaAircraft* AthenaAircraft, float StartTime);
-	__int64 StartFlightPathHook(AFortAthenaAircraft* AthenaAircraft, float StartTime)
+	char (*execPickLootDrops)(UFortKismetLibrary* a1, __int64* a2, __int64* a3);
+	char execPickLootDropsHook(UFortKismetLibrary* a1, __int64* a2, __int64* a3)
 	{
-		uintptr_t Offset = uintptr_t(_ReturnAddress()) - InSDKUtils::GetImageBase();
-		uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
+		FN_LOG(LogMinHook, Log, "execPickLootDropsHook called!");
+		return execPickLootDrops(a1, a2, a3);
+	}
 
-		FN_LOG(LogMinHook, Log, "Function [StartFlightPathHook] successfully hooked with Offset [0x%llx], IdaAddress [%p], AthenaAircraft: [%s], StartTime: [%.2f]", (unsigned long long)Offset, IdaAddress, AthenaAircraft->GetName().c_str(), StartTime);
+	void test()
+	{
 
-		return StartFlightPath(AthenaAircraft, StartTime);
 	}
 
 	void InitHook()
@@ -743,6 +772,9 @@ namespace Hooks
 		static auto FortPlayerPawnAthenaDefault = AFortPlayerPawnAthena::GetDefaultObj();
 
 		MinHook::HookVTable(FortPickupAthenaDefault, 0xBF, PickupAddInventoryOwnerInterfaceHook, (LPVOID*)(&PickupAddInventoryOwnerInterface), "PickupAddInventoryOwnerInterface");
+
+		MinHook::HookVTable(AFortPlayerPawnAthena::GetDefaultObj(), 0x196, test, nullptr, "AFortPlayerPawn::ServerReviveFromDBNO");
+		MinHook::HookVTable(AFortPlayerControllerAthena::GetDefaultObj(), 0x396, test, nullptr, "AFortPlayerControllerZone::ClientOnPawnRevived");
 
 		uintptr_t AddressLocalSpawnPlayActor = MinHook::FindPattern(Patterns::LocalSpawnPlayActor);
 		uintptr_t AddressInternalGetNetMode = MinHook::FindPattern(Patterns::InternalGetNetMode);
@@ -776,23 +808,16 @@ namespace Hooks
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8960), CollectGarbageInternalHook, nullptr);
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8960));
 
-		/*MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x.2fB490), BeginDeferredActorSpawnFromClassHook, (LPVOID*)(&BeginDeferredActorSpawnFromClass));
-		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x.2fB490));*/
-
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0xE31290), sub_7FF66F481290Hook, nullptr);
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0xE31290));
 
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0xC56D70), InitalizePoiManager, nullptr);
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0xC56D70));
-		/*MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x10194B0), RestartHook, (LPVOID*)(&Restart));
+		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x10194B0), RestartHook, (LPVOID*)(&Restart));
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x10194B0));
-		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0xBCC270), StartFlightPathHook, (LPVOID*)(&StartFlightPath));
-		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0xBCC270));*/
 
-		/*MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x25D4D40), SpawnActorHook, (LPVOID*)(&SpawnActor));
-		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x25D4D40));
-		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x25D3D60), RealSpawnActorHook, (LPVOID*)(&RealSpawnActor));
-		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x25D3D60));*/
+		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x145E6C0), execPickLootDropsHook, (LPVOID*)(&execPickLootDrops));
+		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x145E6C0));
 
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + Offsets::ProcessEvent), ProcessEventHook, (LPVOID*)(&ProcessEvent));
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + Offsets::ProcessEvent));

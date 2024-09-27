@@ -25,7 +25,7 @@ namespace Inventory
 	int32 GetItemLevel(const FDataTableCategoryHandle& ItemLevelDataHandle)
 	{
 		UDataTable* DataTable = ItemLevelDataHandle.DataTable;
-		AFortGameStateAthena* GameState = Globals::GetGameState();
+		AFortGameState* GameState = Globals::GetGameState();
 
 		if (!DataTable || !GameState)
 			return 0;
@@ -752,7 +752,7 @@ namespace Inventory
 
 	void SetupInventory(AFortPlayerController* PlayerController, UFortWeaponMeleeItemDefinition* PickaxeDefinition)
 	{
-		TArray<FItemAndCount> StartingItems = Globals::GetGameMode()->StartingItems;
+		TArray<FItemAndCount> StartingItems = Cast<AFortGameModeAthena>(Globals::GetGameMode())->StartingItems;
 
 		for (int32 i = 0; i < StartingItems.Num(); i++)
 		{

@@ -304,6 +304,11 @@ namespace UC
 				memset(Data, 0, NumElements * ElementSize);
 		}
 
+		inline void SetNum(int32 NewNumElements)
+		{
+			NumElements = NewNumElements;
+		}
+
 		inline void Free()
 		{
 			if (Data)

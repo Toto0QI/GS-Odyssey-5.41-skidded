@@ -106,6 +106,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="SDK\AthenaSupplyDrop_functions.cpp" />
     <ClCompile Include="SDK\Basic.cpp" />
     <ClCompile Include="SDK\CoreUObject_functions.cpp" />
     <ClCompile Include="SDK\CUBE_functions.cpp" />
@@ -121,6 +122,7 @@
     <ClInclude Include="Functions\Functions.h" />
     <ClInclude Include="Functions\Inventory.h" />
     <ClInclude Include="Functions\Loots.h" />
+    <ClInclude Include="Functions\NewInventory.h" />
     <ClInclude Include="Functions\Threads.h" />
     <ClInclude Include="Globals.h" />
     <ClInclude Include="Globals\BuildingActor.h" />

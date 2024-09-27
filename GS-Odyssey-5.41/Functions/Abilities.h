@@ -13,7 +13,7 @@ namespace Abilities
 	{
 		FGameplayAbilitySpec* Spec = nullptr;
 
-		for (int i = 0; i < AbilitySystemComponent->ActivatableAbilities.Items.Num(); i++)
+		for (int32 i = 0; i < AbilitySystemComponent->ActivatableAbilities.Items.Num(); i++)
 		{
 			if (AbilitySystemComponent->ActivatableAbilities.Items[i].Handle.Handle == Ability.Handle)
 			{
@@ -36,7 +36,7 @@ namespace Abilities
 			FGameplayAbilitySpec AbilitySpec;
 			CreateDefaultAbilitySpec(&AbilitySpec, (UGameplayAbility*)CreateDefaultObject(AbilityClass), 1, -1, nullptr);
 
-			for (int i = 0; i < AbilitySystemComponent->ActivatableAbilities.Items.Num(); i++)
+			for (int32 i = 0; i < AbilitySystemComponent->ActivatableAbilities.Items.Num(); i++)
 			{
 				auto& CurrentSpec = AbilitySystemComponent->ActivatableAbilities.Items[i];
 
