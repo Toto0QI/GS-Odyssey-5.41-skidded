@@ -101,16 +101,6 @@ namespace Inventory
 		return Globals::GetDataTableRowFromName<FFortBaseWeaponStats>(WeaponStatHandle->DataTable, WeaponStatHandle->RowName);
 	}
 
-	TArray<UFortWorldItem*>* GetItemInstances(AFortInventory* Inventory, TArray<UFortWorldItem*>* OutItemInstances)
-	{
-		OutItemInstances->Clear();
-
-		if (Inventory)
-			OutItemInstances = &Inventory->Inventory.ItemInstances;
-
-		return OutItemInstances;
-	}
-
 	void MakeItemEntry(FFortItemEntry* ItemEntry, UFortItemDefinition* ItemDefinition, int32 Count, int32 Level, int32 LoadedAmmo, float Durability)
 	{
 		if (!ItemEntry || !ItemDefinition)
@@ -371,7 +361,7 @@ namespace Inventory
 		Inventory->HandleInventoryLocalUpdate();
 	}
 
-	AFortPickup* SpawnPickup(AFortPawn* ItemOwner, FFortItemEntry ItemEntry, FVector SpawnLocation, bool bToss)
+	AFortPickup* SpawnPickup(AFortPawn* ItemOwner, FFortItemEntry ItemEntry, FVector SpawnLocation, FVector FinalLocation, bool bToss)
 	{
 		FRotator SpawnRotation = FRotator({ 0, 0, 0 });
 
@@ -393,7 +383,7 @@ namespace Inventory
 			if (ItemOwner)
 				Pickup->PawnWhoDroppedPickup = ItemOwner;
 
-			Pickup->TossPickup(SpawnLocation, ItemOwner, 0, bToss);
+			Pickup->TossPickup(FinalLocation, ItemOwner, 0, bToss);
 		}
 			
 		return Pickup;
@@ -517,9 +507,22 @@ namespace Inventory
 		}
 		else if (IsInventoryFull(PlayerController->WorldInventory) && WorldItemDefinition->bInventorySizeLimited && PlayerController->MyFortPawn) // If the Inventory is full replace the current weapon and spawn pickup
 		{
+			FVector SpawnLocation = PlayerController->MyFortPawn->K2_GetActorLocation();
+			FRotator PlayerRotation = PlayerController->MyFortPawn->K2_GetActorRotation();
+
+			float RandomAngle = UKismetMathLibrary::RandomFloatInRange(-60.0f, 60.0f);
+
+			FRotator RandomRotation = PlayerRotation;
+			RandomRotation.Yaw += RandomAngle;
+
+			float RandomDistance = UKismetMathLibrary::RandomFloatInRange(500.0f, 600.0f);
+			FVector Direction = UKismetMathLibrary::GetForwardVector(RandomRotation);
+
+			FVector FinalLocation = SpawnLocation + Direction * RandomDistance;
+
 			if (!bReplaceWeapon)
 			{
-				SpawnPickup(PlayerController->MyFortPawn, ItemEntry, PlayerController->MyFortPawn->K2_GetActorLocation(), true);
+				SpawnPickup(PlayerController->MyFortPawn, ItemEntry, SpawnLocation, FinalLocation, true);
 				return;
 			}
 
@@ -535,7 +538,7 @@ namespace Inventory
 
 			if (!WorldItem)
 			{
-				SpawnPickup(PlayerController->MyFortPawn, ItemEntry, PlayerController->MyFortPawn->K2_GetActorLocation(), true);
+				SpawnPickup(PlayerController->MyFortPawn, ItemEntry, SpawnLocation, FinalLocation, true);
 				return;
 			}
 
@@ -543,7 +546,7 @@ namespace Inventory
 
 			if (!WorldItemDefinition || !WorldItemDefinition->bCanBeDropped)
 			{
-				SpawnPickup(PlayerController->MyFortPawn, ItemEntry, PlayerController->MyFortPawn->K2_GetActorLocation(), true);
+				SpawnPickup(PlayerController->MyFortPawn, ItemEntry, SpawnLocation, FinalLocation, true);
 				return;
 			}
 
@@ -569,7 +572,20 @@ namespace Inventory
 
 			if (WorldItem && !WorldItemDefinition->bAllowMultipleStacks && PlayerController->MyFortPawn)
 			{
-				SpawnPickup(PlayerController->MyFortPawn, ItemEntry, PlayerController->MyFortPawn->K2_GetActorLocation(), true);
+				FVector SpawnLocation = PlayerController->MyFortPawn->K2_GetActorLocation();
+				FRotator PlayerRotation = PlayerController->MyFortPawn->K2_GetActorRotation();
+
+				float RandomAngle = UKismetMathLibrary::RandomFloatInRange(-60.0f, 60.0f);
+
+				FRotator RandomRotation = PlayerRotation;
+				RandomRotation.Yaw += RandomAngle;
+
+				float RandomDistance = UKismetMathLibrary::RandomFloatInRange(500.0f, 600.0f);
+				FVector Direction = UKismetMathLibrary::GetForwardVector(RandomRotation);
+
+				FVector FinalLocation = SpawnLocation + Direction * RandomDistance;
+
+				SpawnPickup(PlayerController->MyFortPawn, ItemEntry, SpawnLocation, FinalLocation, true);
 				return;
 			}
 			else

@@ -418,16 +418,16 @@ namespace Functions
 		}
 	}
 
-	TArray<UFortWorldItemDefinition*> PickOnlyAthena(TArray<UFortWorldItemDefinition*> AllItems)
+	TArray<UFortItemDefinition*> PickOnlyAthena(TArray<UFortItemDefinition*> AllItems)
 	{
-		static TArray<UFortWorldItemDefinition*> AllAthenaItems;
+		static TArray<UFortItemDefinition*> AllAthenaItems;
 
 		if (AllAthenaItems.Num() > 0)
 			return AllAthenaItems;
 
 		for (int32 i = 0; i < AllItems.Num(); i++)
 		{
-			UFortWorldItemDefinition* ItemDefinition = AllItems[i];
+			UFortItemDefinition* ItemDefinition = AllItems[i];
 
 			if (!ItemDefinition)
 				continue;
@@ -443,9 +443,9 @@ namespace Functions
 		return AllAthenaItems;
 	}
 
-	TArray<UFortWorldItemDefinition*> GetAllItems(bool bOnlyAthena = false)
+	TArray<UFortItemDefinition*> GetAllItems(bool bOnlyAthena = false)
 	{
-		static TArray<UFortWorldItemDefinition*> AllItems;
+		static TArray<UFortItemDefinition*> AllItems;
 
 		if (AllItems.Num() > 0)
 			return bOnlyAthena ? PickOnlyAthena(AllItems) : AllItems;
@@ -457,14 +457,9 @@ namespace Functions
 			if (!GObject)
 				continue;
 
-			if (GObject->IsA(UFortWeaponRangedItemDefinition::StaticClass()) ||
-				GObject->IsA(UFortAmmoItemDefinition::StaticClass()) ||
-				GObject->IsA(UFortWeaponMeleeItemDefinition::StaticClass()) ||
-				GObject->IsA(UFortResourceItemDefinition::StaticClass()) || 
-				GObject->IsA(UFortContextTrapItemDefinition::StaticClass()) ||
-				GObject->IsA(UFortTrapItemDefinition::StaticClass()))
+			if (GObject->IsA(UFortItemDefinition::StaticClass()))
 			{
-				UFortWorldItemDefinition* ItemDefinition = (UFortWorldItemDefinition*)GObject;
+				UFortItemDefinition* ItemDefinition = Cast<UFortItemDefinition>(GObject);
 				if (!ItemDefinition) continue;
 
 				AllItems.Add(ItemDefinition);

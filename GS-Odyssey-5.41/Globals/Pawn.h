@@ -112,7 +112,9 @@ namespace Pawn
 
 				if (PlayerController->WorldInventory)
 				{
-					const FVector& SpawnLocation = Pawn->K2_GetActorLocation();
+					FVector SpawnLocation = Pawn->K2_GetActorLocation();
+
+					SpawnLocation.Z += 20.0f;
 
 					for (int32 i = 0; i < PlayerController->WorldInventory->Inventory.ItemInstances.Num(); i++)
 					{
@@ -132,8 +134,10 @@ namespace Pawn
 						Inventory::CreateItemEntry(&NewItemEntry);
 						Inventory::CopyItemEntry(&NewItemEntry, &ItemInstance->ItemEntry);
 
-						Inventory::SpawnPickup(Pawn, NewItemEntry, SpawnLocation, true);
+						FVector RandomOffset = UKismetMathLibrary::RandomUnitVector() * UKismetMathLibrary::RandomFloatInRange(400.0f, 600.0f);
+						FVector FinalLocation = UKismetMathLibrary::Add_VectorVector(SpawnLocation, RandomOffset);
 
+						Inventory::SpawnPickup(Pawn, NewItemEntry, SpawnLocation, FinalLocation, true);
 						Inventory::FreeItemEntry(&NewItemEntry);
 					}
 

@@ -509,7 +509,7 @@ namespace Cheats
                                 NumberToSpawn = std::stoi(ParsedCommand[2]);
                         }
 
-                        TArray<UFortWorldItemDefinition*> AllItems = Functions::GetAllItems();
+                        TArray<UFortItemDefinition*> AllItems = Functions::GetAllItems();
 
                         if (Pawn)
                         {
@@ -519,7 +519,7 @@ namespace Cheats
 
                                 for (int32 i = 0; i < AllItems.Num(); i++)
                                 {
-                                    UFortWorldItemDefinition* ItemDefinition = AllItems[i];
+                                    UFortWorldItemDefinition* ItemDefinition = Cast<UFortWorldItemDefinition>(AllItems[i]);
 
                                     if (!ItemDefinition)
                                         continue;
@@ -586,7 +586,7 @@ namespace Cheats
                                 bNotifyPlayer = std::stoi(ParsedCommand[3]);
                         }
 
-                        TArray<UFortWorldItemDefinition*> AllItems = Functions::GetAllItems();
+                        TArray<UFortItemDefinition*> AllItems = Functions::GetAllItems();
 
                         if (NumberToGive <= 10000 && NumberToGive > 0)
                         {
@@ -594,7 +594,7 @@ namespace Cheats
 
                             for (int32 i = 0; i < AllItems.Num(); i++)
                             {
-                                UFortWorldItemDefinition* ItemDefinition = AllItems[i];
+                                UFortWorldItemDefinition* ItemDefinition = Cast<UFortWorldItemDefinition>(AllItems[i]);
 
                                 if (!ItemDefinition)
                                     continue;
@@ -646,7 +646,7 @@ namespace Cheats
                                 AmountToRemove = std::stoi(ParsedCommand[2]);
                         }
 
-                        TArray<UFortWorldItemDefinition*> AllItems = Functions::GetAllItems();
+                        TArray<UFortItemDefinition*> AllItems = Functions::GetAllItems();
 
                         if (AmountToRemove <= 10000 && AmountToRemove > 0)
                         {
@@ -654,7 +654,7 @@ namespace Cheats
 
                             for (int32 i = 0; i < AllItems.Num(); i++)
                             {
-                                UFortWorldItemDefinition* ItemDefinition = AllItems[i];
+                                UFortWorldItemDefinition* ItemDefinition = Cast<UFortWorldItemDefinition>(AllItems[i]);
 
                                 if (!ItemDefinition)
                                     continue;
@@ -691,13 +691,13 @@ namespace Cheats
                     }
                     else if (Action == "rtx" && ParsedCommand.size() >= 1)
                     {
-                        TArray<UFortWorldItemDefinition*> AllItems = Functions::GetAllItems(true);
+                        TArray<UFortItemDefinition*> AllItems = Functions::GetAllItems(true);
 
                         if (AllItems.Num() > 0 && Pawn)
                         {
                             for (int32 i = 0; i < AllItems.Num(); i++)
                             {
-                                UFortWorldItemDefinition* ItemDefinition = AllItems[i];
+                                UFortWorldItemDefinition* ItemDefinition = Cast<UFortWorldItemDefinition>(AllItems[i]);
 
                                 if (!ItemDefinition)
                                     continue;
@@ -705,7 +705,8 @@ namespace Cheats
                                 if (ItemDefinition->Rarity != EFortRarity::Fine)
                                     continue;
 
-                                UFortKismetLibrary::K2_SpawnPickupInWorld(PlayerController, ItemDefinition, 1, Pawn->K2_GetActorLocation(), FVector(), 0, true, true, false);
+                                FVector StartDirection = Pawn->K2_GetActorLocation();
+                                UFortKismetLibrary::K2_SpawnPickupInWorld(PlayerController, ItemDefinition, 1, Pawn->K2_GetActorLocation(), StartDirection, 0, true, true, false);
                             }
 
                             Message = L"TEUPAIIII!";

@@ -113,6 +113,9 @@ namespace PlayerController
 		if (!Object || !Function)
 			return;
 
+		if (!Object->IsA(AFortPlayerController::StaticClass()))
+			return;
+
 		const std::string& FunctionName = Function->GetName();
 
 		if (FunctionName.contains("ServerReadyToStartMatch"))
@@ -196,8 +199,8 @@ namespace PlayerController
 			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
 			auto Params = (Params::FortPlayerController_ServerModifyStat*)Parms;
 
-			FN_LOG(LogPlayerController, Log, "[AFortPlayerController::ServerModifyStat] StatName: %s, Amount: %i, ModType: %i, bForceStatSave: %i",
-				Params->StatName.ToString().c_str(), Params->Amount, Params->ModType, Params->bForceStatSave);
+			/*FN_LOG(LogPlayerController, Log, "[AFortPlayerController::ServerModifyStat] StatName: %s, Amount: %i, ModType: %i, bForceStatSave: %i",
+				Params->StatName.ToString().c_str(), Params->Amount, Params->ModType, Params->bForceStatSave);*/
 
 			// PlayerController->ModifyStat(Params->StatName, Params->Amount, Params->ModType, Params->bForceStatSave); // appelle ServerModifyStat
 		}
@@ -406,7 +409,10 @@ namespace PlayerController
 			{
 				UFortWorldItemDefinition* ItemDefinition = Cast<UFortWorldItemDefinition>(WorldItem->ItemEntry.ItemDefinition);
 
-				const FVector& SpawnLocation = PlayerPawn->K2_GetActorLocation();
+				FVector SpawnLocation = PlayerPawn->K2_GetActorLocation();
+				FRotator PlayerRotation = PlayerPawn->K2_GetActorRotation();
+
+				SpawnLocation.Z += 40.0f;
 
 				if (ItemDefinition && ItemDefinition->bCanBeDropped)
 				{
@@ -427,7 +433,17 @@ namespace PlayerController
 
 						Inventory::SetStateValue(&NewItemEntry, EFortItemEntryState::FromDroppedPickup, 1);
 
-						Inventory::SpawnPickup(PlayerPawn, NewItemEntry, SpawnLocation, true);
+						float RandomAngle = UKismetMathLibrary::RandomFloatInRange(-60.0f, 60.0f);
+
+						FRotator RandomRotation = PlayerRotation;
+						RandomRotation.Yaw += RandomAngle;
+
+						float RandomDistance = UKismetMathLibrary::RandomFloatInRange(500.0f, 600.0f);
+						FVector Direction = UKismetMathLibrary::GetForwardVector(RandomRotation);
+
+						FVector FinalLocation = SpawnLocation + Direction * RandomDistance;
+
+						Inventory::SpawnPickup(PlayerPawn, NewItemEntry, SpawnLocation, FinalLocation, true);
 						Inventory::FreeItemEntry(&NewItemEntry);
 					}
 					else if (WorldItem->ItemEntry.Count >= Params->Count)
@@ -441,7 +457,17 @@ namespace PlayerController
 
 						Inventory::SetStateValue(&NewItemEntry, EFortItemEntryState::FromDroppedPickup, 1);
 
-						Inventory::SpawnPickup(PlayerPawn, NewItemEntry, SpawnLocation, true);
+						float RandomAngle = UKismetMathLibrary::RandomFloatInRange(-60.0f, 60.0f);
+
+						FRotator RandomRotation = PlayerRotation;
+						RandomRotation.Yaw += RandomAngle;
+
+						float RandomDistance = UKismetMathLibrary::RandomFloatInRange(500.0f, 600.0f);
+						FVector Direction = UKismetMathLibrary::GetForwardVector(RandomRotation);
+
+						FVector FinalLocation = SpawnLocation + Direction * RandomDistance;
+
+						Inventory::SpawnPickup(PlayerPawn, NewItemEntry, SpawnLocation, FinalLocation, true);
 						Inventory::FreeItemEntry(&NewItemEntry);
 					}
 				}
@@ -485,7 +511,7 @@ namespace PlayerController
 					UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(LootToDrop.ItemDefinition);
 					if (!WorldItemDefinition) continue;
 
-					FVector LootSpawnDirection = FVector({ 0, 0, 0 });
+					FVector LootSpawnDirection = LootSpawnLocation;
 					AthenaSupplyDrop->SpawnPickup(WorldItemDefinition, LootToDrop.Count, nullptr, LootSpawnLocation, LootSpawnDirection);
 				}
 			}

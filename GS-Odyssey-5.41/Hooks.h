@@ -120,6 +120,7 @@ namespace Hooks
 		FortKismetLibrary::ProcessEventHook(Object, Function, Parms, &bCallOG);
 		Cheats::ProcessEventHook(Object, Function, Parms);
 		FortAthenaSupplyDrop::ProcessEventHook(Object, Function, Parms, &bCallOG);
+		BuildingActor::ProcessEventHook(Object, Function, Parms);
 
 		const std::string& FunctionName = Function->GetName();
 
@@ -358,8 +359,8 @@ namespace Hooks
 				if (!Pawn)
 					return;
 
-				static auto Tiered_Chest_6_ParentClass = FindObjectFast<UBlueprintGeneratedClass>("/Game/Building/ActorBlueprints/Containers/Tiered_Chest_6_Parent.Tiered_Chest_6_Parent_C");
-				static auto WID_Shotgun_Standard_Athena_UC_Ore_T03 = FindObjectFast<UFortWeaponRangedItemDefinition>("/Game/Athena/Items/Weapons/WID_Shotgun_Standard_Athena_UC_Ore_T03.WID_Shotgun_Standard_Athena_UC_Ore_T03");
+				auto Tiered_Chest_6_ParentClass = FindObjectFast<UBlueprintGeneratedClass>("/Game/Building/ActorBlueprints/Containers/Tiered_Chest_6_Parent.Tiered_Chest_6_Parent_C");
+				auto WID_Shotgun_Standard_Athena_UC_Ore_T03 = FindObjectFast<UFortWeaponRangedItemDefinition>("/Game/Athena/Items/Weapons/WID_Shotgun_Standard_Athena_UC_Ore_T03.WID_Shotgun_Standard_Athena_UC_Ore_T03");
 
 				FVector SpawnLocation = Pawn->K2_GetActorLocation();
 				SpawnLocation.X += 50;
@@ -471,6 +472,15 @@ namespace Hooks
 
 			if (GetAsyncKeyState(VK_F7) & 0x1)
 			{
+				AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
+
+				if (!PlayerController)
+					return;
+
+				UKismetSystemLibrary::ExecuteConsoleCommand(PlayerController, L"SPAWNLLAMA", PlayerController);
+
+				return;
+
 				TArray<AFortPlayerController*> PlayerControllers = UFortKismetLibrary::GetAllFortPlayerControllers(Globals::GetWorld(), true, true);
 
 				for (int32 i = 0; i < PlayerControllers.Num(); i++)
