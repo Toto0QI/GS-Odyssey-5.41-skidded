@@ -107,8 +107,6 @@ namespace Pawn
 				if (!PlayerController)
 					return;
 
-				//TArray<UFortWorldItem*> ItemInstances;
-				//Inventory::GetItemInstances(PlayerController->WorldInventory, &ItemInstances);
 
 				if (PlayerController->WorldInventory)
 				{

@@ -26,7 +26,7 @@ namespace Patterns
 
 	// GameMode
 	constexpr const char* AddFromAlivePlayers = "48 85 D2 0F 84 ? ? ? ? 56 57 48 83 EC 78";
-	constexpr const char* RemoveFromAlivePlayers = "4C 89 4C 24 ? 4C 89 44 24 ? 55 41 54 41 55 41 56 41 57 48 8D 6C 24 ?";
+	constexpr const char* RemoveFromAlivePlayers = "4C 89 4C 24 ? 4C 89 44 24 ? 55 41 55 41 56 41 57 48 8D 6C 24 ?";
 	constexpr const char* SpawnDefaultPawnFor = "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 30 49 8B F0 48 8B FA 48 8B D9 48 85 D2";
 	constexpr const char* HandleMatchHasStarted = "4C 8B DC 53 48 83 EC 70 80 3D ? ? ? ? ? 48 8B D9 49 89 73 18 49 89 7B F0 72 3B";
 

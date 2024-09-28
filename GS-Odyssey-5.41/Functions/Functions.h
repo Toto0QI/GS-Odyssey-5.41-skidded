@@ -176,6 +176,80 @@ namespace Functions
 		}
 	}
 
+	void FillVendingMachine(ABuildingItemCollectorActor* ItemCollectorActor, std::map<int32, float> RarityAndWeight)
+	{
+		if (!ItemCollectorActor)
+			return;
+
+		int32 RandomRarity = GetRandomRarity(RarityAndWeight);
+
+		if (RandomRarity == 0)
+		{
+			ItemCollectorActor->K2_DestroyActor();
+			return;
+		}
+
+		// Get Real Rarity
+		RandomRarity -= 1;
+
+		// 0 = Common
+		// 1 = UnCommon
+		// 2 = Rare
+		// 3 = Epic
+		// 4 = Legendary
+
+		TArray<FColletorUnitInfo> ItemCollections = ItemCollectorActor->ItemCollections;
+
+		for (int32 i = 0; i < ItemCollections.Num(); i++)
+		{
+			FColletorUnitInfo& ItemCollection = ItemCollections[i];
+			UFortWorldItemDefinition* InputItem = ItemCollection.InputItem;
+			if (!InputItem) continue;
+
+			int32 LootLevel = UFortKismetLibrary::GetLootLevel(ItemCollectorActor);
+
+			TArray<FFortItemEntry> LootToDrops;
+			bool bValidLoot = false;
+
+			do
+			{
+				FName LootTierKey = FName(0);
+				int32 LootTier = -1;
+
+				bool bSuccess = Loots::PickLootTierKeyAndLootTierFromTierGroup(&LootTierKey, &LootTier, ItemCollectorActor->DefaultItemLootTierGroupName, LootLevel, 0, RandomRarity, ItemCollectorActor->StaticGameplayTags);
+				if (!bSuccess) continue;
+
+				Loots::PickLootDrops(&LootToDrops, LootLevel, LootTierKey, 0, 0, ItemCollectorActor->StaticGameplayTags, false, false);
+
+				bValidLoot = true;
+				if (LootToDrops.Num() > 0)
+				{
+					UFortWorldItemDefinition* LootToDropDefinition = Cast<UFortWorldItemDefinition>(LootToDrops[0].ItemDefinition);
+
+					for (const FColletorUnitInfo& OtherItemCollection : ItemCollections)
+					{
+						if (OtherItemCollection.OutputItem == LootToDropDefinition)
+						{
+							bValidLoot = false;
+							break;
+						}
+					}
+				}
+
+			} while (!bValidLoot);
+
+			if (ItemCollections[i].OutputItemEntry.Num() > 0)
+				ItemCollections[i].OutputItemEntry.Free();
+
+			for (auto& LootToDrop : LootToDrops)
+				ItemCollections[i].OutputItemEntry.Add(LootToDrop);
+
+			ItemCollections[i].OutputItem = Cast<UFortWorldItemDefinition>(ItemCollections[i].OutputItemEntry[0].ItemDefinition);
+		}
+
+		ItemCollectorActor->StartingGoalLevel = RandomRarity;
+	}
+
 	void FillVendingMachines()
 	{
 		AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
@@ -211,62 +285,10 @@ namespace Functions
 
 			for (int32 i = 0; i < VendingMachines.Num(); i++)
 			{
-				ABuildingItemCollectorActor* VendingMachine = (ABuildingItemCollectorActor*)VendingMachines[i];
+				ABuildingItemCollectorActor* VendingMachine = Cast<ABuildingItemCollectorActor>(VendingMachines[i]);
 				if (!VendingMachine) continue;
 
-				int32 RandomRarity = GetRandomRarity(RarityAndWeight);
-
-				if (RandomRarity == 0)
-				{
-					VendingMachine->K2_DestroyActor();
-					continue;
-				}
-
-				// Get Real Rarity
-				RandomRarity -= 1;
-
-				// 0 = Common
-				// 1 = UnCommon
-				// 2 = Rare
-				// 3 = Epic
-				// 4 = Legendary
-
-				// Loot_AthenaVending
-				const FName& LootTierGroup = VendingMachine->DefaultItemLootTierGroupName;
-
-				TArray<FColletorUnitInfo> ItemCollections = VendingMachine->ItemCollections;
-
-				for (int32 j = 0; j < ItemCollections.Num(); j++)
-				{
-					FColletorUnitInfo ItemCollection = ItemCollections[j];
-
-					UFortWorldItemDefinition* InputItem = ItemCollection.InputItem;
-					if (!InputItem) continue;
-
-					int32 LootLevel = UFortKismetLibrary::GetLootLevel(VendingMachine);
-
-					FName LootTierKey = FName(0);
-					int32 LootTier = -1;
-
-					bool bSuccess = Loots::PickLootTierKeyAndLootTierFromTierGroup(&LootTierKey, &LootTier, LootTierGroup, LootLevel, 0, RandomRarity, VendingMachine->StaticGameplayTags);
-
-					if (!bSuccess)
-					{
-						FN_LOG(LogFunctions, Error, "Failed to get loot to drops at %i", j);
-						continue;
-					}
-
-					TArray<FFortItemEntry> LootToDrops;
-					Loots::PickLootDrops(&LootToDrops, LootLevel, LootTierKey, 0, 0, VendingMachine->StaticGameplayTags, false, false);
-
-					if (ItemCollections[j].OutputItemEntry.Num() > 0)
-						ItemCollections[j].OutputItemEntry.Free();
-
-					for (auto& LootToDrop : LootToDrops)
-						ItemCollections[j].OutputItemEntry.Add(LootToDrop);
-				}
-
-				VendingMachine->StartingGoalLevel = RandomRarity;
+				FillVendingMachine(VendingMachine, RarityAndWeight);
 			}
 
 			if (VendingMachines.Num() > 0)

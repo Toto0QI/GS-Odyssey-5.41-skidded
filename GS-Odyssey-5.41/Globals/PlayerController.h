@@ -520,7 +520,91 @@ namespace PlayerController
 
 			if (ItemCollectorActor)
 			{
+				UFortWorldItemDefinition* ActiveInputItem = ItemCollectorActor->ActiveInputItem;
 
+				if (!ActiveInputItem)
+				{
+					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerAttemptInteract] Failed to get ActiveInputItem!");
+					return;
+				}
+
+				FVector ItemCollectorLocation = ItemCollectorActor->K2_GetActorLocation();
+				FVector ItemCollectorRightVector = ItemCollectorActor->GetActorRightVector() * 70.f;
+
+				FVector SpawnLocation = ItemCollectorLocation + ItemCollectorRightVector;
+
+				SpawnLocation.Z += 40;
+
+				FRotator SpawnRotation = FRotator({ 0, 0, 0 });
+
+				TArray<FColletorUnitInfo> ItemCollections = ItemCollectorActor->ItemCollections;
+
+				for (int32 i = 0; i < ItemCollections.Num(); i++)
+				{
+					FColletorUnitInfo ItemCollection = ItemCollections[i];
+
+					UFortWorldItemDefinition* InputItem = ItemCollection.InputItem;
+					if (!InputItem) continue;
+
+					if (InputItem != ActiveInputItem)
+						continue;
+
+					UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_FindExistingItemForDefinition(ActiveInputItem, false));
+					if (!WorldItem) continue;
+
+					float InputCostXY = 0.0f;
+
+					FString ContextString;
+					EEvaluateCurveTableResult Result;
+					UDataTableFunctionLibrary::EvaluateCurveTableRow(ItemCollection.InputCount.Curve.CurveTable, ItemCollection.InputCount.Curve.RowName, ItemCollectorActor->StartingGoalLevel, &Result, &InputCostXY, ContextString);
+
+					int32 InputCost = (InputCostXY * ItemCollection.InputCount.Value);
+
+#ifdef CHEATS
+					if (PlayerController->bInfiniteAmmo)
+						InputCost = 0;
+#endif // CHEATS
+
+					if (InputCost > WorldItem->ItemEntry.Count)
+						break;
+
+					if (Inventory::RemoveInventoryItem(PlayerController, WorldItem->ItemEntry.ItemGuid, InputCost))
+					{
+						TArray<FFortItemEntry> OutputItemEntry = ItemCollection.OutputItemEntry;
+
+						for (auto& ItemEntry : OutputItemEntry)
+						{
+							UFortWorldItemDefinition* ItemDefinition = Cast<UFortWorldItemDefinition>(ItemEntry.ItemDefinition);
+							if (!ItemDefinition) continue;
+
+							FFortItemEntry NewItemEntry;
+							Inventory::MakeItemEntry(&NewItemEntry, ItemDefinition, ItemEntry.Count, ItemEntry.Level, ItemEntry.LoadedAmmo, ItemEntry.Durability);
+
+							FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
+							CreatePickupData.World = Globals::GetWorld();
+							CreatePickupData.ItemEntry = &NewItemEntry;
+							CreatePickupData.SpawnLocation = &SpawnLocation;
+							CreatePickupData.SpawnRotation = &SpawnRotation;
+							CreatePickupData.PlayerController = nullptr;
+							CreatePickupData.OverrideClass = nullptr;
+							CreatePickupData.NullptrIdk = nullptr;
+							CreatePickupData.bRandomRotation = true;
+							CreatePickupData.PickupSourceTypeFlags = 0;
+
+							AFortPickup* Pickup = Inventory::CreatePickupFromData(&CreatePickupData);
+
+							if (Pickup)
+							{
+								FVector FinalLocation = SpawnLocation;
+								Pickup->TossPickup(FinalLocation, nullptr, 0, true);
+							}
+
+							Inventory::FreeItemEntry(&NewItemEntry);
+						}
+					}
+
+					break;
+				}
 			}
 
 #ifdef DEBUGS
@@ -888,116 +972,140 @@ namespace PlayerController
 		}*/
 		else if (FunctionName.contains("ClientOnPawnDied"))
 		{
-			AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)Object;
+			AFortPlayerControllerZone* PlayerControllerZone = Cast<AFortPlayerControllerZone>(Object);
 			auto Params = (Params::FortPlayerControllerZone_ClientOnPawnDied*)Parms;
 
-			if (!PlayerController || !PlayerController->MyFortPawn || !PlayerController->PlayerState)
+			if (!PlayerControllerZone)
 			{
 				FN_LOG(LogPlayerController, Error, "[AFortPlayerControllerZone::ClientOnPawnDied] Failed to get PlayerController!");
 				return;
 			}
 
-			AFortPlayerPawnAthena* Pawn = (AFortPlayerPawnAthena*)PlayerController->MyFortPawn;
-			AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
-			
-			if (!Pawn || !PlayerState)
+			AFortPlayerPawnAthena* PlayerPawn = Cast<AFortPlayerPawnAthena>(PlayerControllerZone->MyFortPawn);
+			AFortPlayerStateAthena* PlayerState = Cast<AFortPlayerStateAthena>(PlayerControllerZone->PlayerState);
+
+			if (!PlayerPawn || !PlayerState)
 			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerControllerZone::ClientOnPawnDied] Failed to get Pawn/PlayerState!");
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerControllerZone::ClientOnPawnDied] Failed to get PlayerPawn/PlayerState!");
 				return;
 			}
 
 			const FFortPlayerDeathReport& DeathReport = Params->DeathReport;
 
-			AFortPlayerStateAthena* KillerPlayerState = (AFortPlayerStateAthena*)DeathReport.KillerPlayerState;
-			AFortPlayerPawnAthena* KillerPawn = (AFortPlayerPawnAthena*)DeathReport.KillerPawn;
+			AFortPlayerStateAthena* KillerPlayerState = Cast<AFortPlayerStateAthena>(DeathReport.KillerPlayerState);
+			AFortPlayerPawnAthena* KillerPawn = Cast<AFortPlayerPawnAthena>(DeathReport.KillerPawn);
 			AActor* DamageCauser = DeathReport.DamageCauser;
-			FGameplayTagContainer Tags = Pawn ? *(FGameplayTagContainer*)(__int64(Pawn) + 0x1188) : FGameplayTagContainer();
 
-			float Distance = KillerPawn ? KillerPawn->GetDistanceTo(Pawn) : 0;
+			FGameplayTagContainer TagContainer = PlayerPawn ? *(FGameplayTagContainer*)(__int64(PlayerPawn) + 0x1188) : FGameplayTagContainer();
 
-			FDeathInfo DeathInfo;
+			float Distance = KillerPawn ? KillerPawn->GetDistanceTo(PlayerPawn) : 0;
+
+			EDeathCause DeathCause = ToDeathCause(TagContainer, PlayerPawn->bIsDBNO);
+
+			FDeathInfo DeathInfo = FDeathInfo();
 			DeathInfo.FinisherOrDowner = KillerPlayerState ? KillerPlayerState : PlayerState;
-			DeathInfo.bDBNO = Pawn->bIsDBNO;
-			DeathInfo.DeathCause = ToDeathCause(Tags, Pawn->bIsDBNO);
-			DeathInfo.Distance = (DeathInfo.DeathCause == EDeathCause::FallDamage) ? Pawn->LastFallDistance : Distance;
-			DeathInfo.DeathLocation = Pawn->K2_GetActorLocation();
+			DeathInfo.bDBNO = PlayerPawn->bIsDBNO;
+			DeathInfo.DeathCause = DeathCause;
+			DeathInfo.Distance = (DeathCause == EDeathCause::FallDamage) ? PlayerPawn->LastFallDistance : Distance;
+			DeathInfo.DeathLocation = PlayerPawn->K2_GetActorLocation();
 			DeathInfo.bInitialized = true;
+
+			PlayerState->PawnDeathLocation = DeathInfo.DeathLocation;
+
+			PlayerState->DeathInfo = DeathInfo;
+			PlayerState->OnRep_DeathInfo();
 
 			if (KillerPlayerState && PlayerState != KillerPlayerState)
 			{
 				KillerPlayerState->KillScore++;
 				KillerPlayerState->ClientReportKill(PlayerState);
 				KillerPlayerState->OnRep_Kills();
-
-				PlayerState->PawnDeathLocation = DeathInfo.DeathLocation;
 			}
 
-			PlayerState->DeathInfo = DeathInfo;
-			PlayerState->OnRep_DeathInfo();
+			AFortPlayerControllerAthena* PlayerControllerAthena = Cast<AFortPlayerControllerAthena>(PlayerControllerZone);
+			AFortGameModeAthena* GameMode = Cast<AFortGameModeAthena>(Globals::GetGameMode());
+			AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
 
-			if (!Pawn->bIsDBNO)
+			if (PlayerControllerAthena && GameMode && GameState)
 			{
-				UAthenaPlayerMatchReport* MatchReport = PlayerController->GetMatchReport();
-				AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
-
-				FAthenaMatchTeamStats TeamStats;
+				FAthenaMatchTeamStats TeamStats = FAthenaMatchTeamStats();
 				TeamStats.Place = GameState->PlayersLeft;
 				TeamStats.TotalPlayers = GameState->TotalPlayers;
 
-				FAthenaRewardResult EndOfMatchResults;
-				EndOfMatchResults.LevelsGained = 999;
-				EndOfMatchResults.BookLevelsGained = 999;
-				EndOfMatchResults.TotalSeasonXpGained = 999;
-				EndOfMatchResults.TotalBookXpGained = 999;
-				EndOfMatchResults.PrePenaltySeasonXpGained = 999;
-				EndOfMatchResults.XpMultipliers = {};
-				EndOfMatchResults.Rewards = {};
-				EndOfMatchResults.AntiAddictionMultiplier = 0.0f;
+				PlayerControllerAthena->ClientSendTeamStatsForPlayer(TeamStats);
+
+				FAthenaRewardResult RewardResult = FAthenaRewardResult();
+				RewardResult.LevelsGained = 999;
+				RewardResult.BookLevelsGained = 999;
+				RewardResult.TotalSeasonXpGained = 999;
+				RewardResult.TotalBookXpGained = 999;
+				RewardResult.PrePenaltySeasonXpGained = 999;
+				RewardResult.XpMultipliers = {};
+				RewardResult.Rewards = {};
+				RewardResult.AntiAddictionMultiplier = 0.0f;
+
+				PlayerControllerAthena->ClientSendEndBattleRoyaleMatchForPlayer(true, RewardResult);
+
+				UAthenaPlayerMatchReport* MatchReport = PlayerControllerAthena->MatchReport;
 
 				if (MatchReport)
 				{
-					//MatchReport->InitialLevelInfo;
 					MatchReport->bHasMatchStats = true;
-					//MatchReport->MatchStats;
 					MatchReport->bHasTeamStats = true;
 					MatchReport->TeamStats = TeamStats;
 					MatchReport->bHasRewards = true;
-					MatchReport->EndOfMatchResults = EndOfMatchResults;
-					//MatchReport->TravelRecord;
+					MatchReport->EndOfMatchResults = RewardResult;
 				}
 
-				PlayerController->ClientSendEndBattleRoyaleMatchForPlayer(true, EndOfMatchResults);
-				PlayerController->ClientSendTeamStatsForPlayer(TeamStats);
-
-				// AFortGameModeAthena* GameMode = Globals::GetGameMode();
-
-				AFortPlayerStateAthena* CorrectPlayerState = (PlayerState == KillerPlayerState) ? nullptr : KillerPlayerState;
-
-				UFortWeaponItemDefinition* WeaponItemDefinition = nullptr;
+				AFortPlayerStateAthena* CorrectKillerPlayerState = (KillerPlayerState && KillerPlayerState == PlayerState) ? nullptr : KillerPlayerState;
+				UFortWeaponItemDefinition* KillerWeaponItemDefinition = nullptr;
 
 				if (DamageCauser)
 				{
-					if (DamageCauser->IsA(AFortProjectileBase::StaticClass()))
-					{
-						AFortWeapon* Weapon = (AFortWeapon*)(AFortProjectileBase*)DamageCauser->GetOwner();
+					AFortProjectileBase* ProjectileBase = Cast<AFortProjectileBase>(DamageCauser);
+					AFortWeapon* Weapon = Cast<AFortWeapon>(DamageCauser);
 
-						if (Weapon)
-							WeaponItemDefinition = Weapon->WeaponData;
+					if (ProjectileBase)
+					{
+						AFortWeapon* ProjectileBaseWeapon = Cast<AFortWeapon>(ProjectileBase->Owner);
+
+						if (ProjectileBaseWeapon)
+							KillerWeaponItemDefinition = ProjectileBaseWeapon->WeaponData;
 					}
-					else if (DamageCauser->IsA(AFortWeapon::StaticClass()))
-						WeaponItemDefinition = ((AFortWeapon*)DamageCauser)->WeaponData;
+					else if (Weapon)
+						KillerWeaponItemDefinition = Weapon->WeaponData;
 				}
 
-				//RemoveFromAlivePlayers(GameMode, PlayerController, CorrectPlayerState, KillerPawn, WeaponItemDefinition, ToDeathCause(Tags, Pawn->bIsDBNO), 0);
+				GameMode::RemoveFromAlivePlayers(GameMode, PlayerControllerAthena, CorrectKillerPlayerState, KillerPawn, KillerWeaponItemDefinition, DeathCause, 0);
 
-				/*if (GameMode && GameMode->bAllowSpectateAfterDeath && KillerPawn)
+				if (GameMode->bAllowSpectateAfterDeath)
 				{
-					PlayerController->PlayerToSpectateOnDeath = KillerPawn;
+					APawn* PlayerToSpectate = KillerPawn;
 
-					// Thanks reboot for K2_SetTimer
-					UKismetSystemLibrary::K2_ClearTimer(PlayerController, L"SpectateOnDeath");
-					UKismetSystemLibrary::K2_SetTimer(PlayerController, L"SpectateOnDeath", 5.f, false);
-				}*/
+					if (!PlayerToSpectate)
+					{
+						TArray<AFortPlayerPawn*> FortPlayerPawns;
+						UFortKismetLibrary::GetAllFortPlayerPawns(PlayerControllerAthena, &FortPlayerPawns);
+
+						for (int32 i = 0; i < FortPlayerPawns.Num(); i++)
+						{
+							AFortPlayerPawn* FortPlayerPawn = FortPlayerPawns[i];
+							if (!FortPlayerPawn) continue;
+
+							if (PlayerPawn == FortPlayerPawn)
+								continue;
+
+							PlayerToSpectate = FortPlayerPawn;
+							break;
+						}
+					}
+
+					if (PlayerToSpectate && PlayerToSpectate != PlayerPawn)
+					{
+						PlayerControllerAthena->PlayerToSpectateOnDeath = PlayerToSpectate;
+						UKismetSystemLibrary::K2_SetTimer(PlayerControllerAthena, L"SpectateOnDeath", 5.0f, false);
+					}
+				}
 			}
 		}
 		else if (FunctionName.contains("ServerPlayEmoteItem"))

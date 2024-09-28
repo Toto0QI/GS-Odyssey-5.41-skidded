@@ -375,7 +375,7 @@ namespace Loots
 
             UStruct* RowStruct = LootTierDataTable->RowStruct;
 
-            if (RowStruct)
+            if (RowStruct && false)
             {
                 UStruct* FortLootTierDataStruct = FindObjectFast<UStruct>("/Script/FortniteGame.FortLootTierData"); // UObject::FindObject<UScriptStruct>("ScriptStruct FortLootTierData.FortLootTierData");
                 bool bIsMatch = false;
@@ -427,7 +427,7 @@ namespace Loots
 
             UStruct* RowStruct = LootTierPackageTable->RowStruct;
 
-            if (RowStruct)
+            if (RowStruct && false)
             {
                 UStruct* FortLootPackageDataStruct = FindObjectFast<UStruct>("/Script/FortniteGame.FortLootPackageData"); // UObject::FindObject<UScriptStruct>("ScriptStruct FortLootPackageData.FortLootPackageData");
                 bool bIsMatch = false;
@@ -1002,6 +1002,8 @@ namespace Loots
     {
         if (!LootTierKey.IsValid())
             return false;
+
+        OutLootToDrops->Clear();
 
         UFortGameData* GameData = Globals::GetGameData();
         FFortLootTierData* LootTierData = FindLootTierDataRow(GameData, LootTierKey, L"UFortLootPackage::PickLootDrops");

@@ -102,57 +102,54 @@ namespace BuildingActor
 							TArray<FFortItemEntry> LootToDrops;
 							Loots::PickLootDrops(&LootToDrops, WorldLevel, BuildingSMActor->DestructionLootTierKey, 0, 0, BuildingSMActor->StaticGameplayTags, true, false);
 
-							if (LootToDrops.Num() > 0)
+							for (int32 i = 0; i < LootToDrops.Num(); i++)
 							{
-								for (int32 i = 0; i < LootToDrops.Num(); i++)
+								FFortItemEntry LootToDrop = LootToDrops[i];
+								UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(LootToDrop.ItemDefinition);
+
+								if (!WorldItemDefinition)
 								{
-									FFortItemEntry LootToDrop = LootToDrops[i];
-									UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(LootToDrop.ItemDefinition);
-
-									if (!WorldItemDefinition)
-									{
-										FN_LOG(LogBuildingActor, Error, "Loot tier %s dropped entry with no item data!", BuildingSMActor->DestructionLootTierGroup.ToString().c_str());
-										continue;
-									}
-
-									FVector ComponentLocation = BuildingSMActor->RootComponent->K2_GetComponentLocation();
-									FVector RandomDirection = UKismetMathLibrary::RandomUnitVector();
-
-									ComponentLocation.X += RandomDirection.X * 200.0f;
-									ComponentLocation.Y += RandomDirection.Y * 200.0f;
-									ComponentLocation.Z += RandomDirection.Z * 200.0f;
-
-									FFortItemEntry ItemEntry;
-									Inventory::MakeItemEntry(&ItemEntry, WorldItemDefinition, LootToDrop.Count, LootToDrop.Level, LootToDrop.LoadedAmmo, LootToDrop.Durability);
-
-									Inventory::SetStateValue(&ItemEntry, EFortItemEntryState::DoNotShowSpawnParticles, 1);
-
-									FRotator SpawnRotation = FRotator({ 0, 0, 0 });
-
-									FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
-									CreatePickupData.World = Globals::GetWorld();
-									CreatePickupData.ItemEntry = &ItemEntry;
-									CreatePickupData.SpawnLocation = &ComponentLocation;
-									CreatePickupData.SpawnRotation = &SpawnRotation;
-									CreatePickupData.PlayerController = nullptr;
-									CreatePickupData.OverrideClass = nullptr;
-									CreatePickupData.NullptrIdk = nullptr;
-									CreatePickupData.bRandomRotation = true;
-									CreatePickupData.PickupSourceTypeFlags = 0;
-
-									AFortPickup* Pickup = Inventory::CreatePickupFromData(&CreatePickupData);
-
-									if (Pickup)
-									{
-										FVector ConeDir = { 0, 0, 0 };
-										FVector VectorInCone = UKismetMathLibrary::RandomUnitVectorInConeInDegrees(ConeDir, 1.0f);
-
-										float FlyTime = GenFlyTime();
-										Pawn::SetPickupTarget(Pickup, PlayerPawn, (FlyTime + (i + 1) * 0.30000001192092896f), VectorInCone, true);
-									}
-
-									Inventory::FreeItemEntry(&ItemEntry);
+									FN_LOG(LogBuildingActor, Error, "Loot tier %s dropped entry with no item data!", BuildingSMActor->DestructionLootTierGroup.ToString().c_str());
+									continue;
 								}
+
+								FVector ComponentLocation = BuildingSMActor->RootComponent->K2_GetComponentLocation();
+								FVector RandomDirection = UKismetMathLibrary::RandomUnitVector();
+
+								ComponentLocation.X += RandomDirection.X * 200.0f;
+								ComponentLocation.Y += RandomDirection.Y * 200.0f;
+								ComponentLocation.Z += RandomDirection.Z * 200.0f;
+
+								FFortItemEntry ItemEntry;
+								Inventory::MakeItemEntry(&ItemEntry, WorldItemDefinition, LootToDrop.Count, LootToDrop.Level, LootToDrop.LoadedAmmo, LootToDrop.Durability);
+
+								Inventory::SetStateValue(&ItemEntry, EFortItemEntryState::DoNotShowSpawnParticles, 1);
+
+								FRotator SpawnRotation = FRotator({ 0, 0, 0 });
+
+								FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
+								CreatePickupData.World = Globals::GetWorld();
+								CreatePickupData.ItemEntry = &ItemEntry;
+								CreatePickupData.SpawnLocation = &ComponentLocation;
+								CreatePickupData.SpawnRotation = &SpawnRotation;
+								CreatePickupData.PlayerController = nullptr;
+								CreatePickupData.OverrideClass = nullptr;
+								CreatePickupData.NullptrIdk = nullptr;
+								CreatePickupData.bRandomRotation = true;
+								CreatePickupData.PickupSourceTypeFlags = 0;
+
+								AFortPickup* Pickup = Inventory::CreatePickupFromData(&CreatePickupData);
+
+								if (Pickup)
+								{
+									FVector ConeDir = { 0, 0, 0 };
+									FVector VectorInCone = UKismetMathLibrary::RandomUnitVectorInConeInDegrees(ConeDir, 1.0f);
+
+									float FlyTime = GenFlyTime();
+									Pawn::SetPickupTarget(Pickup, PlayerPawn, (FlyTime + (i + 1) * 0.30000001192092896f), VectorInCone, true);
+								}
+
+								Inventory::FreeItemEntry(&ItemEntry);
 							}
 
 							if (LootToDrops.IsValid())
@@ -500,8 +497,6 @@ namespace BuildingActor
 				{
 					if (UFortGlobals::IsInAthena())
 					{
-						SpawnLocation.Z += 50.0f;
-
 						FVector FinalLocation = SpawnLocation;
 						Pickup->TossPickup(FinalLocation, nullptr, 0, true);
 					}
@@ -513,6 +508,8 @@ namespace BuildingActor
 						Pawn::SetPickupTarget(Pickup, PlayerPawn, 0.0f, StartDirection, true);
 					}
 				}
+
+				Inventory::FreeItemEntry(&ItemEntry);
             }
             else if (BuildingContainer->ContainerLootTierKey.IsValid())
             {
@@ -523,88 +520,86 @@ namespace BuildingActor
 
                 BuildingContainer->HighestRarity = EFortRarity::Handmade;
 
-                if (LootToDrops.Num() > 0)
-                {
-                    for (int32 i = 0; i < LootToDrops.Num(); i++)
-                    {
-                        FFortItemEntry LootToDrop = LootToDrops[i];
-                        UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(LootToDrop.ItemDefinition);
+				for (int32 i = 0; i < LootToDrops.Num(); i++)
+				{
+					FFortItemEntry LootToDrop = LootToDrops[i];
+					UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(LootToDrop.ItemDefinition);
 
-                        if (!WorldItemDefinition)
-                        {
-                            UFortItemDefinition* ItemDefinition = LootToDrop.ItemDefinition;
-                            FN_LOG(LogBuildingActor, Warning, "Attempted to spawn non-world item %s!", ItemDefinition->GetName().c_str());
-                            continue;
-                        }
+					if (!WorldItemDefinition)
+					{
+						UFortItemDefinition* ItemDefinition = LootToDrop.ItemDefinition;
+						FN_LOG(LogBuildingActor, Warning, "Attempted to spawn non-world item %s!", ItemDefinition->GetName().c_str());
+						continue;
+					}
 
-                        EFortRarity Rarity = BuildingContainer->HighestRarity;
+					EFortRarity Rarity = BuildingContainer->HighestRarity;
 
-                        if (WorldItemDefinition->bCalculateRarityFromQualityAndTier)
-                        {
-                            unsigned __int8 Tier = (unsigned __int8)WorldItemDefinition->Tier;
-                            unsigned __int8 Quality = (unsigned __int8)WorldItemDefinition->Quality;
+					if (WorldItemDefinition->bCalculateRarityFromQualityAndTier)
+					{
+						unsigned __int8 Tier = (unsigned __int8)WorldItemDefinition->Tier;
+						unsigned __int8 Quality = (unsigned __int8)WorldItemDefinition->Quality;
 
-                            if (Tier > 0)
-                                Quality += (Tier - 1) / 2;
+						if (Tier > 0)
+							Quality += (Tier - 1) / 2;
 
-                            Rarity = EFortRarity::Legendary;
+						Rarity = EFortRarity::Legendary;
 
-                            if (Quality <= 9)
-                                Rarity = (EFortRarity)Quality;
-                        }
-                        else
-                        {
-                            Rarity = WorldItemDefinition->Rarity;
-                        }
+						if (Quality <= 9)
+							Rarity = (EFortRarity)Quality;
+					}
+					else
+					{
+						Rarity = WorldItemDefinition->Rarity;
+					}
 
-                        EFortRarity HighestRarity = BuildingContainer->HighestRarity;
+					EFortRarity HighestRarity = BuildingContainer->HighestRarity;
 
-                        if (HighestRarity < Rarity)
-                            BuildingContainer->HighestRarity = Rarity;
+					if (HighestRarity < Rarity)
+						BuildingContainer->HighestRarity = Rarity;
 
-                        if (WorldItemDefinition->ItemType == EFortItemType::WeaponMelee || WorldItemDefinition->ItemType == EFortItemType::WeaponRanged)
-                        {
-                            int32 ItemLevel = LootToDrop.Level;
+					if (WorldItemDefinition->ItemType == EFortItemType::WeaponMelee || WorldItemDefinition->ItemType == EFortItemType::WeaponRanged)
+					{
+						int32 ItemLevel = LootToDrop.Level;
 
-                            float NewDurability = 1.0f * BuildingContainer->LootedWeaponsDurabilityModifier;
+						float NewDurability = 1.0f * BuildingContainer->LootedWeaponsDurabilityModifier;
 
-							Inventory::SetDurability(&LootToDrop, NewDurability);
-                            Inventory::SetStateValue(&LootToDrop, EFortItemEntryState::DurabilityInitialized, 1);
-                        }
+						Inventory::SetDurability(&LootToDrop, NewDurability);
+						Inventory::SetStateValue(&LootToDrop, EFortItemEntryState::DurabilityInitialized, 1);
+					}
 
-						FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
-						CreatePickupData.World = Globals::GetWorld();
-						CreatePickupData.ItemEntry = &LootToDrop;
-						CreatePickupData.SpawnLocation = &SpawnLocation;
-						CreatePickupData.SpawnRotation = &SpawnRotation;
-						CreatePickupData.PlayerController = nullptr;
-						CreatePickupData.OverrideClass = nullptr;
-						CreatePickupData.NullptrIdk = nullptr;
-						CreatePickupData.bRandomRotation = true;
-						CreatePickupData.PickupSourceTypeFlags = 0;
+					FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
+					CreatePickupData.World = Globals::GetWorld();
+					CreatePickupData.ItemEntry = &LootToDrop;
+					CreatePickupData.SpawnLocation = &SpawnLocation;
+					CreatePickupData.SpawnRotation = &SpawnRotation;
+					CreatePickupData.PlayerController = nullptr;
+					CreatePickupData.OverrideClass = nullptr;
+					CreatePickupData.NullptrIdk = nullptr;
+					CreatePickupData.bRandomRotation = true;
+					CreatePickupData.PickupSourceTypeFlags = 0;
 
-						AFortPickup* Pickup = Inventory::CreatePickupFromData(&CreatePickupData);
+					AFortPickup* Pickup = Inventory::CreatePickupFromData(&CreatePickupData);
 
-						if (Pickup)
+					if (Pickup)
+					{
+						if (UFortGlobals::IsInAthena())
 						{
-							if (UFortGlobals::IsInAthena())
-							{
-								SpawnLocation.Z += 50.0f;
-
-								FVector FinalLocation = SpawnLocation;
-								Pickup->TossPickup(FinalLocation, nullptr, 0, true);
-							}
-							else
-							{
-								FVector ConeDir = FVector({ 0, 0, 0 });
-								FVector VectorInCone = UKismetMathLibrary::RandomUnitVectorInConeInRadians(ConeDir, 1.0f);
-
-								float FlyTime = GenFlyTime();
-								Pawn::SetPickupTarget(Pickup, PlayerPawn, (FlyTime + i * 0.30000001192092896f), VectorInCone, true);
-							}
+							FVector FinalLocation = SpawnLocation;
+							Pickup->TossPickup(FinalLocation, nullptr, 0, true);
 						}
-                    }
-                }
+						else
+						{
+							FVector ConeDir = FVector({ 0, 0, 0 });
+							FVector VectorInCone = UKismetMathLibrary::RandomUnitVectorInConeInRadians(ConeDir, 1.0f);
+
+							float FlyTime = GenFlyTime();
+							Pawn::SetPickupTarget(Pickup, PlayerPawn, (FlyTime + i * 0.30000001192092896f), VectorInCone, true);
+						}
+					}
+				}
+
+				if (LootToDrops.IsValid())
+					LootToDrops.Free();
             }
 
             bHasNewAlreadySearched = true;
@@ -614,19 +609,8 @@ namespace BuildingActor
 
         if (LootNoiseRange > 0.0f)
         {
-            USceneComponent* RootComponent = BuildingContainer->RootComponent;
-            FVector ComponentLocation;
-
-            if (RootComponent)
-            {
-                ComponentLocation = RootComponent->K2_GetComponentLocation();
-            }
-            else
-            {
-                ComponentLocation = FVector();
-            }
-
-            UFortAIFunctionLibrary::MakeNoiseEventAtLocation(PlayerPawn, LootNoiseRange, ComponentLocation);
+			const FVector& NoiseLocation = BuildingContainer->K2_GetActorLocation();
+            UFortAIFunctionLibrary::MakeNoiseEventAtLocation(PlayerPawn, LootNoiseRange, NoiseLocation);
         }
 
         if (!BuildingContainer->bDestroyed)
@@ -753,44 +737,41 @@ namespace BuildingActor
 					TArray<FFortItemEntry> LootToDrops;
 					Loots::PickLootDrops(&LootToDrops, WorldLevel, BuildingSMActor->DestructionLootTierKey, 0, 0, BuildingSMActor->StaticGameplayTags, true, false);
 
-					if (LootToDrops.Num() > 0)
+					for (int32 i = 0; i < LootToDrops.Num(); i++)
 					{
-						for (int32 i = 0; i < LootToDrops.Num(); i++)
+						FFortItemEntry LootToDrop = LootToDrops[i];
+						UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(LootToDrop.ItemDefinition);
+
+						if (!WorldItemDefinition)
 						{
-							FFortItemEntry LootToDrop = LootToDrops[i];
-							UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(LootToDrop.ItemDefinition);
-
-							if (!WorldItemDefinition)
-							{
-								FN_LOG(LogBuildingActor, Error, "Loot tier %s dropped entry with no item data!", BuildingSMActor->DestructionLootTierGroup.ToString().c_str());
-								continue;
-							}
-
-							FVector ComponentLocation = BuildingSMActor->RootComponent->K2_GetComponentLocation();
-							FVector RandomDirection = UKismetMathLibrary::RandomUnitVector();
-
-							ComponentLocation.X += RandomDirection.X * 200.0f;
-							ComponentLocation.Y += RandomDirection.Y * 200.0f;
-							ComponentLocation.Z += RandomDirection.Z * 200.0f;
-
-							FFortItemEntry ItemEntry;
-							Inventory::MakeItemEntry(&ItemEntry, WorldItemDefinition, LootToDrop.Count, LootToDrop.Level, LootToDrop.LoadedAmmo, LootToDrop.Durability);
-
-							Inventory::SetStateValue(&ItemEntry, EFortItemEntryState::DoNotShowSpawnParticles, 1);
-
-							AFortPickup* Pickup = Inventory::CreateSimplePickup(Globals::GetWorld(), &ItemEntry, ComponentLocation, FRotator());
-
-							if (Pickup)
-							{
-								FVector ConeDir = { 0, 0, 0 };
-								FVector VectorInCone = UKismetMathLibrary::RandomUnitVectorInConeInDegrees(ConeDir, 1.0f);
-
-								float FlyTime = GenFlyTime();
-								Pawn::SetPickupTarget(Pickup, PlayerPawn, (FlyTime + (i + 1) * 0.30000001192092896f), VectorInCone, true);
-							}
-
-							Inventory::FreeItemEntry(&ItemEntry);
+							FN_LOG(LogBuildingActor, Error, "Loot tier %s dropped entry with no item data!", BuildingSMActor->DestructionLootTierGroup.ToString().c_str());
+							continue;
 						}
+
+						FVector ComponentLocation = BuildingSMActor->RootComponent->K2_GetComponentLocation();
+						FVector RandomDirection = UKismetMathLibrary::RandomUnitVector();
+
+						ComponentLocation.X += RandomDirection.X * 200.0f;
+						ComponentLocation.Y += RandomDirection.Y * 200.0f;
+						ComponentLocation.Z += RandomDirection.Z * 200.0f;
+
+						FFortItemEntry ItemEntry;
+						Inventory::MakeItemEntry(&ItemEntry, WorldItemDefinition, LootToDrop.Count, LootToDrop.Level, LootToDrop.LoadedAmmo, LootToDrop.Durability);
+
+						Inventory::SetStateValue(&ItemEntry, EFortItemEntryState::DoNotShowSpawnParticles, 1);
+
+						AFortPickup* Pickup = Inventory::CreateSimplePickup(Globals::GetWorld(), &ItemEntry, ComponentLocation, FRotator());
+
+						if (Pickup)
+						{
+							FVector ConeDir = { 0, 0, 0 };
+							FVector VectorInCone = UKismetMathLibrary::RandomUnitVectorInConeInDegrees(ConeDir, 1.0f);
+
+							float FlyTime = GenFlyTime();
+							Pawn::SetPickupTarget(Pickup, PlayerPawn, (FlyTime + (i + 1) * 0.30000001192092896f), VectorInCone, true);
+						}
+
+						Inventory::FreeItemEntry(&ItemEntry);
 					}
 
 					if (LootToDrops.IsValid())
