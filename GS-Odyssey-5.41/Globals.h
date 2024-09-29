@@ -4,6 +4,7 @@ uintptr_t IdkOffset = 0x680;
 
 #define CHEATS
 #define DEBUGS
+#define SIPHON
 
 template<typename T = UObject>
 static T* Cast(UObject* Object)

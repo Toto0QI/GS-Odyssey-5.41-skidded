@@ -104,15 +104,11 @@ namespace Pawn
 			{
 				AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Pawn->Controller);
 
-				if (!PlayerController)
-					return;
-
-
-				if (PlayerController->WorldInventory)
+				if (PlayerController && PlayerController->WorldInventory)
 				{
 					FVector SpawnLocation = Pawn->K2_GetActorLocation();
 
-					SpawnLocation.Z += 20.0f;
+					SpawnLocation.Z += 15.0f;
 
 					for (int32 i = 0; i < PlayerController->WorldInventory->Inventory.ItemInstances.Num(); i++)
 					{

@@ -18,14 +18,15 @@ namespace FortAthenaSupplyDrop
 
 	void SpawningLootOnDestructionHook(AFortAthenaSupplyDrop* SupplyDrop, AController* EventInstigator)
 	{
-		static class UFunction* GetLootSpawnLocationFunc = nullptr;
+		UFunction* GetLootSpawnLocationFunc = nullptr;
 
 		if (GetLootSpawnLocationFunc == nullptr)
 			GetLootSpawnLocationFunc = SupplyDrop->Class->GetFunction("AthenaSupplyDrop_Llama_C", "GetLootSpawnLocation");
 
 		AthenaSupplyDrop_Llama_C_GetLootSpawnLocation GetLootSpawnLocationParms{};
 
-		SupplyDrop->ProcessEvent(GetLootSpawnLocationFunc, &GetLootSpawnLocationParms);
+		if (GetLootSpawnLocationFunc)
+			SupplyDrop->ProcessEvent(GetLootSpawnLocationFunc, &GetLootSpawnLocationParms);
 
 		FVector LootSpawnLocation = std::move(GetLootSpawnLocationParms.LootSpawnLocation);
 

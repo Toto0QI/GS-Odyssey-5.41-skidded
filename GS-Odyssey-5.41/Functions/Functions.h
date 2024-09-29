@@ -176,6 +176,34 @@ namespace Functions
 		}
 	}
 
+	void VendingMachinePlayVendFX(ABuildingItemCollectorActor* ItemCollectorActor)
+	{
+		if (!ItemCollectorActor)
+			return;
+
+		UFunction* PlayVendFXFunc = nullptr;
+
+		if (PlayVendFXFunc == nullptr)
+			PlayVendFXFunc = ItemCollectorActor->Class->GetFunction("B_Athena_VendingMachine_C", "PlayVendFX");
+
+		if (PlayVendFXFunc)
+			ItemCollectorActor->ProcessEvent(PlayVendFXFunc, nullptr);
+	}
+
+	void VendingMachinePlayVendFailFX(ABuildingItemCollectorActor* ItemCollectorActor)
+	{
+		if (!ItemCollectorActor)
+			return;
+
+		UFunction* PlayVendFailFXFunc = nullptr;
+
+		if (PlayVendFailFXFunc == nullptr)
+			PlayVendFailFXFunc = ItemCollectorActor->Class->GetFunction("B_Athena_VendingMachine_C", "PlayVendFailFX");
+
+		if (PlayVendFailFXFunc)
+			ItemCollectorActor->ProcessEvent(PlayVendFailFXFunc, nullptr);
+	}
+
 	void FillVendingMachine(ABuildingItemCollectorActor* ItemCollectorActor, std::map<int32, float> RarityAndWeight)
 	{
 		if (!ItemCollectorActor)

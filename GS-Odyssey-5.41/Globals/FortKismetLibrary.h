@@ -53,7 +53,7 @@ namespace FortKismetLibrary
 			{
 				const int32 ResourceAmount = Params->ResourceAmount;
 
-				UFortKismetLibrary::K2_GiveItemToPlayer(Controller, ResourceItemDefinition, ResourceAmount, true);
+				UFortKismetLibrary::K2_GiveItemToPlayer(Controller, ResourceItemDefinition, ResourceAmount, false);
 			}
 		}
 		else if (FunctionName.contains("K2_GiveItemToAllPlayers")) // Rewrite

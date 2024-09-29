@@ -31,13 +31,19 @@ namespace GameMode
 			return nullptr;
 		}
 
+		PlayerPawn->Owner = PlayerController;
+		PlayerPawn->OnRep_Owner();
+
+		PlayerController->Pawn = PlayerPawn;
+		PlayerController->OnRep_Pawn();
+		PlayerController->Possess(PlayerPawn);
+
 		PlayerPawn->SetMaxHealth(100);
 		PlayerPawn->SetHealth(100);
 		PlayerPawn->SetMaxShield(100);
 
 		// 7FF66F7BC760 (Je suis sévèrement autiste)
-		void (*SetShield)(AFortPawn * Pawn, float NewShieldValue) = decltype(SetShield)(0x116C760 + uintptr_t(GetModuleHandle(0)));
-
+		void (*SetShield)(AFortPawn* Pawn, float NewShieldValue) = decltype(SetShield)(0x116C760 + uintptr_t(GetModuleHandle(0)));
 		SetShield(PlayerPawn, 0);
 
 		GameMode::ApplyCharacterCustomization(PlayerState, PlayerPawn);
@@ -54,6 +60,8 @@ namespace GameMode
 		}
 
 		Inventory::SetupInventory(PlayerController, WeaponMeleeItemDefinition);
+
+		FN_LOG(LogHooks, Log, "AGameModeBase::SpawnDefaultPawnFor - called!");
 
 		return PlayerPawn;
 	}

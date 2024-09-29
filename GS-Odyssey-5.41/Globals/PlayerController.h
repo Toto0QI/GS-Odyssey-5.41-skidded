@@ -108,7 +108,7 @@ namespace PlayerController
 		}
 	}
 
-	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms)
+	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms, bool* bCallOG)
 	{
 		if (!Object || !Function)
 			return;
@@ -327,26 +327,9 @@ namespace PlayerController
 					return;
 				}
 
-				const FVector& AircraftLocation = Aircraft->K2_GetActorLocation();
-
-				Util::SpawnPlayer(PlayerController, AircraftLocation, FRotator(), false);
-
 				GameMode::SpawnDefaultPawnForHook(Globals::GetGameMode(), PlayerController, Aircraft);
 
 				PlayerController->SetControlRotation(Params->ClientRotation);
-
-				/*FFortAthenaLoadout CustomizationLoadout = PlayerController->CustomizationLoadout;
-				UAthenaPickaxeItemDefinition* Pickaxe = CustomizationLoadout.Pickaxe;
-
-				UFortWeaponMeleeItemDefinition* PickaxeDefinition = nullptr;
-
-				if (!Pickaxe || !Pickaxe->WeaponDefinition)
-					PickaxeDefinition = FindObjectFast<UFortWeaponMeleeItemDefinition>("/Game/Athena/Items/Weapons/WID_Harvest_Pickaxe_Athena_C_T01.WID_Harvest_Pickaxe_Athena_C_T01");
-
-				if (Pickaxe->WeaponDefinition)
-					PickaxeDefinition = Pickaxe->WeaponDefinition;
-
-				Inventory::SetupInventory(PlayerController, PickaxeDefinition);*/
 			}
 		}
 		else if (FunctionName.contains("ServerExecuteInventoryItem")) // Rewrite
@@ -528,6 +511,8 @@ namespace PlayerController
 					return;
 				}
 
+				*bCallOG = false;
+
 				FVector ItemCollectorLocation = ItemCollectorActor->K2_GetActorLocation();
 				FVector ItemCollectorRightVector = ItemCollectorActor->GetActorRightVector() * 70.f;
 
@@ -603,8 +588,13 @@ namespace PlayerController
 						}
 					}
 
-					break;
+					Functions::VendingMachinePlayVendFX(ItemCollectorActor);
+					ItemCollectorActor->bCurrentInteractionSuccess = true;
+					return;
 				}
+
+				Functions::VendingMachinePlayVendFailFX(ItemCollectorActor);
+				ItemCollectorActor->bCurrentInteractionSuccess = false;
 			}
 
 #ifdef DEBUGS
@@ -636,6 +626,7 @@ namespace PlayerController
 				}
 			}
 #endif // DEBUGS
+
 			ReceivingActor->ForceNetUpdate();
 		}
 		else if (FunctionName.contains("ServerCreateBuildingActor")) // Rewrite
@@ -1020,6 +1011,43 @@ namespace PlayerController
 				KillerPlayerState->KillScore++;
 				KillerPlayerState->ClientReportKill(PlayerState);
 				KillerPlayerState->OnRep_Kills();
+
+#ifdef SIPHON
+				AFortPlayerControllerAthena* KillerPlayerController = Cast<AFortPlayerControllerAthena>(KillerPlayerState->Owner);
+
+				if (KillerPlayerController)
+				{
+					UFortKismetLibrary::K2_GiveBuildingResource(KillerPlayerController, EFortResourceType::Wood, 50);
+					UFortKismetLibrary::K2_GiveBuildingResource(KillerPlayerController, EFortResourceType::Stone, 50);
+					UFortKismetLibrary::K2_GiveBuildingResource(KillerPlayerController, EFortResourceType::Metal, 50);
+
+					float MaxHealth = KillerPawn->GetMaxHealth();
+					float MaxShield = KillerPawn->GetMaxShield();
+
+					float Health = KillerPawn->GetHealth();
+					float Shield = KillerPawn->GetShield();
+
+					float SiphonAmount = 50.0f;
+					float RemainingSiphonAmount = SiphonAmount;
+
+					if (Health < MaxHealth)
+					{
+						float NewHealth = UKismetMathLibrary::Clamp(Health + SiphonAmount, 0.0f, MaxHealth);
+
+						KillerPawn->SetHealth(NewHealth);
+
+						RemainingSiphonAmount -= (NewHealth - Health);
+					}
+
+					if (RemainingSiphonAmount > 0.0f)
+					{
+						float NewShield = UKismetMathLibrary::Clamp(Shield + RemainingSiphonAmount, 0.0f, MaxShield);
+
+						void (*SetShield)(AFortPawn* Pawn, float NewShieldValue) = decltype(SetShield)(0x116C760 + uintptr_t(GetModuleHandle(0)));
+						SetShield(KillerPawn, NewShield);
+					}
+				}
+#endif // SIPHON
 			}
 
 			AFortPlayerControllerAthena* PlayerControllerAthena = Cast<AFortPlayerControllerAthena>(PlayerControllerZone);
@@ -1076,104 +1104,166 @@ namespace PlayerController
 						KillerWeaponItemDefinition = Weapon->WeaponData;
 				}
 
-				GameMode::RemoveFromAlivePlayers(GameMode, PlayerControllerAthena, CorrectKillerPlayerState, KillerPawn, KillerWeaponItemDefinition, DeathCause, 0);
-
-				if (GameMode->bAllowSpectateAfterDeath)
+				if (GameState->GamePhase < EAthenaGamePhase::EndGame)
 				{
-					APawn* PlayerToSpectate = KillerPawn;
+					GameMode::RemoveFromAlivePlayers(GameMode, PlayerControllerAthena, CorrectKillerPlayerState, KillerPawn, KillerWeaponItemDefinition, DeathCause, 0);
 
-					if (!PlayerToSpectate)
+					if (GameMode->bAllowSpectateAfterDeath)
 					{
-						TArray<AFortPlayerPawn*> FortPlayerPawns;
-						UFortKismetLibrary::GetAllFortPlayerPawns(PlayerControllerAthena, &FortPlayerPawns);
+						APawn* PlayerToSpectate = KillerPawn;
 
-						for (int32 i = 0; i < FortPlayerPawns.Num(); i++)
+						if (!PlayerToSpectate || PlayerToSpectate == PlayerPawn)
 						{
-							AFortPlayerPawn* FortPlayerPawn = FortPlayerPawns[i];
-							if (!FortPlayerPawn) continue;
+							TArray<AFortPlayerPawn*> FortPlayerPawns;
+							UFortKismetLibrary::GetAllFortPlayerPawns(PlayerControllerAthena, &FortPlayerPawns);
 
-							if (PlayerPawn == FortPlayerPawn)
-								continue;
+							for (int32 i = 0; i < FortPlayerPawns.Num(); i++)
+							{
+								AFortPlayerPawn* FortPlayerPawn = FortPlayerPawns[i];
+								if (!FortPlayerPawn) continue;
 
-							PlayerToSpectate = FortPlayerPawn;
-							break;
+								if (PlayerPawn == FortPlayerPawn)
+									continue;
+
+								PlayerToSpectate = FortPlayerPawn;
+								break;
+							}
 						}
-					}
 
-					if (PlayerToSpectate && PlayerToSpectate != PlayerPawn)
-					{
-						PlayerControllerAthena->PlayerToSpectateOnDeath = PlayerToSpectate;
-						UKismetSystemLibrary::K2_SetTimer(PlayerControllerAthena, L"SpectateOnDeath", 5.0f, false);
+						TArray<FFortSpectatorAthenaItem> SpectatorArray = PlayerState->Spectators.SpectatorArray;
+
+						for (int32 i = 0; i < SpectatorArray.Num(); i++)
+						{
+							FFortSpectatorAthenaItem Spectator = SpectatorArray[i];
+							AFortPlayerStateAthena* SpectatorPlayerState = Spectator.PlayerState;
+							if (!SpectatorPlayerState) continue;
+
+							AFortPlayerControllerAthena* SpectatorPlayerController = Cast<AFortPlayerControllerAthena>(SpectatorPlayerState->Owner);
+							if (!SpectatorPlayerController) continue;
+
+							if (PlayerToSpectate)
+							{
+								SpectatorPlayerController->PlayerToSpectateOnDeath = PlayerToSpectate;
+								UKismetSystemLibrary::K2_SetTimer(SpectatorPlayerController, L"SpectateOnDeath", 5.0f, false);
+							}
+						}
+
+						if (PlayerToSpectate && PlayerToSpectate != PlayerPawn)
+						{
+							PlayerControllerAthena->PlayerToSpectateOnDeath = PlayerToSpectate;
+							UKismetSystemLibrary::K2_SetTimer(PlayerControllerAthena, L"SpectateOnDeath", 5.0f, false);
+						}
 					}
 				}
 			}
 		}
 		else if (FunctionName.contains("ServerPlayEmoteItem"))
 		{
-			AFortPlayerController* PlayerController = (AFortPlayerController*)Object;
+			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
 			auto Params = (Params::FortPlayerController_ServerPlayEmoteItem*)Parms;
 
 			UFortMontageItemDefinitionBase* EmoteAsset = Params->EmoteAsset;
 
-			if (!PlayerController || !PlayerController->PlayerState || !EmoteAsset)
+			if (!PlayerController || !EmoteAsset)
 			{
 				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerPlayEmoteItem] Failed to get PlayerController/EmoteAsset!");
 				return;
 			}
 
-			AFortPlayerPawn* MyFortPawn = PlayerController->MyFortPawn;
+			AFortPlayerPawn* PlayerPawn = PlayerController->MyFortPawn;
+			AFortPlayerStateAthena* PlayerState = Cast<AFortPlayerStateAthena>(PlayerController->PlayerState);
 
-			if (!MyFortPawn)
+			if (!PlayerPawn || !PlayerState)
 			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerPlayEmoteItem] Failed to get Pawn!");
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerPlayEmoteItem] Failed to get PlayerPawn/PlayerState!");
 				return;
 			}
 
-			UGameplayAbility* Ability = nullptr;
+			UGameplayAbility* GameplayAbility = nullptr;
 
-			if (EmoteAsset->IsA(UAthenaToyItemDefinition::StaticClass()))
+			UAthenaToyItemDefinition* ToyItemDefinition = Cast<UAthenaToyItemDefinition>(EmoteAsset);
+			UAthenaSprayItemDefinition* SprayItemDefinition = Cast<UAthenaSprayItemDefinition>(EmoteAsset);
+
+			if (ToyItemDefinition)
 			{
-				FN_LOG(LogPlayerController, Warning, "[AFortPlayerController::ServerPlayEmoteItem] EmoteAsset UAthenaToyItemDefinition is not valid for now!");
-				return;
+				UClass* ToySpawnAbility = ToyItemDefinition->ToySpawnAbility.Get();
+
+				if (!ToySpawnAbility)
+				{
+					FN_LOG(LogPlayerController, Log, "if (!ToySpawnAbility)");
+
+					std::string AssetPathName = ToyItemDefinition->ToySpawnAbility.ObjectID.AssetPathName.ToString();
+					std::string SubPathString = ToyItemDefinition->ToySpawnAbility.ObjectID.SubPathString.ToString();
+
+					std::string ObjectName = "BlueprintGeneratedClass " + AssetPathName;
+
+					ToySpawnAbility = StaticLoadObject<UBlueprintGeneratedClass>(L"/Game/Abilities/Toys/Golf/Shared/GAB_Toy_GolfSwing.GAB_Toy_GolfSwing_C"); // UObject::FindObject<UBlueprintGeneratedClass>("BlueprintGeneratedClass GAB_Toy_GolfSwing.GAB_Toy_GolfSwing_C");
+
+					FN_LOG(LogPlayerController, Log, "AssetPathName: [%s]", AssetPathName.c_str());
+					FN_LOG(LogPlayerController, Log, "SubPathString: [%s]", SubPathString.c_str());
+
+					/*
+						OdysseyLog: LogPlayerController: Info: AssetPathName: [GAB_Toy_GolfSwing.GAB_Toy_GolfSwing_C]
+						OdysseyLog: LogPlayerController: Info: SubPathString: []
+						OdysseyLog: LogPlayerController: Info: ToyItemDefinition: TOY_005_GolfballElite
+						OdysseyLog: LogPlayerController: Info: Object: Default__GAB_Toy_GolfSwing_C
+						OdysseyLog: LogPlayerController: Info: ToySpawnAbility: BlueprintGeneratedClass GAB_Toy_GolfSwing.GAB_Toy_GolfSwing_C
+						OdysseyLog: LogPlayerController: Info: CastFlags: 0
+						OdysseyLog: LogPlayerController: Info: Flags: 2621489
+						OdysseyLog: LogPlayerController: Info: DanceItemDefinition: TOY_005_GolfballElite
+						OdysseyLog: LogPlayerController: Info: Step 1
+						OdysseyLog: LogPlayerController: Info: Step 2
+						OdysseyLog: LogPlayerController: Info: Step 3
+					*/
+
+					// ToySpawnAbility = StaticLoadObject<UClass>(std::wstring(AssetPathName.begin(), AssetPathName.end()).c_str());
+				}
+
+				FN_LOG(LogPlayerController, Log, "ToyItemDefinition: %s", ToyItemDefinition->GetName().c_str());
+
+				// TOY_005_GolfballElite
+
+				if (ToySpawnAbility)
+				{
+					UObject* Object = ToySpawnAbility->DefaultObject;
+
+					FN_LOG(LogPlayerController, Log, "Object: %s", Object->GetName().c_str());
+					FN_LOG(LogPlayerController, Log, "ToySpawnAbility: %s", ToySpawnAbility->GetFullName().c_str());
+					FN_LOG(LogPlayerController, Log, "CastFlags: %i", ToySpawnAbility->CastFlags);
+					FN_LOG(LogPlayerController, Log, "Flags: %i", Object->Flags);
+
+					GameplayAbility = Cast<UGameplayAbility>(ToySpawnAbility->DefaultObject);
+				}
 			}
-			else if (EmoteAsset->IsA(UAthenaSprayItemDefinition::StaticClass()))
+			else if (SprayItemDefinition)
 			{
-				Ability = UGAB_Spray_Generic_C::GetDefaultObj();
+				GameplayAbility = UGAB_Spray_Generic_C::GetDefaultObj();
 			}
-			else if (EmoteAsset->IsA(UAthenaDanceItemDefinition::StaticClass()))
+			else
 			{
-				Ability = UGAB_Emote_Generic_C::GetDefaultObj();
+				GameplayAbility = UGAB_Emote_Generic_C::GetDefaultObj();
 			}
 
-			if (!Ability)
+			if (GameplayAbility)
 			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerPlayEmoteItem] Failed to get Ability for EmoteAsset: [%s]", EmoteAsset->GetName().c_str());
-				return;
+				UAthenaDanceItemDefinition* DanceItemDefinition = Cast<UAthenaDanceItemDefinition>(EmoteAsset);
+
+				if (DanceItemDefinition)
+				{
+					PlayerPawn->bMovingEmote = DanceItemDefinition->bMovingEmote;
+					PlayerPawn->EmoteWalkSpeed = DanceItemDefinition->WalkForwardSpeed;
+				}
+
+				FGameplayAbilitySpec AbilitySpec;
+				Abilities::CreateDefaultAbilitySpec(&AbilitySpec, GameplayAbility, 0, -1, EmoteAsset);
+
+				FGameplayAbilitySpecHandle Handle;
+				Abilities::GiveAbilityAndActivateOnce(PlayerState->AbilitySystemComponent, &Handle, AbilitySpec);
 			}
-
-			UAthenaDanceItemDefinition* DanceItem = (UAthenaDanceItemDefinition*)EmoteAsset;
-
-			if (DanceItem)
-			{
-				MyFortPawn->bMovingEmote = DanceItem->bMovingEmote;
-				MyFortPawn->EmoteWalkSpeed = DanceItem->WalkForwardSpeed;
-			}
-
-			FGameplayAbilitySpecHandle Handle{ rand() };
-
-			FGameplayAbilitySpec Spec{ -1, -1, -1 };
-			Spec.Ability = Ability;
-			Spec.Level = 0;
-			Spec.InputID = -1;
-			Spec.Handle = Handle;
-			Spec.SourceObject = EmoteAsset;
-
-			FGameplayAbilitySpecHandle OutHandle;
-			Abilities::GiveAbilityAndActivateOnce(((AFortPlayerStateAthena*)PlayerController->PlayerState)->AbilitySystemComponent, &OutHandle, Spec);
 		}
 		else if (FunctionName.contains("ServerPlaySquadQuickChatMessage"))
 		{
-			AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)Object;
+			AFortPlayerControllerAthena* PlayerController = Cast<AFortPlayerControllerAthena>(Object);
 			auto Params = (Params::FortPlayerControllerAthena_ServerPlaySquadQuickChatMessage*)Parms;
 
 			static UAthenaEmojiItemDefinition* EmojiComm = FindObjectFast<UAthenaEmojiItemDefinition>("/Game/Athena/Items/Cosmetics/Dances/Emoji/Emoji_Comm.Emoji_Comm");
@@ -1184,6 +1274,20 @@ namespace PlayerController
 
 				PlayerController->ServerPlayEmoteItem(EmojiComm);
 			}
+		}
+		else if (FunctionName.contains("SpawnToyInstance"))
+		{
+			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
+			auto Params = (Params::FortPlayerController_SpawnToyInstance*)Parms;
+
+			FN_LOG(LogPlayerController, Log, "[AFortPlayerController::SpawnToyInstance] - called!");
+		}
+		else if (FunctionName.contains("NotifyAbilityToSpawnToy"))
+		{
+			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
+			auto Params = (Params::FortToyAbilityInterface_NotifyAbilityToSpawnToy*)Parms;
+
+			FN_LOG(LogPlayerController, Log, "[IFortToyAbilityInterface::NotifyAbilityToSpawnToy] - called!");
 		}
 		else if (FunctionName.contains("ServerAcknowledgePossession"))
 		{
@@ -1206,7 +1310,7 @@ namespace PlayerController
 		}
 		else if (FunctionName.contains("ServerReturnToMainMenu"))
 		{
-			AFortPlayerController* PlayerController = (AFortPlayerController*)Object;
+			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
 
 			if (PlayerController)
 			{

@@ -115,7 +115,7 @@ namespace Hooks
 		bool bCallOG = true;
 
 		GameMode::ProcessEventHook(Object, Function, Parms);
-		PlayerController::ProcessEventHook(Object, Function, Parms);
+		PlayerController::ProcessEventHook(Object, Function, Parms, &bCallOG);
 		Pawn::ProcessEventHook(Object, Function, Parms);
 		FortKismetLibrary::ProcessEventHook(Object, Function, Parms, &bCallOG);
 		Cheats::ProcessEventHook(Object, Function, Parms);
@@ -508,7 +508,22 @@ namespace Hooks
 
 			if (GetAsyncKeyState(VK_F9) & 0x1)
 			{
-				AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
+				UAthenaBattleBusItemDefinition* BattleBusItemDefinition = FindObjectFast<UAthenaBattleBusItemDefinition>("/Game/Athena/Items/Cosmetics/BattleBuses/BBID_BirthdayBus.BBID_BirthdayBus");
+
+				TArray<AActor*> Actors;
+				UGameplayStatics::GetAllActorsOfClass(Globals::GetWorld(), AFortAthenaAircraft::StaticClass(), &Actors);
+
+				for (int32 i = 0; i < Actors.Num(); i++)
+				{
+					AFortAthenaAircraft* AthenaAircraft = Cast<AFortAthenaAircraft>(Actors[i]);
+					if (!AthenaAircraft) continue;
+
+					AthenaAircraft->DefaultBusSkin = BattleBusItemDefinition;
+					AthenaAircraft->SpawnedCosmeticActor->ActiveSkin = BattleBusItemDefinition;
+					AthenaAircraft->ForceNetUpdate();
+				}
+
+				/*AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
 
 				if (!PlayerController)
 					return;
@@ -516,7 +531,7 @@ namespace Hooks
 				if (!PlayerController->CheatManager)
 					PlayerController->CheatManager = (UCheatManager*)UGameplayStatics::SpawnObject(UCheatManager::StaticClass(), PlayerController);
 
-				UKismetSystemLibrary::ExecuteConsoleCommand(PlayerController, L"toggledebugcamera", PlayerController);
+				UKismetSystemLibrary::ExecuteConsoleCommand(PlayerController, L"toggledebugcamera", PlayerController);*/
 			}
 
 			if (GetAsyncKeyState(VK_F10) & 0x1)
@@ -562,6 +577,25 @@ namespace Hooks
 			{
 				AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
 				AFortGameModeAthena* GameMode = Cast<AFortGameModeAthena>(Globals::GetGameMode());
+
+				/*UAthenaBattleBusItemDefinition* BattleBusItemDefinition = FindObjectFast<UAthenaBattleBusItemDefinition>("/Game/Athena/Items/Cosmetics/BattleBuses/BBID_BirthdayBus.BBID_BirthdayBus");
+
+				if (GameState && BattleBusItemDefinition)
+				{
+					GameState->DefaultBattleBus = BattleBusItemDefinition;
+
+					TArray<AActor*> Actors;
+					UGameplayStatics::GetAllActorsOfClass(GameState, AFortAthenaAircraft::StaticClass(), &Actors);
+
+					for (int32 i = 0; i < Actors.Num(); i++)
+					{
+						AFortAthenaAircraft* AthenaAircraft = Cast<AFortAthenaAircraft>(Actors[i]);
+						if (!AthenaAircraft) continue;
+
+						AthenaAircraft->DefaultBusSkin = BattleBusItemDefinition;
+						AthenaAircraft->SpawnedCosmeticActor->ActiveSkin = BattleBusItemDefinition;
+					}
+				}*/
 
 				int32 PlaylistId = 2; // Solo
 				//int32 PlaylistId = 10; // Duo
@@ -618,6 +652,18 @@ namespace Hooks
 				GameMode::bWorldReady = true;
 			}
 		}
+		else if (FunctionName.contains("K2_OnEndAbility"))
+		{
+			UFortGameplayAbility* GameplayAbility = Cast<UFortGameplayAbility>(Object);
+
+			if (GameplayAbility)
+			{
+				AFortPawn* ActivatingPawn = GameplayAbility->GetActivatingPawn();
+
+				if (ActivatingPawn)
+					ActivatingPawn->bMovingEmote = false;
+			}
+		}
 
 		if (bCallOG)
 			ProcessEvent(Object, Function, Parms);
@@ -652,30 +698,6 @@ namespace Hooks
 		}
 
 		return Result;
-	}
-
-	AActor* (*BeginDeferredActorSpawnFromClass)(const UObject* WorldContextObject, TSubclassOf<AActor> ActorClass, const FTransform& SpawnTransform, bool bNoCollisionFail, AActor* Owner);
-	AActor* BeginDeferredActorSpawnFromClassHook(const UObject* WorldContextObject, TSubclassOf<AActor> ActorClass, const FTransform& SpawnTransform, bool bNoCollisionFail, AActor* Owner)
-	{
-		if (!WorldContextObject)
-			return nullptr;
-
-		UFortBuildingInstructions;
-
-		UClass* ActorClassNegro = ActorClass.Get();
-
-		if (!ActorClassNegro)
-		{
-			uintptr_t Offset = uintptr_t(_ReturnAddress()) - InSDKUtils::GetImageBase();
-			uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
-
-			FN_LOG(LogMinHook, Log, "Function [BeginDeferredActorSpawnFromClassHook] successfully hooked with Offset [0x%llx], IdaAddress [%p]", (unsigned long long)Offset, IdaAddress);
-			return nullptr;
-		}
-
-		FN_LOG(LogHooks, Debug, "BeginDeferredActorSpawnFromClassHook WorldContextObject: %s, ActorClassNegro: %s", WorldContextObject->GetName().c_str(), ActorClassNegro->GetName().c_str());
-
-		return BeginDeferredActorSpawnFromClass(WorldContextObject, ActorClass, SpawnTransform, bNoCollisionFail, Owner);
 	}
 
 	// 00007FF66F5F11C0
@@ -719,33 +741,6 @@ namespace Hooks
 		return OutGameSessionClass;
 	}
 
-	AActor* (*SpawnActor)(UWorld* World, UClass* Class, FVector const* Location, FRotator const* Rotation, const FActorSpawnParameters& SpawnParameters);
-	AActor* SpawnActorHook(UWorld* World, UClass* Class, FVector const* Location, FRotator const* Rotation, const FActorSpawnParameters& SpawnParameters)
-	{
-		if (Class && Class->IsA(AFortAthenaAircraft::StaticClass()))
-		{
-			
-		}
-
-		uintptr_t Offset = uintptr_t(_ReturnAddress()) - InSDKUtils::GetImageBase();
-		uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
-
-		FN_LOG(LogMinHook, Log, "Function [SpawnActorHook] successfully hooked with Offset [0x%llx], IdaAddress [%p], Class: [%s]", (unsigned long long)Offset, IdaAddress, Class->GetName().c_str());
-
-		return SpawnActor(World, Class, Location, Rotation, SpawnParameters);
-	}
-
-	AActor* (*RealSpawnActor)(UWorld* World, UClass* Class, __m128* a3, const FActorSpawnParameters& SpawnParameters);
-	AActor* RealSpawnActorHook(UWorld* World, UClass* Class, __m128* a3, const FActorSpawnParameters& SpawnParameters)
-	{
-		uintptr_t Offset = uintptr_t(_ReturnAddress()) - InSDKUtils::GetImageBase();
-		uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
-
-		FN_LOG(LogMinHook, Log, "Function [SpawnActorHook] successfully hooked with Offset [0x%llx], IdaAddress [%p], Class: [%s]", (unsigned long long)Offset, IdaAddress, Class->GetName().c_str());
-
-		return RealSpawnActor(World, Class, a3, SpawnParameters);
-	}
-
 	void InitalizePoiManager(AFortPoiManager* PoiManager)
 	{
 		uintptr_t Offset = uintptr_t(_ReturnAddress()) - InSDKUtils::GetImageBase();
@@ -771,9 +766,9 @@ namespace Hooks
 		return execPickLootDrops(a1, a2, a3);
 	}
 
-	void test()
+	void CollectGarbageHook()
 	{
-
+		FN_LOG(LogMinHook, Log, "CollectGarbageHook called!");
 	}
 
 	void InitHook()
@@ -782,9 +777,6 @@ namespace Hooks
 		static auto FortPlayerPawnAthenaDefault = AFortPlayerPawnAthena::GetDefaultObj();
 
 		MinHook::HookVTable(FortPickupAthenaDefault, 0xBF, PickupAddInventoryOwnerInterfaceHook, (LPVOID*)(&PickupAddInventoryOwnerInterface), "PickupAddInventoryOwnerInterface");
-
-		MinHook::HookVTable(AFortPlayerPawnAthena::GetDefaultObj(), 0x196, test, nullptr, "AFortPlayerPawn::ServerReviveFromDBNO");
-		MinHook::HookVTable(AFortPlayerControllerAthena::GetDefaultObj(), 0x396, test, nullptr, "AFortPlayerControllerZone::ClientOnPawnRevived");
 
 		uintptr_t AddressLocalSpawnPlayActor = MinHook::FindPattern(Patterns::LocalSpawnPlayActor);
 		uintptr_t AddressInternalGetNetMode = MinHook::FindPattern(Patterns::InternalGetNetMode);
@@ -815,11 +807,14 @@ namespace Hooks
 		MH_CreateHook((LPVOID)(AddressServerSpawnDeco), ServerSpawnDecoHook, (LPVOID*)(&ServerSpawnDeco));
 		MH_EnableHook((LPVOID)(AddressServerSpawnDeco));
 
-		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8960), CollectGarbageInternalHook, nullptr);
-		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8960));
+		/*MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8960), CollectGarbageInternalHook, nullptr);
+		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8960));*/
 
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0xE31290), sub_7FF66F481290Hook, nullptr);
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0xE31290));
+
+		/*MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8E80), CollectGarbageHook, nullptr);
+		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8E80));*/
 
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0xC56D70), InitalizePoiManager, nullptr);
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0xC56D70));
