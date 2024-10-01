@@ -37,6 +37,18 @@
     <ClCompile Include="SDK\AthenaSupplyDrop_functions.cpp">
       <Filter>SDK</Filter>
     </ClCompile>
+    <ClCompile Include="SDK\McpProfileSys_functions.cpp">
+      <Filter>SDK</Filter>
+    </ClCompile>
+    <ClCompile Include="SDK\B_PlayerSpawnedBall_functions.cpp">
+      <Filter>SDK</Filter>
+    </ClCompile>
+    <ClCompile Include="SDK\PhysicsBall_Master_functions.cpp">
+      <Filter>SDK</Filter>
+    </ClCompile>
+    <ClCompile Include="SDK\AIModule_functions.cpp">
+      <Filter>SDK</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="util.h" />
@@ -98,6 +110,9 @@
       <Filter>Headers\Functions</Filter>
     </ClInclude>
     <ClInclude Include="Functions\NewInventory.h">
+      <Filter>Headers\Functions</Filter>
+    </ClInclude>
+    <ClInclude Include="Functions\AntiCheatOdyssey.h">
       <Filter>Headers\Functions</Filter>
     </ClInclude>
   </ItemGroup>

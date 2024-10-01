@@ -24,7 +24,49 @@ namespace FortKismetLibrary
 
 		const std::string& FunctionName = Function->GetName();
 
-		if (FunctionName.contains("GiveItemToInventoryOwner"))
+		if (FunctionName.contains("GetAIDirector"))
+		{
+			auto Params = (Params::FortKismetLibrary_GetAIDirector*)Parms;
+
+			*bCallOG = false;
+
+			UWorld* World = Functions::GetWorldFromContextObject(Globals::GetFortEngine(), Params->WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
+
+			if (World)
+			{
+				AFortGameModeZone* GameModeZone = Cast<AFortGameModeZone>(World->AuthorityGameMode);
+
+				if (GameModeZone)
+				{
+					Params->ReturnValue = GameModeZone->AIDirector;
+					return;
+				}
+			}
+
+			Params->ReturnValue = nullptr;
+		}
+		else if (FunctionName.contains("GetAIGoalManager"))
+		{
+			auto Params = (Params::FortKismetLibrary_GetAIGoalManager*)Parms;
+
+			*bCallOG = false;
+
+			UWorld* World = Functions::GetWorldFromContextObject(Globals::GetFortEngine(), Params->WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
+
+			if (World)
+			{
+				AFortGameModeZone* GameModeZone = Cast<AFortGameModeZone>(World->AuthorityGameMode);
+
+				if (GameModeZone)
+				{
+					Params->ReturnValue = GameModeZone->AIGoalManager;
+					return;
+				}
+			}
+
+			Params->ReturnValue = nullptr;
+		}
+		else if (FunctionName.contains("GiveItemToInventoryOwner"))
 		{
 			auto Params = (Params::FortKismetLibrary_GiveItemToInventoryOwner*)Parms;
 
@@ -42,7 +84,7 @@ namespace FortKismetLibrary
 
 			}
 		}
-		else if (FunctionName.contains("K2_GiveBuildingResource")) // Rewrite
+		else if (FunctionName.contains("K2_GiveBuildingResource"))
 		{
 			auto Params = (Params::FortKismetLibrary_K2_GiveBuildingResource*)Parms;
 
@@ -56,7 +98,7 @@ namespace FortKismetLibrary
 				UFortKismetLibrary::K2_GiveItemToPlayer(Controller, ResourceItemDefinition, ResourceAmount, false);
 			}
 		}
-		else if (FunctionName.contains("K2_GiveItemToAllPlayers")) // Rewrite
+		else if (FunctionName.contains("K2_GiveItemToAllPlayers"))
 		{
 			auto Params = (Params::FortKismetLibrary_K2_GiveItemToAllPlayers*)Parms;
 
@@ -76,7 +118,7 @@ namespace FortKismetLibrary
 				}
 			}
 		}
-		else if (FunctionName.contains("K2_GiveItemToPlayer")) // Rewrite
+		else if (FunctionName.contains("K2_GiveItemToPlayer"))
 		{
 			auto Params = (Params::FortKismetLibrary_K2_GiveItemToPlayer*)Parms;
 

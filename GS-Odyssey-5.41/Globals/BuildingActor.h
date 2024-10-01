@@ -31,6 +31,15 @@ namespace BuildingActor
 
 		if (FunctionName.contains("OnDamageServer"))
 		{
+
+
+
+
+
+
+
+
+
 			ABuildingSMActor* BuildingSMActor = Cast<ABuildingSMActor>(Object);
 			auto Params = (Params::BuildingActor_OnDamageServer*)Parms;
 

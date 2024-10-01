@@ -624,8 +624,11 @@ namespace Inventory
 		return true;
 	}
 
-	void SetupInventory(AFortPlayerController* PlayerController, UFortWeaponMeleeItemDefinition* PickaxeDefinition)
+	void SetupInventory(AFortPlayerController* PlayerController, UFortWeaponMeleeItemDefinition* WeaponMeleeItemDefinition)
 	{
+		if (!PlayerController || !PlayerController->WorldInventory)
+			return;
+
 		TArray<FItemAndCount> StartingItems = Cast<AFortGameModeAthena>(Globals::GetGameMode())->StartingItems;
 
 		for (int32 i = 0; i < StartingItems.Num(); i++)
@@ -644,10 +647,10 @@ namespace Inventory
 			FreeItemEntry(&ItemEntry);
 		}
 
-		if (PickaxeDefinition)
+		if (WeaponMeleeItemDefinition)
 		{
 			FFortItemEntry ItemEntry;
-			MakeItemEntry(&ItemEntry, PickaxeDefinition, 1, 0, 0, 0.f);
+			MakeItemEntry(&ItemEntry, WeaponMeleeItemDefinition, 1, 0, 0, 0.f);
 
 			AddInventoryItem(PlayerController, ItemEntry);
 			FreeItemEntry(&ItemEntry);

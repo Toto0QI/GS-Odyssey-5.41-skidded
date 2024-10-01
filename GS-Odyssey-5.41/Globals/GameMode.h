@@ -22,8 +22,10 @@ namespace GameMode
 		}
 
 		// 7FF66F49A3C0
-		AFortPlayerPawn* (*SpawnDefaultPawnFor)(AFortGameMode* GameMode, AFortPlayerController* PlayerController, AActor* StartSpot) = decltype(SpawnDefaultPawnFor)(0xE4A3C0 + uintptr_t(GetModuleHandle(0)));
-		AFortPlayerPawn* PlayerPawn = SpawnDefaultPawnFor(GameModeBase, PlayerController, StartSpot);
+		//AFortPlayerPawn* (*SpawnDefaultPawnFor)(AFortGameMode* GameMode, AFortPlayerController* PlayerController, AActor* StartSpot) = decltype(SpawnDefaultPawnFor)(0xE4A3C0 + uintptr_t(GetModuleHandle(0)));
+		//AFortPlayerPawn* PlayerPawn = SpawnDefaultPawnFor(GameModeBase, PlayerController, StartSpot);
+
+		AFortPlayerPawn* PlayerPawn = Util::SpawnPlayer(PlayerController, StartSpot->K2_GetActorLocation(), FRotator(), false);
 
 		if (!PlayerPawn)
 		{
@@ -99,8 +101,6 @@ namespace GameMode
 				{
 					FName InProgress = UKismetStringLibrary::Conv_StringToName(L"InProgress");
 
-					HandleMatchHasStarted(GameMode);
-
 					GameMode->MatchState = InProgress;
 					GameMode->K2_OnSetMatchState(InProgress);
 
@@ -109,6 +109,14 @@ namespace GameMode
 					Functions::InitializeLlamas();
 
 					Functions::FillVendingMachines();
+
+#ifdef DEBUGS
+					GameState->GamePhase = EAthenaGamePhase::SafeZones;
+					GameState->OnRep_GamePhase(EAthenaGamePhase::None);
+					return;
+#endif // DEBUGS
+
+					HandleMatchHasStarted(GameMode);
 				}
 			}
 		}
@@ -125,6 +133,15 @@ namespace GameMode
 
 			if (bWorldReady)
 			{
+#ifdef DEBUGS
+				AFortPlayerPawn* PlayerPawn = Util::SpawnPlayer((AFortPlayerController*)Params->NewPlayer, FVector({0, 0, 3000}), FRotator(), true);
+
+				if (PlayerPawn)
+					PlayerPawn->bCanBeDamaged = true;
+
+				return;
+#endif // DEBUGS
+
 				AActor* PlayerStart = GameModeBase->ChoosePlayerStart(Params->NewPlayer);
 
 				if (!PlayerStart)
@@ -132,24 +149,6 @@ namespace GameMode
 					FN_LOG(LogGameMode, Error, "[AGameModeBase::HandleStartingNewPlayer] Failed to get PlayerStart!");
 					return;
 				}
-
-				/*AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Params->NewPlayer);
-				
-				if (PlayerController)
-				{
-					UFortWeaponMeleeItemDefinition* WeaponMeleeItemDefinition = FindObjectFast<UFortWeaponMeleeItemDefinition>("/Game/Athena/Items/Weapons/WID_Harvest_Pickaxe_Athena_C_T01.WID_Harvest_Pickaxe_Athena_C_T01");
-					AFortPlayerControllerAthena* PlayerControllerAthena = Cast<AFortPlayerControllerAthena>(PlayerController);
-
-					if (PlayerControllerAthena)
-					{
-						UAthenaPickaxeItemDefinition* Pickaxe = PlayerControllerAthena->CustomizationLoadout.Pickaxe;
-
-						if (Pickaxe->WeaponDefinition)
-							WeaponMeleeItemDefinition = Pickaxe->WeaponDefinition;
-					}
-
-					Inventory::SetupInventory(PlayerController, WeaponMeleeItemDefinition);
-				}*/
 
 				const FVector& PlayerStartLocation = PlayerStart->K2_GetActorLocation();
 				const FRotator& PlayerStartRotation = PlayerStart->K2_GetActorRotation();

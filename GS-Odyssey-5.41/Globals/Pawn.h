@@ -4,7 +4,7 @@ namespace Pawn
 {
 	void (*SetPickupTarget)(AFortPickup* Pickup, AFortPlayerPawn* Pawn, float InFlyTime, const FVector& InStartDirection, bool bPlayPickupSound);
 
-	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms)
+	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms, bool* bCallOG)
 	{
 		if (!Object || !Function)
 			return;
@@ -46,6 +46,30 @@ namespace Pawn
 
 			if (Pickup->bPickedUp)
 				return;
+
+#ifdef ANTICHEAT
+			UAntiCheatOdyssey* AntiCheatOdyssey = FindOrCreateAntiCheatOdyssey(PlayerController);
+
+			if (AntiCheatOdyssey)
+			{
+				const float Distance = PlayerPawn->GetDistanceTo(Pickup);
+				const float MaxDistance = AntiCheatOdyssey->GetMaxPickupDistance();
+
+				if (Distance > MaxDistance && !PlayerPawn->bIsSkydiving)
+				{
+					const FString& PlayerName = AntiCheatOdyssey->GetPlayerName();
+
+					if (PlayerName.IsValid())
+					{
+						AC_LOG(ACWarning, "Player [%s] tries to ServerHandlePickup when the distance is [%.2f] and the max is [%.2f]",
+							AntiCheatOdyssey->GetPlayerName().ToString().c_str(), Distance, MaxDistance);
+					}
+
+					AntiCheatOdyssey->BanByAntiCheat(L"AC - You took a pickup too far away!");
+					return;
+				}
+			}
+#endif // ANTICHEAT
 
 			SetPickupTarget(Pickup, PlayerPawn, UKismetMathLibrary::RandomFloatInRange(0.40f, 0.54f), FVector(), true);
 
@@ -139,6 +163,83 @@ namespace Pawn
 				}
 			}
 		}
+
+#ifdef ANTICHEAT
+		else if (FunctionName.contains("OnDamageServer"))
+		{
+			AFortPawn* Pawn = Cast<AFortPawn>(Object);
+			auto Params = (Params::FortPawn_OnDamageServer*)Parms;
+
+			AActor* DamageCauser = Params->DamageCauser;
+
+			if (!Pawn || !DamageCauser)
+				return;
+
+			float Damage = Params->Damage;
+
+			APlayerController* PlayerController = Cast<APlayerController>(Params->InstigatedBy);
+			UAntiCheatOdyssey* AntiCheatOdyssey = FindOrCreateAntiCheatOdyssey(PlayerController);
+
+			if (AntiCheatOdyssey)
+			{
+				AFortWeapon* Weapon = Cast<AFortWeapon>(DamageCauser);
+
+				if (Weapon && Weapon->WeaponData)
+				{
+					UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(Weapon->WeaponData);
+
+					if (!WorldItemDefinition)
+						return;
+
+					const float Distance = PlayerController->Pawn ? PlayerController->Pawn->GetDistanceTo(Pawn) : Weapon->GetDistanceTo(Pawn);
+
+					EFortItemType ItemType = WorldItemDefinition->ItemType;
+
+					if (ItemType == EFortItemType::WeaponHarvest)
+					{
+						const float MaxDistance = AntiCheatOdyssey->GetMaxPickaxeDistance();
+
+						if (Distance > MaxDistance)
+						{
+							const FString& PlayerName = AntiCheatOdyssey->GetPlayerName();
+
+							if (PlayerName.IsValid())
+							{
+								AC_LOG(ACWarning, "Player [%s] attempted to damage a player with a pickaxe at a distance of [%.2f] with a maximum of [%.2f]",
+									AntiCheatOdyssey->GetPlayerName().ToString().c_str(), Distance, MaxDistance);
+							}
+
+							AntiCheatOdyssey->BanByAntiCheat(L"AC - You put pickaxe damage at too long a distance!");
+							*bCallOG = false;
+							return;
+						}
+					}
+					else if (ItemType == EFortItemType::WeaponMelee)
+					{
+
+					}
+
+					AC_LOG(ACLog, "Player [%s] attempted to damage a player at a distance of [%.2f]", AntiCheatOdyssey->GetPlayerName().ToString().c_str(), Distance);
+					AC_LOG(ACLog, "ItemType: %i", ItemType);
+				}
+			}
+
+			FN_LOG(LogPawn, Log, "Pawn: %s", Pawn->GetName().c_str());
+
+			FN_LOG(LogPawn, Log, "DamageCauser: %s", DamageCauser->GetName().c_str());
+			FN_LOG(LogPawn, Log, "Damage: %.2f", Damage);
+			FN_LOG(LogPawn, Log, "InstigatedBy: %s", PlayerController->GetName().c_str());
+
+			FHitResult HitInfo = Params->HitInfo;
+
+			FN_LOG(LogPawn, Log, "Time: %.2f", HitInfo.Time);
+			FN_LOG(LogPawn, Log, "Distance: %.2f", HitInfo.Distance);
+			FN_LOG(LogPawn, Log, "Location: [X: %.2f, Y: %.2f, Z: %.2f]", HitInfo.Location.X, HitInfo.Location.Y, HitInfo.Location.Z);
+			FN_LOG(LogPawn, Log, "ImpactPoint: [X: %.2f, Y: %.2f, Z: %.2f]", HitInfo.ImpactPoint.X, HitInfo.ImpactPoint.Y, HitInfo.ImpactPoint.Z);
+
+			FN_LOG(LogPawn, Log, "AFortPawn::OnDamageServer called!");
+		}
+#endif // ANTICHEAT
 	}
 
 

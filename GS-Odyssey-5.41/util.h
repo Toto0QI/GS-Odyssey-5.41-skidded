@@ -134,6 +134,23 @@ public:
         return (ActorType*)Actor;
     }
 
+    template <typename ActorType>
+    static ActorType* SpawnActorTransfrom(UClass* Class, FTransform Transform)
+    {
+        // 7FF670C23D60
+        AActor* (*RealSpawnActor)(UWorld* World, UClass* Class, FTransform Transform, const FActorSpawnParameters& SpawnParameters) = decltype(RealSpawnActor)(0x25D3D60 + uintptr_t(GetModuleHandle(0)));
+
+        auto SpawnParameters = (FActorSpawnParameters*)VirtualAlloc(0, sizeof(FActorSpawnParameters), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+        SpawnParameters->SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+        SpawnParameters->bDeferConstruction = false;
+
+        AActor* Actor = RealSpawnActor(Globals::GetWorld(), Class, Transform, *SpawnParameters);
+
+        VirtualFree(SpawnParameters, 0, MEM_RELEASE);
+
+        return (ActorType*)Actor;
+    }
+
     static AFortPlayerPawn* SpawnPlayer(AFortPlayerController* PlayerController, const FVector& Location, const FRotator& Rotation, bool NewPlayer = true)
     {
         APlayerPawn_Athena_C* PlayerPawn = SpawnActor<APlayerPawn_Athena_C>(APlayerPawn_Athena_C::StaticClass(), Location, Rotation);
@@ -173,16 +190,7 @@ public:
 
             // 7FF66F7BC760 (Je suis sévèrement autiste)
             void (*SetShield)(AFortPawn* Pawn, float NewShieldValue) = decltype(SetShield)(0x116C760 + uintptr_t(GetModuleHandle(0)));
-
             SetShield(PlayerPawn, 0);
-
-            APlayerCameraManager* PlayerCameraManager = PlayerController->PlayerCameraManager;
-
-            if (PlayerCameraManager)
-            {
-                PlayerCameraManager->ViewRollMin = 0.f;
-                PlayerCameraManager->ViewRollMax = 0.f;
-            }
 
             PlayerController->bIsDisconnecting = false;
             PlayerController->bHasClientFinishedLoading = true;

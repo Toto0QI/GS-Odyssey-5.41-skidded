@@ -17,6 +17,8 @@
 #include "Patterns.h"
 #include "Util.h"
 
+#include "Functions/AntiCheatOdyssey.h"
+
 #include "Functions/Abilities.h"
 
 // #include "Functions/Inventory.h"
@@ -27,6 +29,9 @@
 #include "Functions/Threads.h"
 
 #include "Globals/GameMode.h"
+
+#include "Functions/Bots.h"
+
 #include "Globals/PlayerController.h"
 #include "Globals/Pawn.h"
 #include "Globals/FortKismetLibrary.h"

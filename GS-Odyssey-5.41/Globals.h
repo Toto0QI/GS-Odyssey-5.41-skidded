@@ -3,8 +3,10 @@
 uintptr_t IdkOffset = 0x680;
 
 #define CHEATS
-#define DEBUGS
+// #define DEBUGS
 #define SIPHON
+#define ANTICHEAT
+#define BOTS
 
 template<typename T = UObject>
 static T* Cast(UObject* Object)

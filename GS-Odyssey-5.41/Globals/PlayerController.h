@@ -113,77 +113,92 @@ namespace PlayerController
 		if (!Object || !Function)
 			return;
 
-		if (!Object->IsA(AFortPlayerController::StaticClass()))
-			return;
+		/*if (!Object->IsA(AFortPlayerController::StaticClass()))
+			return;*/
 
 		const std::string& FunctionName = Function->GetName();
 
 		if (FunctionName.contains("ServerReadyToStartMatch"))
 		{
-			AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)Object;
-			UFortPlaylistAthena* Playlist = Globals::GetPlaylist();
+			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
 
-			if (!PlayerController || !Playlist)
+			if (!PlayerController)
 			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerReadyToStartMatch] Failed to get PlayerController/Playlist!");
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerReadyToStartMatch] Failed to get PlayerController!");
 				return;
 			}
 
-			AFortPlayerPawn* Pawn = PlayerController->MyFortPawn;
+#ifdef ANTICHEAT
+			UAntiCheatOdyssey* AntiCheatOdyssey = FindOrCreateAntiCheatOdyssey(PlayerController);
+
+			if (AntiCheatOdyssey)
+			{
+				if (AntiCheatOdyssey->bServerReadyToStartMatch)
+				{
+					const FString& PlayerName = AntiCheatOdyssey->GetPlayerName();
+
+					if (PlayerName.IsValid())
+					{
+						AC_LOG(ACWarning, "Player [%s] is trying to ServerReadyToStartMatch", AntiCheatOdyssey->GetPlayerName().ToString().c_str());
+					}
+
+					AntiCheatOdyssey->BanByAntiCheat(L"AC - You tried ServerReadyToStartMatch!");
+					*bCallOG = false;
+					return;
+				}
+
+				AntiCheatOdyssey->bServerReadyToStartMatch = true;
+			}
+#endif // ANTICHEAT
+
+			AFortPlayerPawn* PlayerPawn = PlayerController->MyFortPawn;
 			AFortPlayerState* PlayerState = Cast<AFortPlayerState>(PlayerController->PlayerState);
 
-			if (Pawn && PlayerState)
+			if (PlayerPawn && PlayerState && PlayerState->AbilitySystemComponent)
 			{
 				// 7FF66EC68170
 				void (*ClearAllAbilities)(UAbilitySystemComponent* AbilitySystemComponent) = decltype(ClearAllAbilities)(0x618170 + uintptr_t(GetModuleHandle(0)));
 				ClearAllAbilities(PlayerState->AbilitySystemComponent);
 
-				static UFortAbilitySet* DefaultAbilities = Globals::GetGameData()->GenericPlayerAbilitySet.Get();
+				UFortAbilitySet* DefaultAbilities = Globals::GetGameData()->GenericPlayerAbilitySet.Get();
 
-#ifdef DEBUGS
-				TArray<TSoftObjectPtr<UFortGameplayModifierItemDefinition>> ModifierList = Playlist->ModifierList;
-
-
-#endif // DEBUGS
-
-				Abilities::GrantGameplayAbility(DefaultAbilities, Pawn);
-				Abilities::GrantGameplayEffect(DefaultAbilities, Pawn);
-				GameMode::ApplyCharacterCustomization(PlayerState, Pawn);
+				Abilities::GrantGameplayAbility(DefaultAbilities, PlayerPawn);
+				Abilities::GrantGameplayEffect(DefaultAbilities, PlayerPawn);
+				GameMode::ApplyCharacterCustomization(PlayerState, PlayerPawn);
 			}
 
-			FFortAthenaLoadout CustomizationLoadout = PlayerController->CustomizationLoadout;
-			UAthenaPickaxeItemDefinition* Pickaxe = CustomizationLoadout.Pickaxe;
+			AFortPlayerControllerAthena* PlayerControllerAthena = Cast<AFortPlayerControllerAthena>(PlayerController);
+			UFortWeaponMeleeItemDefinition* WeaponMeleeItemDefinition = nullptr;
 
-			UFortWeaponMeleeItemDefinition* PickaxeDefinition = nullptr;
+			if (PlayerControllerAthena)
+			{
+				UAthenaPickaxeItemDefinition* AthenaPickaxeItemDefinition = PlayerControllerAthena->CustomizationLoadout.Pickaxe;
 
-			if (!Pickaxe || !Pickaxe->WeaponDefinition)
-				PickaxeDefinition = FindObjectFast<UFortWeaponMeleeItemDefinition>("/Game/Athena/Items/Weapons/WID_Harvest_Pickaxe_Athena_C_T01.WID_Harvest_Pickaxe_Athena_C_T01");
+				if (AthenaPickaxeItemDefinition)
+					WeaponMeleeItemDefinition = AthenaPickaxeItemDefinition->WeaponDefinition;
 
-			if (Pickaxe->WeaponDefinition)
-				PickaxeDefinition = Pickaxe->WeaponDefinition;
+				if (!WeaponMeleeItemDefinition)
+				{
+					UAthenaPickaxeItemDefinition* DefaultPickaxeSkin = Globals::GetGameData()->DefaultPickaxeSkin;
 
-			/*FFortItemEntry ItemEntry;
-			Inventory::MakeItemEntry(&ItemEntry, PickaxeDefinition, 1, 0, 0, 0.f);
+					if (DefaultPickaxeSkin)
+						WeaponMeleeItemDefinition = DefaultPickaxeSkin->WeaponDefinition;
+				}
+			}
 
-			Inventory::AddInventoryItem(PlayerController, ItemEntry);*/
+			Inventory::SetupInventory(PlayerController, WeaponMeleeItemDefinition);
 
-			Inventory::SetupInventory(PlayerController, PickaxeDefinition);
+			APlayerCameraManager* PlayerCameraManager = PlayerController->PlayerCameraManager;
+
+			if (PlayerCameraManager)
+			{
+				PlayerCameraManager->ViewRollMin = 0.0f;
+				PlayerCameraManager->ViewRollMax = 0.0f;
+			}
 
 #ifdef CHEATS
 			if (!PlayerController->CheatManager)
 				PlayerController->CheatManager = (UCheatManager*)UGameplayStatics::SpawnObject(UCheatManager::StaticClass(), PlayerController);
-
-			// UFortCheatManager
-
-#ifdef DEBUGS
-			UCheatManager* CheatManager = PlayerController->CheatManager;
-
-			if (CheatManager)
-			{
-				//CheatManager->ChangeSize(100.f);
-			}
-#endif // DEBUGS
-
 #endif // CHEATS
 		}
 		else if (FunctionName.contains("ServerDropAllItems"))
@@ -286,7 +301,7 @@ namespace PlayerController
 
 			FN_LOG(LogPlayerController, Log, "[AFortPlayerController::ServerItemWillBeDestroyed] ItemDefinition: %s, Count: %i", WorldItem->ItemEntry.ItemDefinition->GetName().c_str(), Params->Count);
 		}
-		else if (FunctionName.contains("ServerAttemptAircraftJump")) // Rewrite
+		else if (FunctionName.contains("ServerAttemptAircraftJump")) 
 		{
 			AFortPlayerControllerAthena* PlayerController = Cast<AFortPlayerControllerAthena>(Object);
 			auto Params = (Params::FortPlayerControllerAthena_ServerAttemptAircraftJump*)Parms;
@@ -305,7 +320,7 @@ namespace PlayerController
 				return;
 			}
 
-			if (PlayerController->IsInAircraft() && !PlayerController->Pawn)
+			if (PlayerState->bInAircraft && !PlayerController->Pawn)
 			{
 				AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
 
@@ -332,7 +347,7 @@ namespace PlayerController
 				PlayerController->SetControlRotation(Params->ClientRotation);
 			}
 		}
-		else if (FunctionName.contains("ServerExecuteInventoryItem")) // Rewrite
+		else if (FunctionName.contains("ServerExecuteInventoryItem")) 
 		{
 			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
 			auto Params = (Params::FortPlayerController_ServerExecuteInventoryItem*)Parms;
@@ -374,7 +389,7 @@ namespace PlayerController
 				EquipWeaponDefinition(WeaponItemDefinition, WorldItem, PlayerController);
 			}
 		}
-		else if (FunctionName.contains("ServerAttemptInventoryDrop")) // Rewrite
+		else if (FunctionName.contains("ServerAttemptInventoryDrop")) 
 		{
 			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
 			auto Params = (Params::FortPlayerController_ServerAttemptInventoryDrop*)Parms;
@@ -468,6 +483,39 @@ namespace PlayerController
 				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerAttemptInteract] Failed to get PlayerController/ReceivingActor!");
 				return;
 			}
+
+			AFortPlayerPawn* PlayerPawn = PlayerController->MyFortPawn;
+
+			if (!PlayerPawn)
+			{
+				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerAttemptInteract] Failed to get PlayerPawn!");
+				return;
+			}
+
+#ifdef ANTICHEAT
+			UAntiCheatOdyssey* AntiCheatOdyssey = FindOrCreateAntiCheatOdyssey(PlayerController);
+
+			if (AntiCheatOdyssey)
+			{
+				const float Distance = PlayerPawn->GetDistanceTo(ReceivingActor);
+				const float MaxDistance = AntiCheatOdyssey->GetMaxInteractDistance();
+
+				if (Distance > MaxDistance)
+				{
+					const FString& PlayerName = AntiCheatOdyssey->GetPlayerName();
+
+					if (PlayerName.IsValid())
+					{
+						AC_LOG(ACWarning, "Player [%s] tries to ServerAttemptInteract when the distance is [%.2f] and the max is [%.2f]", 
+							AntiCheatOdyssey->GetPlayerName().ToString().c_str(), Distance, MaxDistance);
+					}
+
+					AntiCheatOdyssey->BanByAntiCheat(L"AC - You interacted at too long a distance!");
+					*bCallOG = false;
+					return;
+				}
+			}
+#endif // ANTICHEAT
 
 			AAthenaSupplyDrop_C* AthenaSupplyDrop = Cast<AAthenaSupplyDrop_C>(ReceivingActor);
 
@@ -629,9 +677,9 @@ namespace PlayerController
 
 			ReceivingActor->ForceNetUpdate();
 		}
-		else if (FunctionName.contains("ServerCreateBuildingActor")) // Rewrite
+		else if (FunctionName.contains("ServerCreateBuildingActor")) 
 		{
-			AFortPlayerController* PlayerController = (AFortPlayerController*)Object;
+			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
 			auto Params = (Params::FortPlayerController_ServerCreateBuildingActor*)Parms;
 
 			if (!PlayerController)
@@ -656,12 +704,6 @@ namespace PlayerController
 
 			TSubclassOf<ABuildingSMActor> BuildingClass = BuildingClassData.BuildingClass;
 
-			if (!Functions::IsPlayerBuildableClasse(BuildingClass.Get()))
-			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerCreateBuildingActor] Failed to get BuildingClass or is not the player buildable classe!");
-				return;
-			}
-
 			TArray<ABuildingActor*> ExistingBuildings;
 			EFortStructuralGridQueryResults QueryResults = CanAddBuildingActorToGrid(PlayerController, BuildingClass, BuildLoc, BuildRot, Params->bMirrored, &ExistingBuildings);
 
@@ -675,14 +717,43 @@ namespace PlayerController
 					return;
 				}
 
-				const float Distance = PlayerPawn->GetDistanceTo(BuildingActor);
+#ifdef ANTICHEAT
+				UAntiCheatOdyssey* AntiCheatOdyssey = FindOrCreateAntiCheatOdyssey(PlayerController);
 
-				if (Distance > 1750)
+				if (AntiCheatOdyssey)
 				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerCreateBuildingActor] Maximum distance is 1750, your distance is %.2f.", Distance);
-					BuildingActor->SilentDie();
-					return;
+					if (!Functions::IsPlayerBuildableClasse(BuildingClass.Get()))
+					{
+						const FString& PlayerName = AntiCheatOdyssey->GetPlayerName();
+
+						if (PlayerName.IsValid())
+						{
+							AC_LOG(ACWarning, "Failed to get BuildingClass or is not the player buildable classe for player [%s]", PlayerName.ToString().c_str());
+						}
+
+						BuildingActor->SilentDie();
+						AntiCheatOdyssey->BanByAntiCheat(L"AC - You tried to create a BuildingActor with a non-player class!");
+						return;
+					}
+
+					const float Distance = PlayerPawn->GetDistanceTo(BuildingActor);
+					const float MaxDistance = AntiCheatOdyssey->GetMaxBuildingActorDistance();
+
+					if (Distance > MaxDistance)
+					{
+						const FString& PlayerName = AntiCheatOdyssey->GetPlayerName();
+
+						if (PlayerName.IsValid())
+						{
+							AC_LOG(ACWarning, "Player [%s] tries to ServerCreateBuildingActor when the distance is [%.2f] and the max is [%.2f]", PlayerName.ToString().c_str(), Distance, MaxDistance);
+						}
+
+						BuildingActor->SilentDie();
+						AntiCheatOdyssey->BanByAntiCheat(L"AC - You tried to create a BuildingActor from too long a distance!");
+						return;
+					}
 				}
+#endif // ANTICHEAT
 
 #ifdef CHEATS
 				if (!PlayerController->bBuildFree)
@@ -739,9 +810,9 @@ namespace PlayerController
 					ExistingBuildings.Free();
 			}
 		}
-		else if (FunctionName.contains("ServerRepairBuildingActor")) // Rewrite
+		else if (FunctionName.contains("ServerRepairBuildingActor")) 
 		{
-			AFortPlayerController* PlayerController = (AFortPlayerController*)Object;
+			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
 			auto Params = (Params::FortPlayerController_ServerRepairBuildingActor*)Parms;
 
 			ABuildingSMActor* BuildingActorToRepair = Params->BuildingActorToRepair;
@@ -761,21 +832,43 @@ namespace PlayerController
 				return;
 			}
 
-			if (!Functions::IsOnSameTeam(PlayerState, BuildingActorToRepair))
+#ifdef ANTICHEAT
+			UAntiCheatOdyssey* AntiCheatOdyssey = FindOrCreateAntiCheatOdyssey(PlayerController);
+
+			if (AntiCheatOdyssey)
 			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] PlayerController (team: [%i]) and BuildingActorToRepair (team [%i]) is not on the same team!",
-					PlayerState->TeamIndex, BuildingActorToRepair->Team);
+				if (!Functions::IsOnSameTeam(PlayerState, BuildingActorToRepair))
+				{
+					const FString& PlayerName = AntiCheatOdyssey->GetPlayerName();
 
-				return;
+					if (PlayerName.IsValid())
+					{
+						AC_LOG(ACWarning, "Player [%s] tries to RepairBuildingActor, PlayerController (team: [%i]) and BuildingActorToRepair (team [%i]) are not on the same team!",
+							PlayerName.ToString().c_str(), PlayerState->TeamIndex, BuildingActorToRepair->Team);
+					}
+
+					AntiCheatOdyssey->BanByAntiCheat(L"AC - You tried to repair a BuildingActor that is not in your team!");
+					return;
+				}
+
+				const float Distance = PlayerPawn->GetDistanceTo(BuildingActorToRepair);
+				const float MaxDistance = AntiCheatOdyssey->GetMaxBuildingActorDistance();
+
+				if (Distance > MaxDistance)
+				{
+					const FString& PlayerName = AntiCheatOdyssey->GetPlayerName();
+
+					if (PlayerName.IsValid())
+					{
+						AC_LOG(ACWarning, "Player [%s] tries to ServerRepairBuildingActor when the distance is [%.2f] and the max is [%.2f]",
+							PlayerName.ToString().c_str(), Distance, MaxDistance);
+					}
+
+					AntiCheatOdyssey->BanByAntiCheat(L"AC - You tried to repair a BuildingActor from too long a distance!");
+					return;
+				}
 			}
-
-			const float Distance = PlayerPawn->GetDistanceTo(BuildingActorToRepair);
-
-			if (Distance > 1000)
-			{
-				FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerRepairBuildingActor] Maximum distance is 1000, your distance is %.2f.", Distance);
-				return;
-			}
+#endif // ANTICHEAT
 
 #ifdef CHEATS
 			if (!PlayerController->bBuildFree)
@@ -802,9 +895,9 @@ namespace PlayerController
 			int32 ResourcesSpent = PayRepairCosts(PlayerController, BuildingActorToRepair);
 			BuildingActorToRepair->RepairBuilding(PlayerController, ResourcesSpent);
 		}
-		/*else if (FunctionName.contains("ServerBeginEditingBuildingActor")) // Rewrite
+		else if (FunctionName.contains("ServerBeginEditingBuildingActor"))
 		{
-			AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)Object;
+			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
 			auto Params = (Params::FortPlayerController_ServerBeginEditingBuildingActor*)Parms;
 
 			ABuildingSMActor* BuildingActorToEdit = Params->BuildingActorToEdit;
@@ -826,53 +919,70 @@ namespace PlayerController
 
 			if (CheckBeginEditBuildingActor(BuildingActorToEdit, PlayerController))
 			{
-				if (!Functions::IsOnSameTeam(PlayerState, BuildingActorToEdit))
-				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerBeginEditingBuildingActor] PlayerController (team: [%i]) and BuildingActorToEdit (team [%i]) is not on the same team!",
-						PlayerState->TeamIndex, BuildingActorToEdit->Team);
-
-					return;
-				}
-
-				float Distance = PlayerPawn->GetDistanceTo(BuildingActorToEdit);
-
-				if (Distance > 1000)
-				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] Maximum distance is 1000, your distance is %.2f.", Distance);
-					return;
-				}
-
-				static UFortEditToolItemDefinition* EditToolDefinition = Globals::GetGameData()->EditToolItem.Get();
-
-				if (!EditToolDefinition)
-				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerBeginEditingBuildingActor] Failed to get EditToolDefinition!");
-					return;
-				}
-
-				UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_FindExistingItemForDefinition(EditToolDefinition, false));
-
-				if (!WorldItem)
-				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerBeginEditingBuildingActor] Failed to get WorldItem!");
-					return;
-				}
-
-				AFortWeap_EditingTool* EditTool = Cast<AFortWeap_EditingTool>(PlayerPawn->EquipWeaponDefinition(EditToolDefinition, WorldItem->ItemEntry.ItemGuid));
-
-				if (!EditTool)
-				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerBeginEditingBuildingActor] Failed to get EditTool!");
-					return;
-				}
-
 				Functions::SetEditingPlayer(BuildingActorToEdit, PlayerState);
-				Functions::SetEditingActor(EditTool, BuildingActorToEdit);
+
+#ifdef ANTICHEAT
+				UAntiCheatOdyssey* AntiCheatOdyssey = FindOrCreateAntiCheatOdyssey(PlayerController);
+
+				if (AntiCheatOdyssey)
+				{
+					if (!Functions::IsOnSameTeam(PlayerState, BuildingActorToEdit))
+					{
+						const FString& PlayerName = AntiCheatOdyssey->GetPlayerName();
+
+						if (PlayerName.IsValid())
+						{
+							AC_LOG(ACWarning, "Player [%s] tries begin to Editing BuildingActor, PlayerController (team: [%i]) and BuildingActorToEdit (team [%i]) are not on the same team!",
+								PlayerName.ToString().c_str(), PlayerState->TeamIndex, BuildingActorToEdit->Team);
+						}
+
+						AntiCheatOdyssey->BanByAntiCheat(L"AC - You tried to edit a BuildingActor that is not in your team!");
+						return;
+					}
+
+					const float Distance = PlayerPawn->GetDistanceTo(BuildingActorToEdit);
+					const float MaxDistance = AntiCheatOdyssey->GetMaxBuildingActorDistance();
+
+					if (Distance > MaxDistance)
+					{
+						const FString& PlayerName = AntiCheatOdyssey->GetPlayerName();
+
+						if (PlayerName.IsValid())
+						{
+							AC_LOG(ACWarning, "Player [%s] tries to begin editing BuildingActor when the distance is [%.2f] and the max is [%.2f]",
+								PlayerName.ToString().c_str(), Distance, MaxDistance);
+						}
+
+						AntiCheatOdyssey->BanByAntiCheat(L"AC - You tried to beging edit a BuildingActor from too long a distance!");
+						return;
+					}
+				}
+#endif // ANTICHEAT
+
+				UFortGameData* GameData = Globals::GetGameData();
+				UFortEditToolItemDefinition* EditToolItemDefinition = GameData->EditToolItem.Get();
+
+				if (!EditToolItemDefinition)
+				{
+					const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(GameData->EditToolItem.ObjectID.AssetPathName); // ToString doesn't work idk
+
+					EditToolItemDefinition = StaticLoadObject<UFortEditToolItemDefinition>(AssetPathName.CStr());
+				}
+
+				UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_FindExistingItemForDefinition(EditToolItemDefinition, false));
+
+				if (WorldItem && EditToolItemDefinition && EquipWeaponDefinition(EditToolItemDefinition, WorldItem, PlayerController))
+				{
+					AFortWeap_EditingTool* EditingTool = Cast<AFortWeap_EditingTool>(PlayerController->MyFortPawn->CurrentWeapon);
+
+					if (EditingTool)
+						Functions::SetEditingActor(EditingTool, BuildingActorToEdit);
+				}
 			}
 		}
-		else if (FunctionName.contains("ServerEditBuildingActor")) // Rewrite
+		else if (FunctionName.contains("ServerEditBuildingActor"))
 		{
-			AFortPlayerController* PlayerController = (AFortPlayerController*)Object;
+			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
 			auto Params = (Params::FortPlayerController_ServerEditBuildingActor*)Parms;
 
 			ABuildingSMActor* BuildingActorToEdit = Params->BuildingActorToEdit;
@@ -894,32 +1004,35 @@ namespace PlayerController
 
 			if (PlayerState == BuildingActorToEdit->EditingPlayer && !BuildingActorToEdit->bDestroyed)
 			{
-				if (!Functions::IsPlayerBuildableClasse(Params->NewBuildingClass.Get()))
+				Functions::SetEditingPlayer(BuildingActorToEdit, nullptr);
+
+#ifdef ANTICHEAT
+				UAntiCheatOdyssey* AntiCheatOdyssey = FindOrCreateAntiCheatOdyssey(PlayerController);
+
+				if (AntiCheatOdyssey)
 				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] Failed to get BuildingClass or is not the player buildable classe!");
-					return;
+					if (!Functions::IsPlayerBuildableClasse(Params->NewBuildingClass.Get()))
+					{
+						const FString& PlayerName = AntiCheatOdyssey->GetPlayerName();
+
+						if (PlayerName.IsValid())
+						{
+							AC_LOG(ACWarning, "Failed to get BuildingClass or is not the player buildable classe for player [%s]", PlayerName.ToString().c_str());
+						}
+
+						AntiCheatOdyssey->BanByAntiCheat(L"AC - You tried to edit a BuildingActor with a non-player class!");
+						return;
+					}
 				}
+#endif // ANTICHEAT
 
-				if (!PlayerPawn->CurrentWeapon || !PlayerPawn->CurrentWeapon->IsA(AFortWeap_EditingTool::StaticClass()))
-				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEditBuildingActor] Failed to get CurrentWeapon or is not the Editing Tool!");
-					return;
-				}
-
-				ABuildingSMActor* BuildingActor = ReplaceBuildingActor(BuildingActorToEdit, 1, Params->NewBuildingClass, BuildingActorToEdit->CurrentBuildingLevel, Params->RotationIterations, Params->bMirrored, PlayerController);
-
-				if (BuildingActor)
-				{
-					Functions::SetEditingPlayer(BuildingActorToEdit, nullptr);
-
-					BuildingActor->bPlayerPlaced = true;
-					BuildingActor->Team = PlayerState->TeamIndex;
-				}
+				int32 CurrentBuildingLevel = BuildingActorToEdit->CurrentBuildingLevel;
+				ReplaceBuildingActor(BuildingActorToEdit, 1, Params->NewBuildingClass, CurrentBuildingLevel, Params->RotationIterations, Params->bMirrored, PlayerController);
 			}
 		}
-		else if (FunctionName.contains("ServerEndEditingBuildingActor")) // Rewrite
+		else if (FunctionName.contains("ServerEndEditingBuildingActor"))
 		{
-			AFortPlayerController* PlayerController = (AFortPlayerController*)Object;
+			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
 			auto Params = (Params::FortPlayerController_ServerEndEditingBuildingActor*)Parms;
 
 			ABuildingSMActor* BuildingActorToStopEditing = Params->BuildingActorToStopEditing;
@@ -941,13 +1054,7 @@ namespace PlayerController
 
 			if (PlayerState == BuildingActorToStopEditing->EditingPlayer && !BuildingActorToStopEditing->bDestroyed)
 			{
-				static UFortEditToolItemDefinition* EditToolDefinition = Globals::GetGameData()->EditToolItem.Get();
-
-				if (!EditToolDefinition)
-				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerEndEditingBuildingActor] Failed to get EditToolDefinition!");
-					return;
-				}
+				Functions::SetEditingPlayer(BuildingActorToStopEditing, nullptr);
 
 				AFortWeap_EditingTool* EditTool = Cast<AFortWeap_EditingTool>(PlayerPawn->CurrentWeapon);
 
@@ -960,7 +1067,7 @@ namespace PlayerController
 				Functions::SetEditingPlayer(BuildingActorToStopEditing, nullptr);
 				Functions::SetEditingActor(EditTool, nullptr);
 			}
-		}*/
+		}
 		else if (FunctionName.contains("ClientOnPawnDied"))
 		{
 			AFortPlayerControllerZone* PlayerControllerZone = Cast<AFortPlayerControllerZone>(Object);
@@ -1170,6 +1277,47 @@ namespace PlayerController
 				return;
 			}
 
+#ifdef ANTICHEAT
+			/*UAntiCheatOdyssey* AntiCheatOdyssey = FindOrCreateAntiCheatOdyssey(PlayerController);
+
+			if (AntiCheatOdyssey)
+			{
+				AFortPlayerControllerAthena* PlayerControllerAthena = Cast<AFortPlayerControllerAthena>(AntiCheatOdyssey->GetFortPlayerController());
+
+				if (PlayerControllerAthena && EmoteAsset->IsA(UAthenaDanceItemDefinition::StaticClass()))
+				{
+					TArray<UAthenaDanceItemDefinition*> Dances = PlayerControllerAthena->CustomizationLoadout.Dances;
+					UAthenaDanceItemDefinition* FindAthenaDanceItemDefinition = nullptr;
+
+					for (int32 i = 0; i < Dances.Num(); i++)
+					{
+						UAthenaDanceItemDefinition* AthenaDanceItemDefinition = Dances[i];
+						if (!AthenaDanceItemDefinition) continue;
+
+						if (AthenaDanceItemDefinition == EmoteAsset)
+						{
+							FindAthenaDanceItemDefinition = AthenaDanceItemDefinition;
+							break;
+						}
+					}
+
+					if (!FindAthenaDanceItemDefinition)
+					{
+						const FString& PlayerName = AntiCheatOdyssey->GetPlayerName();
+
+						if (PlayerName.IsValid())
+						{
+							AC_LOG(ACWarning, "Player [%s] tries to use the emote [%s] even though he doesn't have it in his locker.", PlayerName.ToString().c_str(), EmoteAsset->GetName().c_str());
+						}
+
+						AntiCheatOdyssey->BanByAntiCheat(L"AC - You tried to use an Emote that isn't in your locker!");
+						*bCallOG = false;
+						return;
+					}
+				}
+			}*/
+#endif // ANTICHEAT
+
 			AFortPlayerPawn* PlayerPawn = PlayerController->MyFortPawn;
 			AFortPlayerStateAthena* PlayerState = Cast<AFortPlayerStateAthena>(PlayerController->PlayerState);
 
@@ -1179,7 +1327,7 @@ namespace PlayerController
 				return;
 			}
 
-			UGameplayAbility* GameplayAbility = nullptr;
+			UFortGameplayAbility* GameplayAbility = nullptr;
 
 			UAthenaToyItemDefinition* ToyItemDefinition = Cast<UAthenaToyItemDefinition>(EmoteAsset);
 			UAthenaSprayItemDefinition* SprayItemDefinition = Cast<UAthenaSprayItemDefinition>(EmoteAsset);
@@ -1190,50 +1338,13 @@ namespace PlayerController
 
 				if (!ToySpawnAbility)
 				{
-					FN_LOG(LogPlayerController, Log, "if (!ToySpawnAbility)");
+					const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(ToyItemDefinition->ToySpawnAbility.ObjectID.AssetPathName); // ToString doesn't work idk
 
-					std::string AssetPathName = ToyItemDefinition->ToySpawnAbility.ObjectID.AssetPathName.ToString();
-					std::string SubPathString = ToyItemDefinition->ToySpawnAbility.ObjectID.SubPathString.ToString();
-
-					std::string ObjectName = "BlueprintGeneratedClass " + AssetPathName;
-
-					ToySpawnAbility = StaticLoadObject<UBlueprintGeneratedClass>(L"/Game/Abilities/Toys/Golf/Shared/GAB_Toy_GolfSwing.GAB_Toy_GolfSwing_C"); // UObject::FindObject<UBlueprintGeneratedClass>("BlueprintGeneratedClass GAB_Toy_GolfSwing.GAB_Toy_GolfSwing_C");
-
-					FN_LOG(LogPlayerController, Log, "AssetPathName: [%s]", AssetPathName.c_str());
-					FN_LOG(LogPlayerController, Log, "SubPathString: [%s]", SubPathString.c_str());
-
-					/*
-						OdysseyLog: LogPlayerController: Info: AssetPathName: [GAB_Toy_GolfSwing.GAB_Toy_GolfSwing_C]
-						OdysseyLog: LogPlayerController: Info: SubPathString: []
-						OdysseyLog: LogPlayerController: Info: ToyItemDefinition: TOY_005_GolfballElite
-						OdysseyLog: LogPlayerController: Info: Object: Default__GAB_Toy_GolfSwing_C
-						OdysseyLog: LogPlayerController: Info: ToySpawnAbility: BlueprintGeneratedClass GAB_Toy_GolfSwing.GAB_Toy_GolfSwing_C
-						OdysseyLog: LogPlayerController: Info: CastFlags: 0
-						OdysseyLog: LogPlayerController: Info: Flags: 2621489
-						OdysseyLog: LogPlayerController: Info: DanceItemDefinition: TOY_005_GolfballElite
-						OdysseyLog: LogPlayerController: Info: Step 1
-						OdysseyLog: LogPlayerController: Info: Step 2
-						OdysseyLog: LogPlayerController: Info: Step 3
-					*/
-
-					// ToySpawnAbility = StaticLoadObject<UClass>(std::wstring(AssetPathName.begin(), AssetPathName.end()).c_str());
+					ToySpawnAbility = StaticLoadObject<UBlueprintGeneratedClass>(AssetPathName.CStr());
 				}
-
-				FN_LOG(LogPlayerController, Log, "ToyItemDefinition: %s", ToyItemDefinition->GetName().c_str());
-
-				// TOY_005_GolfballElite
 
 				if (ToySpawnAbility)
-				{
-					UObject* Object = ToySpawnAbility->DefaultObject;
-
-					FN_LOG(LogPlayerController, Log, "Object: %s", Object->GetName().c_str());
-					FN_LOG(LogPlayerController, Log, "ToySpawnAbility: %s", ToySpawnAbility->GetFullName().c_str());
-					FN_LOG(LogPlayerController, Log, "CastFlags: %i", ToySpawnAbility->CastFlags);
-					FN_LOG(LogPlayerController, Log, "Flags: %i", Object->Flags);
-
-					GameplayAbility = Cast<UGameplayAbility>(ToySpawnAbility->DefaultObject);
-				}
+					GameplayAbility = Cast<UFortGameplayAbility>(ToySpawnAbility->DefaultObject);
 			}
 			else if (SprayItemDefinition)
 			{
@@ -1266,7 +1377,7 @@ namespace PlayerController
 			AFortPlayerControllerAthena* PlayerController = Cast<AFortPlayerControllerAthena>(Object);
 			auto Params = (Params::FortPlayerControllerAthena_ServerPlaySquadQuickChatMessage*)Parms;
 
-			static UAthenaEmojiItemDefinition* EmojiComm = FindObjectFast<UAthenaEmojiItemDefinition>("/Game/Athena/Items/Cosmetics/Dances/Emoji/Emoji_Comm.Emoji_Comm");
+			UAthenaEmojiItemDefinition* EmojiComm = FindObjectFast<UAthenaEmojiItemDefinition>("/Game/Athena/Items/Cosmetics/Dances/Emoji/Emoji_Comm.Emoji_Comm");
 
 			if (PlayerController && EmojiComm)
 			{
@@ -1275,23 +1386,70 @@ namespace PlayerController
 				PlayerController->ServerPlayEmoteItem(EmojiComm);
 			}
 		}
-		else if (FunctionName.contains("SpawnToyInstance"))
-		{
-			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
-			auto Params = (Params::FortPlayerController_SpawnToyInstance*)Parms;
-
-			FN_LOG(LogPlayerController, Log, "[AFortPlayerController::SpawnToyInstance] - called!");
-		}
 		else if (FunctionName.contains("NotifyAbilityToSpawnToy"))
 		{
-			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Object);
+			UFortGameplayAbility* GameplayAbility = Cast<UFortGameplayAbility>(Object);
 			auto Params = (Params::FortToyAbilityInterface_NotifyAbilityToSpawnToy*)Parms;
 
-			FN_LOG(LogPlayerController, Log, "[IFortToyAbilityInterface::NotifyAbilityToSpawnToy] - called!");
+			if (!GameplayAbility)
+			{
+				FN_LOG(LogPlayerController, Error, "[IFortToyAbilityInterface::NotifyAbilityToSpawnToy] Failed to get GameplayAbility!");
+				return;
+			}
+
+			AFortPawn* Pawn = GameplayAbility->GetActivatingPawn();
+			UAthenaToyItemDefinition* LastEmoteItemDef = Cast<UAthenaToyItemDefinition>(Pawn->LastEmoteItemDef);
+
+			if (!Pawn || !LastEmoteItemDef)
+			{
+				FN_LOG(LogPlayerController, Error, "[IFortToyAbilityInterface::NotifyAbilityToSpawnToy] Failed to get Pawn/LastEmoteItemDef!");
+				return;
+			}
+
+			UClass* ToyActorClass = LastEmoteItemDef->ToyActorClass.Get();
+
+			if (!ToyActorClass)
+			{
+				const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(LastEmoteItemDef->ToyActorClass.ObjectID.AssetPathName); // ToString doesn't work idk
+
+				ToyActorClass = StaticLoadObject<UBlueprintGeneratedClass>(AssetPathName.CStr());
+			}
+
+			if (ToyActorClass)
+			{
+				AB_PlayerSpawnedBall_C* PlayerSpawnedBall = Util::SpawnActorTransfrom<AB_PlayerSpawnedBall_C>(ToyActorClass, Params->DesiredLocation);
+
+				if (PlayerSpawnedBall)
+				{
+					AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Pawn->Owner);
+
+					if (PlayerController && PlayerController->PlayerState)
+					{
+						PlayerSpawnedBall->SetOwner(PlayerController->PlayerState);
+						PlayerSpawnedBall->OnRep_Owner();
+
+						PlayerSpawnedBall->InitializeToyInstance(PlayerController, 0);
+						PlayerSpawnedBall->MakeBallDormant();
+
+						PlayerSpawnedBall->DrawDebugTrajectory();
+
+						PlayerController->ActiveToyInstances.Add(PlayerSpawnedBall);
+					}
+
+					UKismetSystemLibrary::K2_SetTimer(PlayerSpawnedBall, L"K2_DestroyActor", 10.0f, false);
+
+					FN_LOG(LogPlayerController, Log, "[IFortToyAbilityInterface::NotifyAbilityToSpawnToy] PlayerSpawnedBall: %s", PlayerSpawnedBall->GetFullName().c_str());
+				}
+
+				// [IFortToyAbilityInterface::NotifyAbilityToSpawnToy] Toy: B_Toy_GolfBall_S5_Elite_C Athena_Terrain.Athena_Terrain.PersistentLevel.B_Toy_GolfBall_S5_Elite_C_0
+
+				*bCallOG = false;
+				Params->ReturnValue = PlayerSpawnedBall;
+			}
 		}
 		else if (FunctionName.contains("ServerAcknowledgePossession"))
 		{
-			APlayerController* PlayerController = (APlayerController*)Object;
+			APlayerController* PlayerController = Cast<APlayerController>(Object);
 			auto Params = (Params::PlayerController_ServerAcknowledgePossession*)Parms;
 
 			if (!PlayerController)
@@ -1320,6 +1478,31 @@ namespace PlayerController
 				PlayerController->ClientTravel(L"/Game/Maps/Frontend", ETravelType::TRAVEL_Absolute, false, FGuid());
 			}
 		}
+
+#ifdef ANTICHEAT
+		else if (FunctionName.contains("ServerChangeName"))
+		{
+			APlayerController* PlayerController = Cast<APlayerController>(Object);
+			auto Params = (Params::PlayerController_ServerChangeName*)Parms;
+
+			/*UAntiCheatOdyssey* AntiCheatOdyssey = FindOrCreateAntiCheatOdyssey(PlayerController);
+
+			if (AntiCheatOdyssey)
+			{
+				const FString& PlayerName = AntiCheatOdyssey->GetPlayerName();
+				const FString& NewName = Params->S;
+
+				if (PlayerName.IsValid() && NewName.IsValid())
+				{
+					AC_LOG(ACWarning, "Player [%s] is trying to change his name to [%s]", AntiCheatOdyssey->GetPlayerName().ToString().c_str(), Params->S.ToString().c_str());
+				}
+
+				AntiCheatOdyssey->BanByAntiCheat(L"AC - You tried to change your name!");
+			}
+
+			*bCallOG = false;*/
+		}
+#endif // ANTICHEAT
 	}
 
 	bool RemoveInventoryItemHook(void* a1, const FGuid& ItemGuid, int32 AmountToRemove, bool bForceRemoveFromQuickBars, bool bForceRemoval)
@@ -1387,9 +1570,9 @@ namespace PlayerController
 
 		auto IdkDefault = (void*)(__int64(FortPlayerControllerAthenaDefault) + IdkOffset);
 
-		MinHook::HookVTable(FortPlayerControllerAthenaDefault, 0x216, ServerBeginEditingBuildingActor, nullptr, "AFortPlayerController::ServerBeginEditingBuildingActor");
+		/*MinHook::HookVTable(FortPlayerControllerAthenaDefault, 0x216, ServerBeginEditingBuildingActor, nullptr, "AFortPlayerController::ServerBeginEditingBuildingActor");
 		MinHook::HookVTable(FortPlayerControllerAthenaDefault, 0x212, ServerEditBuildingActor, nullptr, "AFortPlayerController::ServerEditBuildingActor");
-		MinHook::HookVTable(FortPlayerControllerAthenaDefault, 0x214, ServerEndEditingBuildingActor, nullptr, "AFortPlayerController::ServerEndEditingBuildingActor");
+		MinHook::HookVTable(FortPlayerControllerAthenaDefault, 0x214, ServerEndEditingBuildingActor, nullptr, "AFortPlayerController::ServerEndEditingBuildingActor");*/
 
 		uintptr_t AddressRemoveInventoryItem = MinHook::FindPattern(Patterns::RemoveInventoryItem);
 		uintptr_t AddressModifyLoadedAmmo = MinHook::FindPattern(Patterns::ModifyLoadedAmmo);

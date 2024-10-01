@@ -116,11 +116,15 @@ namespace Hooks
 
 		GameMode::ProcessEventHook(Object, Function, Parms);
 		PlayerController::ProcessEventHook(Object, Function, Parms, &bCallOG);
-		Pawn::ProcessEventHook(Object, Function, Parms);
+		Pawn::ProcessEventHook(Object, Function, Parms, &bCallOG);
 		FortKismetLibrary::ProcessEventHook(Object, Function, Parms, &bCallOG);
 		Cheats::ProcessEventHook(Object, Function, Parms);
 		FortAthenaSupplyDrop::ProcessEventHook(Object, Function, Parms, &bCallOG);
 		BuildingActor::ProcessEventHook(Object, Function, Parms);
+
+#ifdef ANTICHEAT
+		AntiCheatOdyssey::ProcessEventHook(Object, Function, Parms);
+#endif // ANTICHEAT
 
 		const std::string& FunctionName = Function->GetName();
 
@@ -194,6 +198,18 @@ namespace Hooks
 
 			if (GetAsyncKeyState(VK_F4) & 0x1)
 			{
+				AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
+
+				if (!PlayerController)
+					return;
+
+				/*AFortPlayerPawn* PlayerPawnStart = PlayerController->MyFortPawn;
+
+				if (!PlayerPawnStart)
+					return;*/
+
+				CreateBotOdyssey();
+				return;
 				FName LootTierGroup = UKismetStringLibrary::Conv_StringToName(L"Loot_AthenaTreasure"); // Activity_Crafting_Ore_High_MediumMats
 
 				TArray<FFortItemEntry> LootToDrops;
@@ -244,7 +260,7 @@ namespace Hooks
 				FN_LOG(LogBuildingActor, Log, "PickLootDrops - bSuccess: %i, LootToDrops: %i", bSuccess2, LootToDrops.Num());*/
 				return;
 
-				AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
+				/*AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
 				UFortPlaylistAthena* Playlist = Globals::GetPlaylist();
 
 				if (!PlayerController || !Playlist)
@@ -282,7 +298,7 @@ namespace Hooks
 					if (!AthenaCosmetic) continue;
 
 					FN_LOG(LogHooks, Log, "[%i] - AthenaCosmetics - CosmeticItemDefinition: %s", i, AthenaCosmetic->GetName().c_str());
-				}
+				}*/
 
 				//UKismetGuidLibrary::NewGuid();
 
@@ -578,25 +594,6 @@ namespace Hooks
 				AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
 				AFortGameModeAthena* GameMode = Cast<AFortGameModeAthena>(Globals::GetGameMode());
 
-				/*UAthenaBattleBusItemDefinition* BattleBusItemDefinition = FindObjectFast<UAthenaBattleBusItemDefinition>("/Game/Athena/Items/Cosmetics/BattleBuses/BBID_BirthdayBus.BBID_BirthdayBus");
-
-				if (GameState && BattleBusItemDefinition)
-				{
-					GameState->DefaultBattleBus = BattleBusItemDefinition;
-
-					TArray<AActor*> Actors;
-					UGameplayStatics::GetAllActorsOfClass(GameState, AFortAthenaAircraft::StaticClass(), &Actors);
-
-					for (int32 i = 0; i < Actors.Num(); i++)
-					{
-						AFortAthenaAircraft* AthenaAircraft = Cast<AFortAthenaAircraft>(Actors[i]);
-						if (!AthenaAircraft) continue;
-
-						AthenaAircraft->DefaultBusSkin = BattleBusItemDefinition;
-						AthenaAircraft->SpawnedCosmeticActor->ActiveSkin = BattleBusItemDefinition;
-					}
-				}*/
-
 				int32 PlaylistId = 2; // Solo
 				//int32 PlaylistId = 10; // Duo
 				// int32 PlaylistId = 9; // Squad
@@ -645,7 +642,26 @@ namespace Hooks
 					GameMode->CurrentZoneInstanceId;
 				}
 
-				GameMode->DefaultPawnClass = APlayerPawn_Athena_C::StaticClass();
+				AFortAIDirector* AIDirector = GameMode->AIDirector;
+
+				if (!AIDirector)
+					AIDirector = Util::SpawnActor<AAthenaAIDirector>(AAthenaAIDirector::StaticClass());
+
+				if (AIDirector)
+				{
+					AIDirector->Activate();
+					AIDirector->bAIDisabled = false;
+				}
+
+				AFortAIGoalManager* AIGoalManager = GameMode->AIGoalManager;
+
+				if (!AIGoalManager)
+					AIGoalManager = Util::SpawnActor<AFortAIGoalManager>(AFortAIGoalManager::StaticClass());
+
+				UAthenaAISettings* AISettings = GameMode->AISettings;
+
+				if (!AISettings)
+					AISettings = Cast<UAthenaAISettings>(UGameplayStatics::SpawnObject(UAthenaAISettings::StaticClass(), GameMode));
 
 				FN_LOG(LogHooks, Log, "OnWorldReady called!");
 

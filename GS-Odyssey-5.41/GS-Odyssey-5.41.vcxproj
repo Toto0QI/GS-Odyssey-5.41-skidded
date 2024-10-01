@@ -106,16 +106,21 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="SDK\AIModule_functions.cpp" />
     <ClCompile Include="SDK\AthenaSupplyDrop_functions.cpp" />
     <ClCompile Include="SDK\Basic.cpp" />
+    <ClCompile Include="SDK\B_PlayerSpawnedBall_functions.cpp" />
     <ClCompile Include="SDK\CoreUObject_functions.cpp" />
     <ClCompile Include="SDK\CUBE_functions.cpp" />
     <ClCompile Include="SDK\Engine_functions.cpp" />
     <ClCompile Include="SDK\FortniteGame_functions.cpp" />
     <ClCompile Include="SDK\GameplayAbilities_functions.cpp" />
+    <ClCompile Include="SDK\McpProfileSys_functions.cpp" />
+    <ClCompile Include="SDK\PhysicsBall_Master_functions.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Functions\Abilities.h" />
+    <ClInclude Include="Functions\AntiCheatOdyssey.h" />
     <ClInclude Include="Functions\Beacon.h" />
     <ClInclude Include="Functions\Bots.h" />
     <ClInclude Include="Functions\Cheats.h" />
