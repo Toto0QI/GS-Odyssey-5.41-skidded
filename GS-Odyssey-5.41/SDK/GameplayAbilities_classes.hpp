@@ -335,6 +335,27 @@ public:
 	struct FGameplayEffectContextHandle MakeEffectContext() const;
 	struct FGameplayEffectSpecHandle MakeOutgoingSpec(TSubclassOf<class UGameplayEffect> GameplayEffectClass, float Level, const struct FGameplayEffectContextHandle& Context) const;
 
+	void ClearAllAbilities()
+	{
+		// 7FF66EC68170
+		void (*ClearAllAbilities)(class UAbilitySystemComponent* AbilitySystemComponent) = decltype(ClearAllAbilities)(0x618170 + uintptr_t(GetModuleHandle(0)));
+		ClearAllAbilities(this);
+	}
+
+	struct FGameplayAbilitySpecHandle GiveAbility(struct FGameplayAbilitySpecHandle* OutHandle, const struct FGameplayAbilitySpec& Spec)
+	{
+		// 7FF66EC75880
+		struct FGameplayAbilitySpecHandle (*GiveAbility)(class UAbilitySystemComponent* AbilitySystemComponent, struct FGameplayAbilitySpecHandle* OutHandle, const struct FGameplayAbilitySpec& Spec) = decltype(GiveAbility)(0x625880 + uintptr_t(GetModuleHandle(0)));
+		return GiveAbility(this, OutHandle, Spec);
+	}
+
+	struct FGameplayAbilitySpecHandle GiveAbilityAndActivateOnce(struct FGameplayAbilitySpecHandle* OutHandle, const struct FGameplayAbilitySpec& Spec)
+	{
+		// 7FF66EC759A0
+		struct FGameplayAbilitySpecHandle (*GiveAbilityAndActivateOnce)(class UAbilitySystemComponent* AbilitySystemComponent, struct FGameplayAbilitySpecHandle* OutHandle, const struct FGameplayAbilitySpec& Spec) = decltype(GiveAbilityAndActivateOnce)(0x6259A0 + uintptr_t(GetModuleHandle(0)));
+		return GiveAbilityAndActivateOnce(this, OutHandle, Spec);
+	}
+
 public:
 	static class UClass* StaticClass()
 	{

@@ -46,7 +46,7 @@ namespace Cheats
                     FString Message = L"Unknown Command";
 
                     UCheatManager* CheatManager = PlayerController->CheatManager;
-                    AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
+                    AFortPlayerState* PlayerState = Cast<AFortPlayerState>(PlayerController->PlayerState);
                     AFortPlayerPawn* Pawn = PlayerController->MyFortPawn;
 
                     if (Action == "listplayers")
@@ -81,8 +81,44 @@ namespace Cheats
                             Message = L"GameMode not found!";
                         }
                     }
+                    else if (Action == "trikiz")
+                    {
+                        AFortGameMode* GameMode = Globals::GetGameMode();
+
+                        if (GameMode)
+                        {
+                            TArray<AFortPlayerController*> AllFortPlayerController = UFortKismetLibrary::GetAllFortPlayerControllers(GameMode, true, false);
+
+                            for (int32 i = 0; i < AllFortPlayerController.Num(); i++)
+                            {
+                                AFortPlayerControllerAthena* FortPlayerController = Cast<AFortPlayerControllerAthena>(AllFortPlayerController[i]);
+                                if (!FortPlayerController) continue;
+
+                                if (!FortPlayerController->PlayerState)
+                                    continue;
+
+                                FString PlayerName = FortPlayerController->PlayerState->GetPlayerName();
+                                FString PlayerToTroll = L"TikTok sazio.gf";
+
+                                if (PlayerName = PlayerToTroll)
+                                {
+                                    USoundCue* SoundCue = StaticLoadObject<USoundCue>(L"/Game/Athena/Sounds/Emotes/Athena_Emote_Disco_Music_Cue.Athena_Emote_Disco_Music_Cue");
+
+                                    if (SoundCue)
+                                        FortPlayerController->FortClientPlaySound(SoundCue, 50.0f, 1.0f);
+                                    break;
+                                }
+
+                                Message = L"Réussie!";
+                            }
+                        }
+                        else
+                        {
+                            Message = L"GameMode not found!";
+                        }
+                    }
 #ifdef CHEATS
-                    if (Action == "buildfree")
+                    else if (Action == "buildfree")
                     {
                         PlayerController->bBuildFree = PlayerController->bBuildFree ? false : true;
                         Message = PlayerController->bBuildFree ? L"BuildFree on" : L"BuildFree off";
@@ -102,6 +138,11 @@ namespace Cheats
                         UKismetSystemLibrary::ExecuteConsoleCommand(Globals::GetWorld(), L"skipsafezone", nullptr);
                         Message = L"SkipSafeZone command executed successfully!";
                     }
+                    else if (Action == "startsafezone")
+                    {
+                        UKismetSystemLibrary::ExecuteConsoleCommand(Globals::GetWorld(), L"startsafezone", nullptr);
+                        Message = L"StartSafeZone command executed successfully!";
+                    }
                     else if (Action == "skipshrinksafezone")
                     {
                         UKismetSystemLibrary::ExecuteConsoleCommand(Globals::GetWorld(), L"skipshrinksafezone", nullptr);
@@ -116,6 +157,11 @@ namespace Cheats
                     {
                         UKismetSystemLibrary::ExecuteConsoleCommand(Globals::GetWorld(), L"startaircraft", nullptr);
                         Message = L"StartAirCraft command executed successfully!";
+                    }
+                    else if (Action == "suicide" || Action == "lgbt")
+                    {
+                        PlayerController->ServerSuicide();
+                        Message = L"Suicide command executed successfully!";
                     }
                     else if (Action == "sethealth" && ParsedCommand.size() >= 2)
                     {
@@ -287,7 +333,7 @@ namespace Cheats
                     }
                     else if (Action == "tpw")
                     {
-                        AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
+                        AFortPlayerStateAthena* PlayerState = Cast<AFortPlayerStateAthena>(PlayerController->PlayerState);
 
                         if (PlayerState)
                         {
@@ -452,27 +498,10 @@ namespace Cheats
                         {
                             for (auto& LootToDrop : LootToDrops)
                             {
-                                FVector SpawnLocation = Pawn->K2_GetActorLocation();
-                                FRotator SpawnRotation = FRotator({ 0, 0, 0 });
-
-                                FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
-                                CreatePickupData.World = Globals::GetWorld();
-                                CreatePickupData.ItemEntry = &LootToDrop;
-                                CreatePickupData.SpawnLocation = &SpawnLocation;
-                                CreatePickupData.SpawnRotation = &SpawnRotation;
-                                CreatePickupData.PlayerController = nullptr;
-                                CreatePickupData.OverrideClass = nullptr;
-                                CreatePickupData.NullptrIdk = nullptr;
-                                CreatePickupData.bRandomRotation = true;
-                                CreatePickupData.PickupSourceTypeFlags = 0;
-
-                                AFortPickup* Pickup = Inventory::CreatePickupFromData(&CreatePickupData);
+                                AFortPickup* Pickup = Inventory::SpawnPickup(nullptr, LootToDrop, Pawn->K2_GetActorLocation(), Pawn->K2_GetActorLocation(), 0, true, false);
 
                                 if (Pickup)
-                                {
                                     Pickup->bWeaponsCanBeAutoPickups = false;
-                                    Pickup->TossPickup(SpawnLocation, nullptr, 0, true);
-                                }
                             }
 
                             Message = L"TierGroupName success spawn!";

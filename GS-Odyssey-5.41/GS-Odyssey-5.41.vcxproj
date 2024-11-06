@@ -114,6 +114,7 @@
     <ClCompile Include="SDK\CUBE_functions.cpp" />
     <ClCompile Include="SDK\Engine_functions.cpp" />
     <ClCompile Include="SDK\FortniteGame_functions.cpp" />
+    <ClCompile Include="SDK\FortniteUI_functions.cpp" />
     <ClCompile Include="SDK\GameplayAbilities_functions.cpp" />
     <ClCompile Include="SDK\McpProfileSys_functions.cpp" />
     <ClCompile Include="SDK\PhysicsBall_Master_functions.cpp" />
@@ -125,16 +126,15 @@
     <ClInclude Include="Functions\Bots.h" />
     <ClInclude Include="Functions\Cheats.h" />
     <ClInclude Include="Functions\Functions.h" />
-    <ClInclude Include="Functions\Inventory.h" />
     <ClInclude Include="Functions\Loots.h" />
     <ClInclude Include="Functions\NewInventory.h" />
-    <ClInclude Include="Functions\Threads.h" />
     <ClInclude Include="Globals.h" />
     <ClInclude Include="Globals\BuildingActor.h" />
     <ClInclude Include="Globals\FortAthenaSupplyDrop.h" />
     <ClInclude Include="Globals\FortKismetLibrary.h" />
     <ClInclude Include="Globals\GameMode.h" />
     <ClInclude Include="Globals\Pawn.h" />
+    <ClInclude Include="Globals\Pickup.h" />
     <ClInclude Include="Globals\PlayerController.h" />
     <ClInclude Include="Hooks.h" />
     <ClInclude Include="InitFunc.h" />

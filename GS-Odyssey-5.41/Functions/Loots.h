@@ -29,6 +29,20 @@ namespace Loots
 {
     UDataTable* LoadDataTable(TSoftObjectPtr<UDataTable> DataTableToLoad)
     {
+        /*UDataTable* DataTable = DataTableToLoad.Get();
+
+        if (!DataTable)
+        {
+            const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(DataTableToLoad.ObjectID.AssetPathName); // ToString doesn't work idk
+
+            DataTable = FindObjectFast<UDataTable>(AssetPathName.ToString());
+
+            if (!DataTable)
+                DataTable = StaticLoadObject<UDataTable>(AssetPathName.CStr());
+        }
+
+        return DataTable;*/
+
         // 7FF66F229810
         UDataTable* (*LoadDataTable)(TSoftObjectPtr<UDataTable> DataTableToLoad, char a2) = decltype(LoadDataTable)(0xBD9810 + uintptr_t(GetModuleHandle(0)));
 
@@ -60,52 +74,55 @@ namespace Loots
 
     FFortLootTierData* FindLootTierDataRow(UFortGameData* GameData, FName LootTierKey, FString ContextString)
     {
-        AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
+        AFortGameStateAthena* GameStateAthena = Cast<AFortGameStateAthena>(Globals::GetGameState());
         TArray<UDataTable*> LootTierDataTables;
 
-        if (GameState)
+        if (GameStateAthena)
         {
-            UFortPlaylistAthena* CurrentPlaylistData = GameState->CurrentPlaylistData;
+            UFortPlaylistAthena* PlaylistAthena = GameStateAthena->CurrentPlaylistData;
 
-            if (CurrentPlaylistData)
+            if (PlaylistAthena && PlaylistAthena->LootTierData.ObjectID.AssetPathName.IsValid())
             {
-                UCompositeDataTable* CompositeDataTable = Cast<UCompositeDataTable>(LoadDataTable(CurrentPlaylistData->LootTierData));
+                UDataTable* DataTable = LoadDataTable(PlaylistAthena->LootTierData);
+                UCompositeDataTable* CompositeDataTable = Cast<UCompositeDataTable>(DataTable);
 
                 if (CompositeDataTable)
                 {
                     for (int32 i = 0; i < CompositeDataTable->ParentTables.Num(); i++)
                     {
-                        UDataTable* DataTable = CompositeDataTable->ParentTables[i];
+                        UDataTable* ParentTable = CompositeDataTable->ParentTables[i];
 
-                        if (DataTable)
-                            LootTierDataTables.Add(DataTable);
+                        if (ParentTable)
+                            LootTierDataTables.Add(ParentTable);
                     }
-                        
+
                     LootTierDataTables.Add(CompositeDataTable);
+                }
+                else if (DataTable)
+                {
+                    LootTierDataTables.Add(DataTable);
                 }
                 else
                 {
-                    UDataTable* DataTable = LoadDataTable(CurrentPlaylistData->LootTierData);
+                    UDataTable* DataTable = LoadDataTable(PlaylistAthena->LootTierData);
 
                     if (DataTable)
                         LootTierDataTables.Add(DataTable);
                 }
             }
-           
-            if (LootTierDataTables.Num() <= 0)
+            else
             {
-                UDataTable* AthenaLootTierData = FindObjectFast<UDataTable>("/Game/Items/Datatables/AthenaLootTierData_Client.AthenaLootTierData_Client");
+                UDataTable* DataTable = FindObjectFast<UDataTable>("/Game/Items/Datatables/AthenaLootTierData_Client.AthenaLootTierData_Client");
 
-                if (!AthenaLootTierData)
-                {
-                    AthenaLootTierData = StaticLoadObject<UDataTable>(L"/Game/Items/Datatables/AthenaLootTierData_Client.AthenaLootTierData_Client");
-                }
+                if (!DataTable)
+                    DataTable = StaticLoadObject<UDataTable>(L"/Game/Items/Datatables/AthenaLootTierData_Client.AthenaLootTierData_Client");
 
-                if (AthenaLootTierData)
-                    LootTierDataTables.Add(AthenaLootTierData);
+                if (DataTable)
+                    LootTierDataTables.Add(DataTable);
             }
         }
-        else
+
+        if (LootTierDataTables.Num() <= 0)
         {
             for (int32 i = 0; i < GameData->LootTierDataTables.Num(); i++)
             {
@@ -472,52 +489,55 @@ namespace Loots
     // 7FF71A057F70
     void ChooseLootTierDatas(UFortGameData* GameData, std::map<FName, FFortLootTierData*>* OutLootTierDatas, float* OutWeight, FFortLootTierDataCheck LootTierDataCheck)
     {
-        AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
+        AFortGameStateAthena* GameStateAthena = Cast<AFortGameStateAthena>(Globals::GetGameState());
         TArray<UDataTable*> LootTierDataTables;
 
-        if (GameState)
+        if (GameStateAthena)
         {
-            UFortPlaylistAthena* CurrentPlaylistData = GameState->CurrentPlaylistData;
+            UFortPlaylistAthena* PlaylistAthena = GameStateAthena->CurrentPlaylistData;
 
-            if (CurrentPlaylistData)
+            if (PlaylistAthena && PlaylistAthena->LootTierData.ObjectID.AssetPathName.IsValid())
             {
-                UCompositeDataTable* CompositeDataTable = Cast<UCompositeDataTable>(LoadDataTable(CurrentPlaylistData->LootTierData));
+                UDataTable* DataTable = LoadDataTable(PlaylistAthena->LootTierData);
+                UCompositeDataTable* CompositeDataTable = Cast<UCompositeDataTable>(DataTable);
 
                 if (CompositeDataTable)
                 {
                     for (int32 i = 0; i < CompositeDataTable->ParentTables.Num(); i++)
                     {
-                        UDataTable* DataTable = CompositeDataTable->ParentTables[i];
+                        UDataTable* ParentTable = CompositeDataTable->ParentTables[i];
 
-                        if (DataTable)
-                            LootTierDataTables.Add(DataTable);
+                        if (ParentTable)
+                            LootTierDataTables.Add(ParentTable);
                     }
 
                     LootTierDataTables.Add(CompositeDataTable);
                 }
+                else if (DataTable)
+                {
+                    LootTierDataTables.Add(DataTable);
+                }
                 else
                 {
-                    UDataTable* DataTable = LoadDataTable(CurrentPlaylistData->LootTierData);
+                    UDataTable* DataTable = LoadDataTable(PlaylistAthena->LootTierData);
 
                     if (DataTable)
                         LootTierDataTables.Add(DataTable);
                 }
             }
-            
-            if (LootTierDataTables.Num() <= 0)
+            else
             {
-                UDataTable* AthenaLootTierData = FindObjectFast<UDataTable>("/Game/Items/Datatables/AthenaLootTierData_Client.AthenaLootTierData_Client");
+                UDataTable* DataTable = FindObjectFast<UDataTable>("/Game/Items/Datatables/AthenaLootTierData_Client.AthenaLootTierData_Client");
 
-                if (!AthenaLootTierData)
-                {
-                    AthenaLootTierData = StaticLoadObject<UDataTable>(L"/Game/Items/Datatables/AthenaLootTierData_Client.AthenaLootTierData_Client");
-                }
+                if (!DataTable)
+                    DataTable = StaticLoadObject<UDataTable>(L"/Game/Items/Datatables/AthenaLootTierData_Client.AthenaLootTierData_Client");
 
-                if (AthenaLootTierData)
-                    LootTierDataTables.Add(AthenaLootTierData);
+                if (DataTable)
+                    LootTierDataTables.Add(DataTable);
             }
         }
-        else
+
+        if (LootTierDataTables.Num() <= 0)
         {
             for (int32 i = 0; i < GameData->LootTierDataTables.Num(); i++)
             {
@@ -536,52 +556,55 @@ namespace Loots
     // 7FF71A057E30
     void ChooseLootPackageDatas(UFortGameData* GameData, TArray<FFortLootPackageData*>* OutLootPackageDatas, float* OutWeight, FFortLootPackageDataCheck LootPackageDataCheck)
     {
-        AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
+        AFortGameStateAthena* GameStateAthena = Cast<AFortGameStateAthena>(Globals::GetGameState());
         TArray<UDataTable*> LootPackageDataTables;
 
-        if (GameState)
+        if (GameStateAthena)
         {
-            UFortPlaylistAthena* CurrentPlaylistData = GameState->CurrentPlaylistData;
+            UFortPlaylistAthena* PlaylistAthena = GameStateAthena->CurrentPlaylistData;
 
-            if (CurrentPlaylistData)
+            if (PlaylistAthena && PlaylistAthena->LootPackages.ObjectID.AssetPathName.IsValid())
             {
-                UCompositeDataTable* CompositeDataTable = Cast<UCompositeDataTable>(LoadDataTable(CurrentPlaylistData->LootPackages));
+                UDataTable* DataTable = LoadDataTable(PlaylistAthena->LootPackages);
+                UCompositeDataTable* CompositeDataTable = Cast<UCompositeDataTable>(DataTable);
 
                 if (CompositeDataTable)
                 {
                     for (int32 i = 0; i < CompositeDataTable->ParentTables.Num(); i++)
                     {
-                        UDataTable* DataTable = CompositeDataTable->ParentTables[i];
+                        UDataTable* ParentTable = CompositeDataTable->ParentTables[i];
 
-                        if (DataTable)
-                            LootPackageDataTables.Add(DataTable);
+                        if (ParentTable)
+                            LootPackageDataTables.Add(ParentTable);
                     }
 
                     LootPackageDataTables.Add(CompositeDataTable);
                 }
+                else if (DataTable)
+                {
+                    LootPackageDataTables.Add(DataTable);
+                }
                 else
                 {
-                    UDataTable* DataTable = LoadDataTable(CurrentPlaylistData->LootPackages);
+                    UDataTable* DataTable = LoadDataTable(PlaylistAthena->LootPackages);
 
                     if (DataTable)
                         LootPackageDataTables.Add(DataTable);
                 }
             }
-            
-            if (LootPackageDataTables.Num() <= 0)
+            else
             {
-                UDataTable* AthenaLootPackages = FindObjectFast<UDataTable>("/Game/Items/Datatables/AthenaLootPackages_Client.AthenaLootPackages_Client");
+                UDataTable* DataTable = FindObjectFast<UDataTable>("/Game/Items/Datatables/AthenaLootPackages_Client.AthenaLootPackages_Client");
 
-                if (!AthenaLootPackages)
-                {
-                    AthenaLootPackages = StaticLoadObject<UDataTable>(L"/Game/Items/Datatables/AthenaLootPackages_Client.AthenaLootPackages_Client");
-                }
+                if (!DataTable)
+                    DataTable = StaticLoadObject<UDataTable>(L"/Game/Items/Datatables/AthenaLootPackages_Client.AthenaLootPackages_Client");
 
-                if (AthenaLootPackages)
-                    LootPackageDataTables.Add(AthenaLootPackages);
+                if (DataTable)
+                    LootPackageDataTables.Add(DataTable);
             }
         }
-        else
+
+        if (LootPackageDataTables.Num() <= 0)
         {
             for (int32 i = 0; i < GameData->LootPackageDataTables.Num(); i++)
             {

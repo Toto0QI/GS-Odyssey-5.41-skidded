@@ -3264,6 +3264,17 @@ bool AActor::WasRecentlyRendered(float Tolerance) const
 }
 
 
+UWorld* AActor::GetWorld()
+{
+	if (ULevel* Level = this->GetLevel())
+	{
+		return Level->OwningWorld;
+	}
+
+	return nullptr;
+}
+
+
 // Function Engine.Emitter.Activate
 // (Final, Native, Public, BlueprintCallable)
 

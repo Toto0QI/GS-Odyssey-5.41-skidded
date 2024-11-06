@@ -42,10 +42,19 @@ enum class EAntiCheatDetection : uint8
 	EAntiCheatDetection_MAX
 };
 
+struct FAntiCheatReloadTime
+{
+public:
+	UFortWeaponRangedItemDefinition* WeaponRangedItemDefinition = nullptr;
+	std::chrono::time_point<std::chrono::steady_clock> LastReloadTime;
+};
+
 extern inline float MaxPickaxeDistance = 300.0f;
 extern inline float MaxPickupDistance = 550.0f;
 extern inline float MaxInteractDistance = 750.0f;
 extern inline float MaxBuildingActorDistance = 2250.0f;
+
+extern inline uint8 MaxDataNum = 25;
 
 class UAntiCheatOdyssey final
 {
@@ -57,6 +66,7 @@ public:
 	EAntiCheatDetection AntiCheatDetection = EAntiCheatDetection::None;
 	bool bServerReadyToStartMatch = false;
 	AFortPlayerPawn* PlayerPawnAntiAimbot = nullptr;
+	FAntiCheatReloadTime AntiCheatReloadTime = FAntiCheatReloadTime();
 
 	APlayerController* GetPlayerController() const
 	{
@@ -71,6 +81,11 @@ public:
 	FString GetPlayerName() const
 	{
 		return PlayerName;
+	}
+
+	FAntiCheatReloadTime GetAntiCheatReloadTime() const
+	{
+		return AntiCheatReloadTime;
 	}
 
 	float GetMaxPickaxeDistance() const
@@ -91,6 +106,11 @@ public:
 	float GetMaxBuildingActorDistance() const
 	{
 		return MaxBuildingActorDistance;
+	}
+
+	uint8 GetMaxDataNum() const
+	{
+		return MaxDataNum;
 	}
 
 	void KickByAntiCheat(const FString& Reason)
@@ -185,7 +205,10 @@ static UAntiCheatOdyssey* FindOrCreateAntiCheatOdyssey(APlayerController* Player
 {
 	UAntiCheatOdyssey* AntiCheatOdyssey = nullptr;
 
-	if (!PlayerController)
+	if (!PlayerController || !PlayerController->PlayerState)
+		return AntiCheatOdyssey;
+
+	if (PlayerController->PlayerState->bIsABot)
 		return AntiCheatOdyssey;
 
 	for (auto& Find : UAntiCheatOdyssey::AntiCheatOdysseyMap)
@@ -251,5 +274,4 @@ namespace AntiCheatOdyssey
 		}*/
 	}
 }
-
 #endif // ANTICHEAT

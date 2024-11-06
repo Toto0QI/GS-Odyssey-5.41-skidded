@@ -21,12 +21,12 @@
 
 #include "Functions/Abilities.h"
 
-// #include "Functions/Inventory.h"
 #include "Functions/NewInventory.h"
 
 #include "Functions/Loots.h"
 #include "Functions/Functions.h"
-#include "Functions/Threads.h"
+
+#include "Functions/Beacon.h"
 
 #include "Globals/GameMode.h"
 
@@ -37,9 +37,9 @@
 #include "Globals/FortKismetLibrary.h"
 #include "Globals/FortAthenaSupplyDrop.h"
 #include "Globals/BuildingActor.h"
+#include "Globals/Pickup.h"
 
 #include "Functions/Cheats.h"
-#include "Functions/Beacon.h"
 
 #include <fstream>
 #include "Hooks.h"
@@ -81,6 +81,7 @@ DWORD WINAPI MainThread(LPVOID)
         *(bool*)Hooks::GIsClient() = false;
         *(bool*)Hooks::GIsServer() = true;
 
+        FN_LOG(LogInitialize, Log, "ImageBase: [%p]", InSDKUtils::GetImageBase());
         FN_LOG(LogInitialize, Log, "Init Success!");
     }
     else

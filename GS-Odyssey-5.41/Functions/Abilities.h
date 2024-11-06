@@ -24,34 +24,29 @@ namespace Abilities
 		return Spec;
 	}
 
-	void ApplyGameplayAbility(UClass* AbilityClass, AFortPawn* Pawn)
+	void ApplyGameplayAbility(UClass* AbilityClass, UFortAbilitySystemComponent* AbilitySystemComponent)
 	{
-		if (!AbilityClass || !Pawn)
+		if (!AbilityClass || !AbilitySystemComponent)
 			return;
 
-		UFortAbilitySystemComponent* AbilitySystemComponent = Pawn->AbilitySystemComponent;
+		FGameplayAbilitySpec AbilitySpec;
+		AbilitySpec.CreateDefaultAbilitySpec((UGameplayAbility*)AbilityClass->CreateDefaultObject(), 1, -1, nullptr);
 
-		if (AbilitySystemComponent)
+		for (int32 i = 0; i < AbilitySystemComponent->ActivatableAbilities.Items.Num(); i++)
 		{
-			FGameplayAbilitySpec AbilitySpec;
-			CreateDefaultAbilitySpec(&AbilitySpec, (UGameplayAbility*)CreateDefaultObject(AbilityClass), 1, -1, nullptr);
+			auto& CurrentSpec = AbilitySystemComponent->ActivatableAbilities.Items[i];
 
-			for (int32 i = 0; i < AbilitySystemComponent->ActivatableAbilities.Items.Num(); i++)
-			{
-				auto& CurrentSpec = AbilitySystemComponent->ActivatableAbilities.Items[i];
-
-				if (CurrentSpec.Ability == AbilitySpec.Ability)
-					return;
-			}
-
-			FGameplayAbilitySpecHandle Handle;
-			GiveAbility(AbilitySystemComponent, &Handle, AbilitySpec);
+			if (CurrentSpec.Ability == AbilitySpec.Ability)
+				return;
 		}
+
+		FGameplayAbilitySpecHandle Handle;
+		AbilitySystemComponent->GiveAbility(&Handle, AbilitySpec);
 	}
 
-	void GrantGameplayAbility(UFortAbilitySet* AbilitySet, AFortPawn* Pawn)
+	void GrantGameplayAbility(UFortAbilitySet* AbilitySet, UFortAbilitySystemComponent* AbilitySystemComponent)
 	{
-		if (!AbilitySet || !Pawn)
+		if (!AbilitySet || !AbilitySystemComponent)
 			return;
 
 		for (int32 i = 0; i < AbilitySet->GameplayAbilities.Num(); i++)
@@ -61,28 +56,68 @@ namespace Abilities
 			if (!GameplayAbility.Get())
 				continue;
 
-			ApplyGameplayAbility(GameplayAbility, Pawn);
+			ApplyGameplayAbility(GameplayAbility, AbilitySystemComponent);
 		}
 	}
 
-	void GrantGameplayEffect(UFortAbilitySet* AbilitySet, AFortPawn* Pawn)
+	void GrantGameplayEffect(UFortAbilitySet* AbilitySet, UFortAbilitySystemComponent* AbilitySystemComponent)
 	{
-		if (!AbilitySet || !Pawn || !Pawn->AbilitySystemComponent)
+		if (!AbilitySet || !AbilitySystemComponent)
 			return;
 
-		UFortAbilitySystemComponent* AbilitySystemComponent = Pawn->AbilitySystemComponent;
-
-		if (AbilitySystemComponent)
+		for (int32 i = 0; i < AbilitySet->GrantedGameplayEffects.Num(); i++)
 		{
-			for (int32 i = 0; i < AbilitySet->GrantedGameplayEffects.Num(); i++)
-			{
-				FGameplayEffectApplicationInfoHard GrantedGameplayEffect = AbilitySet->GrantedGameplayEffects[i];
+			FGameplayEffectApplicationInfoHard* GrantedGameplayEffect = &AbilitySet->GrantedGameplayEffects[i];
+			if (!GrantedGameplayEffect) continue;
 
-				if (!GrantedGameplayEffect.GameplayEffect.Get())
+			FGameplayEffectContextHandle EffectContext{};
+			AbilitySystemComponent->BP_ApplyGameplayEffectToSelf(GrantedGameplayEffect->GameplayEffect, GrantedGameplayEffect->Level, EffectContext);
+		}
+	}
+
+	void GrantModifierAbility(UFortGameplayModifierItemDefinition* ModifierItemDefinition, UFortAbilitySystemComponent* AbilitySystemComponent)
+	{
+		for (int32 i = 0; i < ModifierItemDefinition->PersistentAbilitySets.Num(); i++)
+		{
+			FFortAbilitySetDeliveryInfo* PersistentAbilitySets = &ModifierItemDefinition->PersistentAbilitySets[i];
+			if (!PersistentAbilitySets) continue;
+
+			for (int32 j = 0; j < PersistentAbilitySets->AbilitySets.Num(); j++)
+			{
+				UFortAbilitySet* AbilitySet = PersistentAbilitySets->AbilitySets[j].Get();
+
+				if (!AbilitySet)
+				{
+					const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(PersistentAbilitySets->AbilitySets[j].ObjectID.AssetPathName); // ToString doesn't work idk
+					AbilitySet = StaticLoadObject<UFortAbilitySet>(AssetPathName.CStr());
+				}
+
+				GrantGameplayAbility(AbilitySet, AbilitySystemComponent);
+				GrantGameplayEffect(AbilitySet, AbilitySystemComponent);
+			}
+		}
+	}
+
+	void GrantModifierAbilityFromPlaylist(UFortAbilitySystemComponent* AbilitySystemComponent)
+	{
+		UFortPlaylistAthena* PlaylistAthena = Globals::GetPlaylist();
+
+		if (PlaylistAthena)
+		{
+			for (int32 i = 0; i < PlaylistAthena->ModifierList.Num(); i++)
+			{
+				UFortGameplayModifierItemDefinition* ModifierItemDefinition = PlaylistAthena->ModifierList[i].Get();
+
+				if (!ModifierItemDefinition)
+				{
+					const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(PlaylistAthena->ModifierList[i].ObjectID.AssetPathName); // ToString doesn't work idk
+					ModifierItemDefinition = StaticLoadObject<UFortGameplayModifierItemDefinition>(AssetPathName.CStr());
+				}
+
+				if (!ModifierItemDefinition)
 					continue;
 
-				FGameplayEffectContextHandle EffectContext{};
-				Pawn->AbilitySystemComponent->BP_ApplyGameplayEffectToSelf(GrantedGameplayEffect.GameplayEffect, GrantedGameplayEffect.Level, EffectContext);
+				GrantModifierAbility(ModifierItemDefinition, AbilitySystemComponent);
 			}
 		}
 	}

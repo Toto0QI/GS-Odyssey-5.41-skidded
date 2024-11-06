@@ -19,6 +19,7 @@ namespace InitFunc
 		BuildingActor::InitBuildingActor();
 		FortKismetLibrary::InitFortKismetLibrary();
 		FortAthenaSupplyDrop::InitFortAthenaSupplyDrop();
+		Pickup::InitPickup();
 
 		// Functions
 		Beacon::InitBeacon();

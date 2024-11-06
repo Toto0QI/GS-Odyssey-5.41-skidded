@@ -1086,7 +1086,66 @@ public:
 	class UFortItem* K2_FindExistingItemForDefinition(const class UFortItemDefinition* ItemDefinition, bool bInStorageVault) const;
 	class UFortItem* K2_GetInventoryItemWithGuid(const struct FGuid& ItemGuid) const;
 
+	static class AFortPlayerController* GetPlayerControllerFromInventoryOwner(void* InventoryOwner)
+	{
+		if (!InventoryOwner)
+			return nullptr;
 
+		return (AFortPlayerController*)(__int64(InventoryOwner) - 0x680);
+	}
+
+	void* GetInventoryOwner()
+	{
+		return (void*)(__int64(this) + 0x680);
+	}
+
+	EFortStructuralGridQueryResults CanPlaceBuilableClassInStructuralGrid(class UClass* BuildingClass, const struct FVector& BuildLoc, const struct FRotator& BuildRot, bool bMirrored, TArray<class ABuildingActor*>* ExistingBuildings)
+	{
+		// 7FF66F7EB6F0
+		EFortStructuralGridQueryResults (*CanPlaceBuilableClassInStructuralGrid)(AFortPlayerController* PlayerController, class UClass* BuildingClass, const struct FVector& BuildLoc, const struct FRotator& BuildRot, bool bMirrored, TArray<class ABuildingActor*>* ExistingBuildings) = decltype(CanPlaceBuilableClassInStructuralGrid)(0x119B6F0 + uintptr_t(GetModuleHandle(0)));
+		return CanPlaceBuilableClassInStructuralGrid(this, BuildingClass, BuildLoc, BuildRot, bMirrored, ExistingBuildings);
+	}
+
+	int32 PayBuildingCosts(const struct FBuildingClassData& BuildingClassData)
+	{
+		// 7FF66F819EA0
+		int32 (*PayBuildingCosts)(AFortPlayerController* PlayerController, const struct FBuildingClassData& BuildingClassData) = decltype(PayBuildingCosts)(0x11C9EA0 + uintptr_t(GetModuleHandle(0)));
+		return PayBuildingCosts(this, BuildingClassData);
+	}
+
+	int32 PayRepairCosts(class ABuildingSMActor* BuildingSMActor)
+	{
+		// 7FF66F81A0B0
+		int32 (*PayRepairCosts)(AFortPlayerController * PlayerController, class ABuildingSMActor* BuildingSMActor) = decltype(PayRepairCosts)(0x11CA0B0 + uintptr_t(GetModuleHandle(0)));
+		return PayRepairCosts(this, BuildingSMActor);
+	}
+
+	int32 GetCreateResourceAmount(const struct FBuildingClassData& BuildingClassData)
+	{
+		// 7FF66F7EA9E0
+		int32 (*GetCreateResourceAmount)(AFortPlayerController* PlayerController, const struct FBuildingClassData& BuildingClassData) = decltype(GetCreateResourceAmount)(0x119A9E0 + uintptr_t(GetModuleHandle(0)));
+		return GetCreateResourceAmount(this, BuildingClassData);
+	}
+
+	bool RemoveInventoryItem(const struct FGuid& ItemGuid, int32 Count = 1, bool bForceRemoveFromQuickBars = false, bool bForceRemoval = false)
+	{
+		void* InventoryOwner = this->GetInventoryOwner();
+		if (!InventoryOwner) return false;
+
+		// 7FF66F821CC0
+		bool (*RemoveInventoryItem)(void* InventoryOwner, const struct FGuid& ItemGuid, int32 Count, bool bForceRemoveFromQuickBars, bool bForceRemoval) = decltype(RemoveInventoryItem)(((UObject*)InventoryOwner)->VTable[0x14]);
+		return RemoveInventoryItem(InventoryOwner, ItemGuid, Count, bForceRemoveFromQuickBars, bForceRemoval);
+	}
+
+	void ModLoadedAmmo(const struct FGuid& ItemGuid, int32 NewLoadedAmmo)
+	{
+		void* InventoryOwner = this->GetInventoryOwner();
+		if (!InventoryOwner) return;
+
+		// 7FF66F828640
+		void (*ModLoadedAmmo)(void* InventoryOwner, const struct FGuid& ItemGuid, int32 NewLoadedAmmo) = decltype(ModLoadedAmmo)(((UObject*)InventoryOwner)->VTable[0xD]);
+		ModLoadedAmmo(InventoryOwner, ItemGuid, NewLoadedAmmo);
+	}
 
 public:
 	static class UClass* StaticClass()
@@ -2075,6 +2134,37 @@ public:
 	bool IsSupportedByWorld() const;
 	bool IsUnderConstruction() const;
 	bool WillRegisterWithStructuralGrid() const;
+
+	int32 GetRepairResourceAmount(class AFortPlayerController* PlayerController)
+	{
+		// 7FF66F312E20
+		int32(*GetRepairResourceAmount)(ABuildingSMActor* BuildingSMActor, class AFortPlayerController* PlayerController) = decltype(GetRepairResourceAmount)(0xCC2E20 + uintptr_t(GetModuleHandle(0)));
+		return GetRepairResourceAmount(this, PlayerController);
+	}
+
+	bool CheckBeginEditBuildingActor(class AFortPlayerController* PlayerController)
+	{
+		// 7FF66F30A870
+		bool (*CheckBeginEditBuildingActor)(ABuildingSMActor * BuildingSMActor, class AFortPlayerController* PlayerController) = decltype(CheckBeginEditBuildingActor)(0xCBA870 + uintptr_t(GetModuleHandle(0)));
+		return CheckBeginEditBuildingActor(this, PlayerController);
+	}
+
+	ABuildingSMActor* ReplaceBuildingActor(TSubclassOf<class ABuildingSMActor> BuildingClass, int32 BuildingLevel, int32 RotationIterations, bool bMirrored, class AFortPlayerController* PlayerController)
+	{
+		// 7FF66F325320
+		ABuildingSMActor* (*ReplaceBuildingActor)(ABuildingSMActor* BuildingSMActor, int32 a2, TSubclassOf<class ABuildingSMActor> BuildingClass, int32 BuildingLevel, int32 RotationIterations, bool bMirrored, class AFortPlayerController* PlayerController) = decltype(ReplaceBuildingActor)(0xCD5320 + uintptr_t(GetModuleHandle(0)));
+		return ReplaceBuildingActor(this, 1, BuildingClass, BuildingLevel, RotationIterations, bMirrored, PlayerController);
+	}
+
+	void SetEditingPlayer(AFortPlayerStateZone* EditingPlayer)
+	{
+		if (this->HasAuthority() && (!this->EditingPlayer || !EditingPlayer))
+		{
+			this->SetNetDormancy(ENetDormancy(2 - (EditingPlayer != 0)));
+			this->ForceNetUpdate();
+			this->EditingPlayer = EditingPlayer;
+		}
+	}
 
 public:
 	static class UClass* StaticClass()
@@ -3521,6 +3611,12 @@ public:
 	bool IsFrontalHit(const struct FVector& HitDirection) const;
 	bool IsStaggered() const;
 	bool IsWeaponHolstered() const;
+
+	void SetShield(float NewShieldValue)
+	{
+		void (*SetShield)(AFortPawn* Pawn, float NewShieldValue) = decltype(SetShield)(0x116C760 + uintptr_t(GetModuleHandle(0)));
+		SetShield(this, NewShieldValue);
+	}
 
 public:
 	static class UClass* StaticClass()
@@ -7822,6 +7918,13 @@ public:
 	bool ShouldAllowTargetingDuringReload() const;
 	bool TargetingPreventsReload() const;
 
+	bool EquipWeaponDefinition(class UFortWorldItem* WorldItem, class AFortPlayerController* PlayerController)
+	{
+		// 7FF66F985640
+		bool (*EquipWeaponDefinition)(class UFortWeaponItemDefinition* WeaponItemDefinition, class UFortWorldItem* WorldItem, class AFortPlayerController* PlayerController) = decltype(EquipWeaponDefinition)(0x1335640 + uintptr_t(GetModuleHandle(0)));
+		return EquipWeaponDefinition(this, WorldItem, PlayerController);
+	}
+
 public:
 	static class UClass* StaticClass()
 	{
@@ -8499,6 +8602,22 @@ public:
 };
 #pragma pack(pop)
 
+// 0x0040 (0x0040 - 0x0000)
+struct FFortCreatePickupData final
+{
+public:
+	class UWorld*								  World;					                         // 0x0000(0x0008)()
+	struct FFortItemEntry*						  ItemEntry;									     // 0x0008(0x0008)()
+	const struct FVector*						  SpawnLocation;									 // 0x0010(0x0008)()
+	const struct FRotator*						  SpawnRotation;                                     // 0x0018(0x0008)()
+	class AFortPlayerController*				  PlayerController;									 // 0x0020(0x0008)()
+	class UClass*								  OverrideClass;									 // 0x0028(0x0008)()
+	void*									      NullptrIdk;										 // 0x0030(0x0008)()
+	bool										  bRandomRotation;									 // 0x0038(0x0001)()
+	uint8                                         Pad_1[0x3];                                        // 0x0039(0x0003)()
+	uint32										  PickupSourceTypeFlags;						     // 0x003C(0x0004)()
+};
+
 // Class FortniteGame.FortPickup
 // 0x0298 (0x05C0 - 0x0328)
 class AFortPickup : public AActor
@@ -8557,6 +8676,57 @@ public:
 	void TossPickup(const struct FVector& FinalLocation, class AFortPawn* ItemOwner, int32 OverrideMaxStackCount, bool bToss);
 
 	bool PickedUp() const;
+
+	float LastDropPickupTime()
+	{
+		return *(float*)(__int64(this) + 0x580);
+	}
+
+	void InitializePickup(struct FFortItemEntry* ItemEntry, TArray<struct FFortItemEntry*> MultiItemEntries, bool bSplitOnPickup)
+	{
+		// 7FF66F5F8A00
+		void (*InitializePickup)(AFortPickup* Pickup, struct FFortItemEntry* ItemEntry, TArray<struct FFortItemEntry*> MultiItemEntries, bool bSplitOnPickup) = decltype(InitializePickup)(0xFA8A00 + uintptr_t(GetModuleHandle(0)));
+		InitializePickup(this, ItemEntry, MultiItemEntries, bSplitOnPickup);
+	}
+
+	void SetPickupTarget(class AFortPlayerPawn* PlayerPawn, float InFlyTime, const struct FVector& InStartDirection, bool bPlayPickupSound = true)
+	{
+		// 7FF66F5F8B20
+		void (*SetPickupTarget)(AFortPickup* Pickup, class AFortPlayerPawn* PlayerPawn, float InFlyTime, const struct FVector& InStartDirection, bool bPlayPickupSound) = decltype(SetPickupTarget)(0xFA8B20 + uintptr_t(GetModuleHandle(0)));
+		SetPickupTarget(this, PlayerPawn, InFlyTime, InStartDirection, bPlayPickupSound);
+	}
+
+	static AFortPickup* CreatePickupFromData(FFortCreatePickupData* CreatePickupData)
+	{
+		// 7FF66F5E4880
+		AFortPickup* (*CreatePickupFromData)(FFortCreatePickupData* CreatePickupData) = decltype(CreatePickupFromData)(0xF94880 + uintptr_t(GetModuleHandle(0)));
+		return CreatePickupFromData(CreatePickupData);
+	}
+
+	static AFortPickup* CreatePickup(
+		class UWorld* World, 
+		struct FFortItemEntry* ItemEntry, 
+		const struct FVector* SpawnLocation, 
+		const struct FRotator* SpawnRotation = nullptr, 
+		class AFortPlayerController* OwnerPlayerController = nullptr, 
+		struct UClass* OverrideClass = nullptr,
+		bool bRandomRotation = true,
+		uint32 PickupSourceTypeFlags = 0
+	)
+	{
+		FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
+		CreatePickupData.World = World;
+		CreatePickupData.ItemEntry = ItemEntry;
+		CreatePickupData.SpawnLocation = SpawnLocation;
+		CreatePickupData.SpawnRotation = SpawnRotation;
+		CreatePickupData.PlayerController = OwnerPlayerController;
+		CreatePickupData.OverrideClass = OverrideClass;
+		CreatePickupData.NullptrIdk = nullptr;
+		CreatePickupData.bRandomRotation = bRandomRotation;
+		CreatePickupData.PickupSourceTypeFlags = PickupSourceTypeFlags;
+
+		return CreatePickupFromData(&CreatePickupData);
+	}
 
 public:
 	static class UClass* StaticClass()
@@ -9251,6 +9421,13 @@ public:
 	bool GetPlaylistTeams(TArray<EFortTeam>* OutTeams) const;
 	class AFortSafeZoneIndicator* GetSafeZoneIndicator() const;
 	bool IsTeamSwitchAllowed() const;
+
+	int32 GetAircraftIndex(class APlayerState* PlayerState)
+	{
+		// 7FF66F239300
+		int32 (*GetAircraftIndex)(class AFortGameStateAthena* GameStateAthena, class APlayerState* PlayerState) = decltype(GetAircraftIndex)(0xBE9300 + uintptr_t(GetModuleHandle(0)));
+		return GetAircraftIndex(this, PlayerState);
+	}
 
 public:
 	static class UClass* StaticClass()
@@ -21110,6 +21287,15 @@ public:
 public:
 	void OnRep_EditActor();
 
+	void SetEditingActor(class ABuildingSMActor* BuildingSMActor)
+	{
+		if (this->HasAuthority())
+		{
+			this->EditActor = BuildingSMActor;
+			this->OnRep_EditActor();
+		}
+	}
+
 public:
 	static class UClass* StaticClass()
 	{
@@ -21913,6 +22099,13 @@ public:
 	bool ShouldIgnoreCollisionWithStructuralGridActors() const;
 	bool ShouldSnapYawToHorizontalAxes() const;
 	bool ShouldUseRelativeCameraRotation() const;
+
+	bool EquipDecoDefinition(class UFortWorldItem* WorldItem, class AFortPlayerController* PlayerController)
+	{
+		// 7FF66F5D3E60
+		bool (*EquipDecoDefinition)(class UFortDecoItemDefinition* DecoItemDefinition, class UFortWorldItem* WorldItem, class AFortPlayerController* PlayerController) = decltype(EquipDecoDefinition)(0xF83E60 + uintptr_t(GetModuleHandle(0)));
+		return EquipDecoDefinition(this, WorldItem, PlayerController);
+	}
 
 public:
 	static class UClass* StaticClass()
@@ -23103,6 +23296,13 @@ public:
 	class FName GetPlayerOSSName() const;
 	struct FUniqueNetIdRepl GetUniqueID() const;
 	bool IsConsolePlayer() const;
+
+	void ApplyCharacterCustomization(class AFortPlayerPawn* PlayerPawn)
+	{
+		// 7FF66F83EA20
+		void (*ApplyCharacterCustomization)(class AFortPlayerState* PlayerState, class AFortPlayerPawn* PlayerPawn) = decltype(ApplyCharacterCustomization)(0x11EEA20 + uintptr_t(GetModuleHandle(0)));
+		ApplyCharacterCustomization(this, PlayerPawn);
+	}
 
 public:
 	static class UClass* StaticClass()
@@ -26045,6 +26245,13 @@ public:
 	class UFortTrapItemDefinition*                WallTrap;                                          // 0x0CB0(0x0008)(Edit, BlueprintVisible, BlueprintReadOnly, ZeroConstructor, IsPlainOldData, NoDestructor, HasGetValueTypeHash, NativeAccessSpecifierPublic)
 	uint8                                         Pad_1E8A[0x8];                                     // 0x0CB8(0x0008)(Fixing Struct Size After Last Property [ Dumper-7 ])
 
+	bool EquipContextTrapDefinition(class UFortWorldItem* WorldItem, class AFortPlayerController* PlayerController)
+	{
+		// 7FF66F5D3D10
+		bool (*EquipContextTrapDefinition)(class UFortContextTrapItemDefinition* ContextTrapItemDefinition, class UFortWorldItem* WorldItem, class AFortPlayerController* PlayerController) = decltype(EquipContextTrapDefinition)(0xF83D10 + uintptr_t(GetModuleHandle(0)));
+		return EquipContextTrapDefinition(this, WorldItem, PlayerController);
+	}
+
 public:
 	static class UClass* StaticClass()
 	{
@@ -28420,6 +28627,20 @@ public:
 	void OnEndGameKickPlayers();
 	void OnGamePhaseStepChanged(EAthenaGamePhaseStep GamePhaseStep);
 	void SafeZoneInsideChecks();
+
+	void AddFromAlivePlayers(class AFortPlayerControllerAthena* PlayerControllerAthena)
+	{
+		// 7FF66F22FCE0
+		void (*AddFromAlivePlayers)(AFortGameModeAthena* GameModeAthena, class AFortPlayerControllerAthena* PlayerControllerAthena) = decltype(AddFromAlivePlayers)(0xBDFCE0 + uintptr_t(GetModuleHandle(0)));
+		return AddFromAlivePlayers(this, PlayerControllerAthena);
+	}
+
+	void RemoveFromAlivePlayers(class AFortPlayerControllerAthena* PlayerControllerAthena, class AFortPlayerStateAthena* PlayerStateAthena, class AFortPlayerPawnAthena* PlayerPawnAthena, class UFortWeaponItemDefinition* WeaponItemDefinition, EDeathCause DeathCause)
+	{
+		// 7FF66F24C3E0
+		void (*RemoveFromAlivePlayers)(AFortGameModeAthena* GameModeAthena, class AFortPlayerControllerAthena* PlayerControllerAthena, class AFortPlayerStateAthena* PlayerStateAthena, class AFortPlayerPawnAthena* PlayerPawnAthena, class UFortWeaponItemDefinition* WeaponItemDefinition, EDeathCause DeathCause, char a7) = decltype(RemoveFromAlivePlayers)(0xBFC3E0 + uintptr_t(GetModuleHandle(0)));
+		return RemoveFromAlivePlayers(this, PlayerControllerAthena, PlayerStateAthena, PlayerPawnAthena, WeaponItemDefinition, DeathCause, 0);
+	}
 
 public:
 	static class UClass* StaticClass()
@@ -34598,6 +34819,13 @@ public:
 	struct FVector2D GetMapIndicatorPos() const;
 	struct FLinearColor GetPinColor() const;
 	bool IsDisconnected() const;
+
+	static EDeathCause ToDeathCause(const struct FGameplayTagContainer& InTags, bool bWasDBNO)
+	{
+		// 7FF66F2BC050
+		EDeathCause (*ToDeathCause)(const struct FGameplayTagContainer& InTags, bool bWasDBNO) = decltype(ToDeathCause)(0xC6C050 + uintptr_t(GetModuleHandle(0)));
+		return ToDeathCause(InTags, bWasDBNO);
+	}
 
 public:
 	static class UClass* StaticClass()

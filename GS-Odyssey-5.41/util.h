@@ -53,16 +53,83 @@ static T* FindObjectFast(std::string ObjectName, UClass* ObjectClass = UObject::
     return StaticFindObject(ObjectClass, nullptr, OrigInName, false);
 }
 
-enum class EGetWorldErrorMode
+#define RESULT_PARAM Z_Param__Result
+#define RESULT_DECL void*const RESULT_PARAM
+
+#pragma pack(push, 0x1)
+class alignas(0x08) FOutputDevice
 {
-    // Silently returns nullptr, the calling code is expected to handle this gracefully
-    ReturnNull,
+public:
+    uint8 Pad_01[0x10];
+};
+#pragma pack(pop)
 
-    // Raises a runtime error but still returns nullptr, the calling code is expected to handle this gracefully
-    LogAndReturnNull,
+struct FFrame : public FOutputDevice
+{
+public:
+    UFunction* Node; // 0x10
+    UObject* Object; // 0x18
+    uint8* Code; // 0x20
+    uint8* Locals; // 0x28
 
-    // Asserts, the calling code is not expecting to handle a failure gracefully
-    Assert
+    UProperty* MostRecentProperty; // 0x30
+    uint8* MostRecentPropertyAddress; // 0x38
+
+    uint8 Pad_01[0x58];
+
+public:
+    void Step(UObject* Context, RESULT_DECL)
+    {
+        // 7FF66FE7FCE0
+        void (*Step)(FFrame* Frame, UObject* Context, RESULT_DECL) = decltype(Step)(0x182FCE0 + uintptr_t(GetModuleHandle(0)));
+        Step(this, Context, RESULT_PARAM);
+    }
+
+    void StepExplicitProperty(void* const Result, UProperty* Property)
+    {
+        // 7FF66FE7FD10
+        void (*StepExplicitProperty)(FFrame* Frame, void* const Result, UProperty* Property) = decltype(StepExplicitProperty)(0x182FD10 + uintptr_t(GetModuleHandle(0)));
+        StepExplicitProperty(this, Result, Property);
+    }
+
+    void StepCompiledIn(void* const Result)
+    {
+        // https://imgur.com/q5efUyh
+
+        if (Code)
+        {
+            Step(Object, Result);
+        }
+        else
+        {
+            // https://imgur.com/a/CvmkuCy
+            UProperty* Property = (UProperty*)(*(UField**)(__int64(this) + 0x80));
+            *(UField**)(__int64(this) + 0x80) = Property->Next;
+
+            StepExplicitProperty(Result, Property);
+        }
+    }
+
+    template<typename TNativeType>
+    TNativeType& StepCompiledInRef(void* const TemporaryBuffer)
+    {
+        MostRecentPropertyAddress = NULL;
+
+        if (Code)
+        {
+            Step(Object, TemporaryBuffer);
+        }
+        else
+        {
+            // https://imgur.com/a/CvmkuCy
+            UProperty* Property = (UProperty*)(*(UField**)(__int64(this) + 0x80));
+            *(UField**)(__int64(this) + 0x80) = Property->Next;
+
+            StepExplicitProperty(TemporaryBuffer, Property);
+        }
+
+        return (MostRecentPropertyAddress != NULL) ? *(TNativeType*)(MostRecentPropertyAddress) : *(TNativeType*)TemporaryBuffer;
+    }
 };
 
 struct FActorSpawnParameters

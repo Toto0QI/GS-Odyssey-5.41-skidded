@@ -2,7 +2,7 @@
 
 namespace Inventory
 {
-	bool (*FindItemInstancesFromDefinition)(void* idk, UFortItemDefinition* ItemDefinition, TArray<UFortItem*>& ItemArray);
+	bool (*FindItemInstancesFromDefinition)(void* InventoryOwner, UFortItemDefinition* ItemDefinition, TArray<UFortItem*>& ItemArray);
 	FFortItemEntry* (*CreateItemEntry)(FFortItemEntry* ItemEntry);
 	FFortItemEntry* (*CreateDefaultItemEntry)(FFortItemEntry* ItemEntry, UFortItemDefinition* ItemDefinition, int32 Count, int32 Level);
 	FFortItemEntry* (*CopyItemEntry)(FFortItemEntry* PrimaryItemEntry, FFortItemEntry* ItemEntry);
@@ -262,26 +262,22 @@ namespace Inventory
 
 	bool IsInventoryFull(AFortInventory* Inventory)
 	{
-		if (!Inventory)
+		if (!Inventory || !Inventory->Owner)
 			return false;
 
-		int32 TotalItems = 0;
+		// 7FF66FE971B0
+		void* (*GetInterfaceAddress)(UObject* Object, UClass* InterfaceClass) = decltype(GetInterfaceAddress)(0x18471B0 + uintptr_t(GetModuleHandle(0)));
+		void* InventoryOwnerInterfaceAddress = GetInterfaceAddress(Inventory->Owner, IFortInventoryOwnerInterface::StaticClass());
 
-		for (int32 i = 0; i < Inventory->Inventory.ItemInstances.Num(); i++)
-		{
-			UFortWorldItem* WorldItem = Inventory->Inventory.ItemInstances[i];
-			if (!WorldItem) continue;
+		// 7FF66F5C1B60
+		int32(*GetInventoryCapacity)(void* InventoryOwnerInterfaceAddress, EFortInventoryType InventoryType) = decltype(GetInventoryCapacity)(0xF71B60 + uintptr_t(GetModuleHandle(0)));
+		int32 InventoryCapacity = GetInventoryCapacity(InventoryOwnerInterfaceAddress, Inventory->InventoryType);
 
-			UFortItemDefinition* ItemDefinition = WorldItem->ItemEntry.ItemDefinition;
-			if (!ItemDefinition) continue;
+		// 7FF66F5C21C0
+		int32(*GetInventorySize)(void* InventoryOwnerInterfaceAddress, EFortInventoryType InventoryType) = decltype(GetInventorySize)(0xF721C0 + uintptr_t(GetModuleHandle(0)));
+		int32 InventorySize = GetInventorySize(InventoryOwnerInterfaceAddress, Inventory->InventoryType);
 
-			if (!ItemDefinition->bInventorySizeLimited)
-				continue;
-
-			TotalItems++;
-		}
-
-		return (TotalItems >= 5); // GetMaxBackpackSize
+		return (InventorySize >= InventoryCapacity);
 	}
 
 	UFortWorldItem* AddItem(AFortInventory* Inventory, FFortItemEntry ItemEntry)
@@ -301,19 +297,57 @@ namespace Inventory
 
 		AddWorldItem(Inventory, WorldItem);
 
+		if (WorldItemEntry && PlayerController)
+		{
+			UFortGadgetItemDefinition* GadgetItemDefinition = Cast<UFortGadgetItemDefinition>(WorldItemEntry->ItemDefinition);
+
+			if (GadgetItemDefinition)
+			{
+				// 7FF66FE971B0
+				void* (*GetInterfaceAddress)(UObject* Object, UClass* InterfaceClass) = decltype(GetInterfaceAddress)(0x18471B0 + uintptr_t(GetModuleHandle(0)));
+				void* InterfaceAddress = GetInterfaceAddress(PlayerController, IFortInventoryOwnerInterface::StaticClass());
+
+				// 7FF66F5CEEE0
+				bool (*ApplyGadgetData)(UFortGadgetItemDefinition* GadgetItemDefinition, void* InterfaceAddress, UFortWorldItem* WorldItem, bool bIdk) = decltype(ApplyGadgetData)(0xF7EEE0 + uintptr_t(GetModuleHandle(0)));
+				ApplyGadgetData(GadgetItemDefinition, InterfaceAddress, WorldItem, true);
+			}
+		}
+
 		return WorldItem;
 	}
 
 	void RemoveItem(AFortInventory* Inventory, const FGuid& ItemGuid)
 	{
-		if (!Inventory || !Inventory->Owner)
+		if (!Inventory)
 			return;
 
 		AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Inventory->Owner);
+
+		if (!PlayerController)
+			return;
+
 		UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_GetInventoryItemWithGuid(ItemGuid));
 
 		if (!WorldItem)
 			return;
+
+		FFortItemEntry* WorldItemEntry = &WorldItem->ItemEntry;
+
+		if (WorldItemEntry)
+		{
+			UFortGadgetItemDefinition* GadgetItemDefinition = Cast<UFortGadgetItemDefinition>(WorldItemEntry->ItemDefinition);
+
+			if (GadgetItemDefinition)
+			{
+				// 7FF66FE971B0
+				void* (*GetInterfaceAddress)(UObject* Object, UClass* InterfaceClass) = decltype(GetInterfaceAddress)(0x18471B0 + uintptr_t(GetModuleHandle(0)));
+				void* InterfaceAddress = GetInterfaceAddress(PlayerController, IFortInventoryOwnerInterface::StaticClass());
+
+				// 7FF66F5CF030
+				void (*RemoveGadgetData)(UFortGadgetItemDefinition* GadgetItemDefinition, void* InterfaceAddress, UFortWorldItem* WorldItem) = decltype(RemoveGadgetData)(0xF7F030 + uintptr_t(GetModuleHandle(0)));
+				RemoveGadgetData(GadgetItemDefinition, InterfaceAddress, WorldItem);
+			}
+		}
 
 		Inventory->RecentlyRemoved.Add(WorldItem);
 
@@ -323,9 +357,11 @@ namespace Inventory
 			if (!ItemInstance) continue;
 
 			FFortItemEntry* ItemEntry = &Inventory->Inventory.ItemInstances[i]->ItemEntry;
+			if (!ItemEntry) continue;
 
 			if (ItemEntry->ItemGuid == ItemGuid)
 			{
+				FreeItemEntry(ItemEntry);
 				Inventory->Inventory.ItemInstances.Remove(i);
 				break;
 			}
@@ -334,9 +370,11 @@ namespace Inventory
 		for (int32 i = 0; i < Inventory->Inventory.ReplicatedEntries.Num(); i++)
 		{
 			FFortItemEntry* ReplicatedItemEntry = &Inventory->Inventory.ReplicatedEntries[i];
+			if (!ReplicatedItemEntry) continue;
 
 			if (ReplicatedItemEntry->ItemGuid == ItemGuid)
 			{
+				FreeItemEntry(ReplicatedItemEntry);
 				Inventory->Inventory.ReplicatedEntries.Remove(i);
 				break;
 			}
@@ -346,24 +384,152 @@ namespace Inventory
 		Inventory->HandleInventoryLocalUpdate();
 	}
 
-	void ResetInventory(AFortInventory* Inventory)
+	void ResetInventory(AFortInventory* Inventory, bool bRemoveAll = true)
 	{
 		if (!Inventory)
 			return;
 	
-		if (Inventory->Inventory.ItemInstances.IsValid())
-			Inventory->Inventory.ItemInstances.Free();
+		if (bRemoveAll)
+		{
+			if (Inventory->Inventory.ItemInstances.IsValid())
+				Inventory->Inventory.ItemInstances.Free();
 
-		if (Inventory->Inventory.ReplicatedEntries.IsValid())
-			Inventory->Inventory.ReplicatedEntries.Free();
+			if (Inventory->Inventory.ReplicatedEntries.IsValid())
+				Inventory->Inventory.ReplicatedEntries.Free();
 
-		Inventory->Inventory.MarkArrayDirty();
-		Inventory->HandleInventoryLocalUpdate();
+			Inventory->Inventory.MarkArrayDirty();
+			Inventory->HandleInventoryLocalUpdate();
+		}
+		else
+		{
+			TArray<FGuid> ItemGuidToRemoves;
+
+			for (int32 i = 0; i < Inventory->Inventory.ItemInstances.Num(); i++)
+			{
+				UFortWorldItem* ItemInstance = Inventory->Inventory.ItemInstances[i];
+				if (!ItemInstance) continue;
+
+				FFortItemEntry* ItemEntry = &ItemInstance->ItemEntry;
+				if (!ItemEntry) continue;
+
+				UFortWorldItemDefinition* ItemDefinition = Cast<UFortWorldItemDefinition>(ItemEntry->ItemDefinition);
+				if (!ItemDefinition) continue;
+
+				if (!ItemDefinition->bCanBeDropped)
+					continue;
+
+				ItemGuidToRemoves.Add(ItemEntry->ItemGuid);
+			}
+
+			for (int32 i = 0; i < ItemGuidToRemoves.Num(); i++)
+				Inventory::RemoveItem(Inventory, ItemGuidToRemoves[i]);
+		}
 	}
 
-	AFortPickup* SpawnPickup(AFortPawn* ItemOwner, FFortItemEntry ItemEntry, FVector SpawnLocation, FVector FinalLocation, bool bToss)
+	AFortPickup* GetClosestPickup(AFortPickup* PickupToCombine, float MaxDistance)
+	{
+		if (!PickupToCombine)
+			return nullptr;
+
+		UFortWorldItemDefinition* WorldItemDefinitionCombine = Cast<UFortWorldItemDefinition>(PickupToCombine->PrimaryPickupItemEntry.ItemDefinition);
+
+		if (WorldItemDefinitionCombine)
+		{
+			TArray<AActor*> Actors;
+			UGameplayStatics::GetAllActorsOfClass(PickupToCombine, AFortPickup::StaticClass(), &Actors);
+
+			AFortPickup* ClosestPickup = nullptr;
+
+			for (int32 i = 0; i < Actors.Num(); i++)
+			{
+				AFortPickup* Pickup = Cast<AFortPickup>(Actors[i]);
+				if (!Pickup) continue;
+
+				if (Pickup->bActorIsBeingDestroyed || Pickup->bPickedUp)
+					continue;
+
+				if (Pickup == PickupToCombine)
+					continue;
+
+				//if (Pickup->PickupLocationData.TossState != EFortPickupTossState::AtRest)
+					//continue;
+
+				const float Distance = PickupToCombine->GetDistanceTo(Pickup);
+
+				if (Distance > MaxDistance)
+					continue;
+
+				if (Pickup->PickupLocationData.CombineTarget)
+					continue;
+
+				FFortItemEntry* PrimaryPickupItemEntry = &Pickup->PrimaryPickupItemEntry;
+				if (!PrimaryPickupItemEntry) continue;
+
+				UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(PrimaryPickupItemEntry->ItemDefinition);
+				if (!WorldItemDefinition) continue;
+
+				if (WorldItemDefinition != WorldItemDefinitionCombine)
+					continue;
+
+				if (PrimaryPickupItemEntry->Count >= WorldItemDefinition->MaxStackSize)
+					continue;
+
+				ClosestPickup = Pickup;
+				break;
+			}
+
+			if (Actors.IsValid())
+				Actors.Free();
+
+			return ClosestPickup;
+		}
+
+		return nullptr;
+	}
+
+	bool CombineNearestPickup(AFortPickup* PickupToCombine)
+	{
+		if (!PickupToCombine || !PickupToCombine->bCombinePickupsWhenTossCompletes)
+			return false;
+
+		return false;
+
+		AFortPickup* ClosestPickup = GetClosestPickup(PickupToCombine, 300.0f);
+
+		if (ClosestPickup)
+		{
+			FFortPickupLocationData* PickupLocationData = &PickupToCombine->PickupLocationData;
+			if (!PickupLocationData) return false;
+
+			PickupLocationData->CombineTarget = ClosestPickup;
+			PickupLocationData->FlyTime = 0.25f;
+			PickupLocationData->LootFinalPosition = (FVector_NetQuantize10)ClosestPickup->K2_GetActorLocation();
+			PickupLocationData->LootInitialPosition = (FVector_NetQuantize10)PickupToCombine->K2_GetActorLocation();
+			PickupLocationData->FinalTossRestLocation = (FVector_NetQuantize10)ClosestPickup->K2_GetActorLocation();
+			
+			PickupToCombine->OnRep_PickupLocationData();
+			ClosestPickup->OnRep_PickupLocationData();
+
+			PickupToCombine->ForceNetUpdate();
+			ClosestPickup->ForceNetUpdate();
+
+			const float Distance = ClosestPickup->GetDistanceTo(PickupToCombine);
+
+			UKismetSystemLibrary::K2_SetTimer(PickupToCombine, L"OnRep_ServerImpactSoundFlash", PickupLocationData->FlyTime, false); // Func OnRep_ServerImpactSoundFlash use for combine
+
+			return true;
+		}
+
+		return false;
+	}
+
+	AFortPickup* SpawnPickup(AFortPawn* ItemOwner, FFortItemEntry ItemEntry, FVector SpawnLocation, FVector FinalLocation, int32 OverrideMaxStackCount = 0, bool bToss = true, bool bCombinePickup = true)
 	{
 		FRotator SpawnRotation = FRotator({ 0, 0, 0 });
+
+		// 7FF66F5F89D0
+		void (*SetParentInventory)(FFortItemEntry* ItemEntry, AFortInventory* Inventory, bool bIsReplicatedCopy) = decltype(SetParentInventory)(0xFA89D0 + uintptr_t(GetModuleHandle(0)));
+		SetParentInventory(&ItemEntry, nullptr, false);
 
 		FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
 		CreatePickupData.World = Globals::GetWorld();
@@ -383,7 +549,12 @@ namespace Inventory
 			if (ItemOwner)
 				Pickup->PawnWhoDroppedPickup = ItemOwner;
 
-			Pickup->TossPickup(FinalLocation, ItemOwner, 0, bToss);
+			Pickup->bCombinePickupsWhenTossCompletes = bCombinePickup;
+
+			if (CombineNearestPickup(Pickup))
+				return Pickup;
+
+			Pickup->TossPickup(FinalLocation, ItemOwner, OverrideMaxStackCount, bToss);
 		}
 			
 		return Pickup;
@@ -412,6 +583,102 @@ namespace Inventory
 		return PrimaryStateValues;
 	}
 
+	/*void AddInventoryItem(AFortPlayerController* PlayerController, FFortItemEntry* ItemEntry, FGuid CurrentItemGuid = FGuid(), bool bReplaceWeapon = true)
+	{
+		if (!PlayerController || !ItemEntry || ItemEntry->Count <= 0)
+			return;
+
+		AFortInventory* WorldInventory = PlayerController->WorldInventory;
+		UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(ItemEntry->ItemDefinition);
+
+		if (!WorldInventory || !WorldItemDefinition)
+			return;
+
+		// 7FF66FE971B0
+		void* (*GetInterfaceAddress)(UObject* Object, UClass* InterfaceClass) = decltype(GetInterfaceAddress)(0x18471B0 + uintptr_t(GetModuleHandle(0)));
+		void* InventoryOwnerInterface = GetInterfaceAddress(PlayerController, IFortInventoryOwnerInterface::StaticClass());
+
+		if (!InventoryOwnerInterface)
+			return;
+
+		FVector SpawnLocation = FVector({ 0, 0, 0 });
+		FVector FinalLocation = FVector({ 0, 0, 0 });
+
+		AFortPlayerPawn* PlayerPawn = PlayerController->MyFortPawn;
+
+		if (PlayerPawn)
+		{
+			SpawnLocation = PlayerPawn->K2_GetActorLocation();
+			SpawnLocation.Z += 40.0f;
+
+			float RandomAngle = UKismetMathLibrary::RandomFloatInRange(-60.0f, 60.0f);
+
+			FRotator RandomRotation = PlayerPawn->K2_GetActorRotation();
+			RandomRotation.Yaw += RandomAngle;
+
+			float RandomDistance = UKismetMathLibrary::RandomFloatInRange(500.0f, 600.0f);
+			FVector Direction = UKismetMathLibrary::GetForwardVector(RandomRotation);
+
+			FinalLocation = SpawnLocation + Direction * RandomDistance;
+		}
+
+		// 7FF66F5C4A40
+		int32 (*GetOverflowCountIfItemWasAddedToInventory)(AFortInventory* Inventory, FFortItemEntry* ItemEntry) = decltype(GetOverflowCountIfItemWasAddedToInventory)(0xF74A40 + uintptr_t(GetModuleHandle(0)));
+		int32 OverflowCountIfItemWasAddedToInventory = GetOverflowCountIfItemWasAddedToInventory(WorldInventory, ItemEntry);
+
+		if (OverflowCountIfItemWasAddedToInventory > 0 && WorldItemDefinition->bInventorySizeLimited)
+		{
+			UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_GetInventoryItemWithGuid(CurrentItemGuid));
+
+			if (!WorldItem)
+			{
+				AFortWeapon* Weapon = PlayerPawn->CurrentWeapon;
+
+				if (Weapon)
+					WorldItem = Cast<UFortWorldItem>(PlayerController->K2_GetInventoryItemWithGuid(Weapon->ItemEntryGuid));
+			}
+
+			if (!WorldItem || !WorldItemDefinition->bCanBeDropped || !bReplaceWeapon)
+			{
+				SpawnPickup(PlayerPawn, *ItemEntry, SpawnLocation, FinalLocation);
+				return;
+			}
+
+			UFortWeaponRangedItemDefinition* WeaponRangedItemDefinition = Cast<UFortWeaponRangedItemDefinition>(WorldItemDefinition);
+
+			if (WeaponRangedItemDefinition && WeaponRangedItemDefinition->bPersistInInventoryWhenFinalStackEmpty)
+			{
+				int32 ItemQuantity = UFortKismetLibrary::K2_GetItemQuantityOnPlayer(PlayerController, WeaponRangedItemDefinition);
+
+				if (ItemQuantity == 0)
+				{
+					SpawnPickup(PlayerPawn, *ItemEntry, SpawnLocation, FinalLocation);
+					return;
+				}
+			}
+
+			PlayerController->ServerAttemptInventoryDrop(WorldItem->ItemEntry.ItemGuid, WorldItem->ItemEntry.Count);
+
+			UFortWorldItem* NewWorldItem = AddItem(PlayerController->WorldInventory, *ItemEntry);
+
+			if (NewWorldItem)
+			{
+				AFortPlayerControllerAthena* PlayerControllerAthena = Cast<AFortPlayerControllerAthena>(PlayerController);
+
+				if (WorldItem->ItemEntry.ItemGuid == PlayerPawn->CurrentWeapon->ItemEntryGuid && PlayerControllerAthena)
+					PlayerControllerAthena->ClientEquipItem(NewWorldItem->ItemEntry.ItemGuid, true);
+			}
+		}
+		else if (OverflowCountIfItemWasAddedToInventory > 0 && !WorldItemDefinition->bInventorySizeLimited)
+		{
+
+		}
+		else if (OverflowCountIfItemWasAddedToInventory <= 0)
+		{
+
+		}
+	}*/
+
 	void AddInventoryItem(AFortPlayerController* PlayerController, FFortItemEntry ItemEntry, FGuid CurrentItemGuid = FGuid(), bool bReplaceWeapon = true)
 	{
 		if (!PlayerController || !PlayerController->WorldInventory || !ItemEntry.ItemDefinition)
@@ -420,10 +687,16 @@ namespace Inventory
 		if (ItemEntry.Count <= 0)
 			return;
 
-		void* idk = (void*)(__int64(PlayerController) + IdkOffset);
+		// 7FF66F5C4A40
+		/*int32 (*GetOverflowCountIfItemWasAddedToInventory)(AFortInventory* Inventory, FFortItemEntry* ItemEntry) = decltype(GetOverflowCountIfItemWasAddedToInventory)(0xF74A40 + uintptr_t(GetModuleHandle(0)));
+		int32 OverflowCountIfItemWasAddedToInventory = GetOverflowCountIfItemWasAddedToInventory(PlayerController->WorldInventory, &ItemEntry);
+
+		FN_LOG(LogHooks, Log, "OverflowCountIfItemWasAddedToInventory: %i", OverflowCountIfItemWasAddedToInventory);*/
+
+		void* InventoryOwner = (void*)(__int64(PlayerController) + InventoryOwnerOffset);
 
 		TArray<UFortItem*> ItemArray;
-		bool bFoundItemInstances = FindItemInstancesFromDefinition(idk, ItemEntry.ItemDefinition, ItemArray);
+		bool bFoundItemInstances = FindItemInstancesFromDefinition(InventoryOwner, ItemEntry.ItemDefinition, ItemArray);
 
 		if (bFoundItemInstances)
 		{
@@ -483,7 +756,29 @@ namespace Inventory
 
 			return;
 		}
+
+		FVector SpawnLocation = FVector({ 0, 0, 0 });
+		FVector FinalLocation = FVector({ 0, 0, 0 });
 		
+		AFortPlayerPawn* PlayerPawn = PlayerController->MyFortPawn;
+
+		if (PlayerPawn)
+		{
+			SpawnLocation = PlayerPawn->K2_GetActorLocation();
+
+			SpawnLocation.Z += 40.0f;
+
+			float RandomAngle = UKismetMathLibrary::RandomFloatInRange(-60.0f, 60.0f);
+
+			FRotator RandomRotation = PlayerPawn->K2_GetActorRotation();
+			RandomRotation.Yaw += RandomAngle;
+
+			float RandomDistance = UKismetMathLibrary::RandomFloatInRange(500.0f, 600.0f);
+			FVector Direction = UKismetMathLibrary::GetForwardVector(RandomRotation);
+
+			FinalLocation = SpawnLocation + Direction * RandomDistance;
+		}
+
 		if (WorldItemDefinition->IsA(UFortWeaponMeleeItemDefinition::StaticClass()) && !WorldItemDefinition->bCanBeDropped) // If the WorldItemDefinition is a pickaxe, replace or add
 		{
 			for (int32 i = 0; i < PlayerController->WorldInventory->Inventory.ItemInstances.Num(); i++)
@@ -505,24 +800,11 @@ namespace Inventory
 
 			AddItem(PlayerController->WorldInventory, ItemEntry);
 		}
-		else if (IsInventoryFull(PlayerController->WorldInventory) && WorldItemDefinition->bInventorySizeLimited && PlayerController->MyFortPawn) // If the Inventory is full replace the current weapon and spawn pickup
+		else if (IsInventoryFull(PlayerController->WorldInventory) && WorldItemDefinition->bInventorySizeLimited && PlayerPawn) // If the Inventory is full replace the current weapon and spawn pickup
 		{
-			FVector SpawnLocation = PlayerController->MyFortPawn->K2_GetActorLocation();
-			FRotator PlayerRotation = PlayerController->MyFortPawn->K2_GetActorRotation();
-
-			float RandomAngle = UKismetMathLibrary::RandomFloatInRange(-60.0f, 60.0f);
-
-			FRotator RandomRotation = PlayerRotation;
-			RandomRotation.Yaw += RandomAngle;
-
-			float RandomDistance = UKismetMathLibrary::RandomFloatInRange(500.0f, 600.0f);
-			FVector Direction = UKismetMathLibrary::GetForwardVector(RandomRotation);
-
-			FVector FinalLocation = SpawnLocation + Direction * RandomDistance;
-
 			if (!bReplaceWeapon)
 			{
-				SpawnPickup(PlayerController->MyFortPawn, ItemEntry, SpawnLocation, FinalLocation, true);
+				SpawnPickup(PlayerPawn, ItemEntry, SpawnLocation, FinalLocation);
 				return;
 			}
 
@@ -530,7 +812,7 @@ namespace Inventory
 
 			if (!WorldItem)
 			{
-				AFortWeapon* Weapon = PlayerController->MyFortPawn->CurrentWeapon;
+				AFortWeapon* Weapon = PlayerPawn->CurrentWeapon;
 
 				if (Weapon)
 					WorldItem = Cast<UFortWorldItem>(PlayerController->K2_GetInventoryItemWithGuid(Weapon->ItemEntryGuid));
@@ -538,7 +820,7 @@ namespace Inventory
 
 			if (!WorldItem)
 			{
-				SpawnPickup(PlayerController->MyFortPawn, ItemEntry, SpawnLocation, FinalLocation, true);
+				SpawnPickup(PlayerPawn, ItemEntry, SpawnLocation, FinalLocation);
 				return;
 			}
 
@@ -546,8 +828,21 @@ namespace Inventory
 
 			if (!WorldItemDefinition || !WorldItemDefinition->bCanBeDropped)
 			{
-				SpawnPickup(PlayerController->MyFortPawn, ItemEntry, SpawnLocation, FinalLocation, true);
+				SpawnPickup(PlayerPawn, ItemEntry, SpawnLocation, FinalLocation);
 				return;
+			}
+
+			UFortWeaponRangedItemDefinition* WeaponRangedItemDefinition = Cast<UFortWeaponRangedItemDefinition>(WorldItemDefinition);
+
+			if (WeaponRangedItemDefinition && WeaponRangedItemDefinition->bPersistInInventoryWhenFinalStackEmpty)
+			{
+				int32 ItemQuantity = UFortKismetLibrary::K2_GetItemQuantityOnPlayer(PlayerController, WeaponRangedItemDefinition);
+
+				if (ItemQuantity == 0)
+				{
+					SpawnPickup(PlayerPawn, ItemEntry, SpawnLocation, FinalLocation);
+					return;
+				}
 			}
 
 			PlayerController->ServerAttemptInventoryDrop(WorldItem->ItemEntry.ItemGuid, WorldItem->ItemEntry.Count);
@@ -558,7 +853,7 @@ namespace Inventory
 			{
 				AFortPlayerControllerAthena* PlayerControllerAthena = Cast<AFortPlayerControllerAthena>(PlayerController);
 
-				if (WorldItem->ItemEntry.ItemGuid == PlayerController->MyFortPawn->CurrentWeapon->ItemEntryGuid && PlayerControllerAthena)
+				if (WorldItem->ItemEntry.ItemGuid == PlayerPawn->CurrentWeapon->ItemEntryGuid && PlayerControllerAthena)
 					PlayerControllerAthena->ClientEquipItem(NewWorldItem->ItemEntry.ItemGuid, true);
 			}
 		}
@@ -570,22 +865,9 @@ namespace Inventory
 		{
 			UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_FindExistingItemForDefinition(WorldItemDefinition, false));
 
-			if (WorldItem && !WorldItemDefinition->bAllowMultipleStacks && PlayerController->MyFortPawn)
+			if (WorldItem && !WorldItemDefinition->bAllowMultipleStacks && PlayerPawn)
 			{
-				FVector SpawnLocation = PlayerController->MyFortPawn->K2_GetActorLocation();
-				FRotator PlayerRotation = PlayerController->MyFortPawn->K2_GetActorRotation();
-
-				float RandomAngle = UKismetMathLibrary::RandomFloatInRange(-60.0f, 60.0f);
-
-				FRotator RandomRotation = PlayerRotation;
-				RandomRotation.Yaw += RandomAngle;
-
-				float RandomDistance = UKismetMathLibrary::RandomFloatInRange(500.0f, 600.0f);
-				FVector Direction = UKismetMathLibrary::GetForwardVector(RandomRotation);
-
-				FVector FinalLocation = SpawnLocation + Direction * RandomDistance;
-
-				SpawnPickup(PlayerController->MyFortPawn, ItemEntry, SpawnLocation, FinalLocation, true);
+				SpawnPickup(PlayerPawn, ItemEntry, SpawnLocation, FinalLocation);
 				return;
 			}
 			else
@@ -610,13 +892,26 @@ namespace Inventory
 
 		if (AmountToRemove >= ItemEntry->Count)
 		{
-			Inventory::RemoveItem(PlayerController->WorldInventory, ItemGuid);
+			UFortWeaponRangedItemDefinition* WeaponRangedItemDefinition = Cast<UFortWeaponRangedItemDefinition>(ItemEntry->ItemDefinition);
+
+			if (WeaponRangedItemDefinition && WeaponRangedItemDefinition->bPersistInInventoryWhenFinalStackEmpty)
+			{
+				int32 ItemQuantity = UFortKismetLibrary::K2_GetItemQuantityOnPlayer(PlayerController, WeaponRangedItemDefinition);
+
+				if (ItemQuantity == 1)
+				{
+					ModifyCountItem(PlayerController->WorldInventory, ItemGuid, 0);
+					return true;
+				}
+			}
+
+			RemoveItem(PlayerController->WorldInventory, ItemGuid);
 		}
 		else if (AmountToRemove < ItemEntry->Count)
 		{
 			int32 NewCount = ItemEntry->Count - AmountToRemove;
 
-			Inventory::ModifyCountItem(PlayerController->WorldInventory, ItemGuid, NewCount);
+			ModifyCountItem(PlayerController->WorldInventory, ItemGuid, NewCount);
 		}
 		else
 			return false;
@@ -624,9 +919,57 @@ namespace Inventory
 		return true;
 	}
 
-	void SetupInventory(AFortPlayerController* PlayerController, UFortWeaponMeleeItemDefinition* WeaponMeleeItemDefinition)
+	bool InitWorldInventory(AFortPlayerController* PlayerController)
 	{
-		if (!PlayerController || !PlayerController->WorldInventory)
+		if (PlayerController->WorldInventory)
+			return true;
+
+		AFortInventory* WorldInventory = Util::SpawnActor<AFortInventory>(AFortInventory::StaticClass());
+
+		if (WorldInventory)
+		{
+			WorldInventory->SetOwner(PlayerController);
+			WorldInventory->OnRep_Owner();
+
+			PlayerController->WorldInventory = WorldInventory;
+			PlayerController->bHasInitializedWorldInventory = true;
+			PlayerController->HandleWorldInventoryLocalUpdate();
+
+			return (PlayerController->WorldInventory != nullptr);
+		}
+
+		return false;
+	}
+
+	bool InitQuickBars(AFortPlayerController* PlayerController) // Wtf
+	{
+		return true;
+
+		if (PlayerController->QuickBars)
+			return true;
+
+		AFortQuickBarsAthena* QuickBars = Util::SpawnActor<AFortQuickBarsAthena>(AFortQuickBarsAthena::StaticClass());
+
+		if (QuickBars)
+		{
+			QuickBars->SetOwner(PlayerController);
+			QuickBars->OnRep_Owner();
+
+			PlayerController->QuickBars = QuickBars;
+			PlayerController->OnRep_QuickBar();
+
+			return (PlayerController->QuickBars != nullptr);
+		}
+
+		return false;
+	}
+
+	void SetupInventory(AFortPlayerController* PlayerController, UFortWeaponMeleeItemDefinition* PickaxeItemDefinition)
+	{
+		if (!PlayerController)
+			return;
+
+		if (!InitWorldInventory(PlayerController) || !InitQuickBars(PlayerController))
 			return;
 
 		TArray<FItemAndCount> StartingItems = Cast<AFortGameModeAthena>(Globals::GetGameMode())->StartingItems;
@@ -647,10 +990,10 @@ namespace Inventory
 			FreeItemEntry(&ItemEntry);
 		}
 
-		if (WeaponMeleeItemDefinition)
+		if (PickaxeItemDefinition)
 		{
 			FFortItemEntry ItemEntry;
-			MakeItemEntry(&ItemEntry, WeaponMeleeItemDefinition, 1, 0, 0, 0.f);
+			MakeItemEntry(&ItemEntry, PickaxeItemDefinition, 1, 0, 0, 0.f);
 
 			AddInventoryItem(PlayerController, ItemEntry);
 			FreeItemEntry(&ItemEntry);

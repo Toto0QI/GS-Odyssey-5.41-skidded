@@ -1,125 +1,82 @@
 #pragma once
 
-struct AthenaSupplyDrop_Llama_C_GetLootSpawnLocation final
-{
-public:
-	struct FVector                                LootSpawnLocation;                                 // 0x0000(0x000C)(Parm, OutParm, IsPlainOldData, NoDestructor, HasGetValueTypeHash)
-	float                                         CallFunc_RandomFloatInRange_ReturnValue;           // 0x000C(0x0004)(ZeroConstructor, IsPlainOldData, NoDestructor, HasGetValueTypeHash)
-	struct FVector                                CallFunc_K2_GetComponentLocation_ReturnValue;      // 0x0010(0x000C)(IsPlainOldData, NoDestructor, HasGetValueTypeHash)
-	struct FVector                                CallFunc_RandomUnitVector_ReturnValue;             // 0x001C(0x000C)(IsPlainOldData, NoDestructor, HasGetValueTypeHash)
-	struct FVector                                CallFunc_Multiply_VectorFloat_ReturnValue;         // 0x0028(0x000C)(IsPlainOldData, NoDestructor, HasGetValueTypeHash)
-	struct FVector                                CallFunc_Add_VectorVector_ReturnValue;             // 0x0034(0x000C)(IsPlainOldData, NoDestructor, HasGetValueTypeHash)
-	struct FVector                                CallFunc_Add_VectorVector_ReturnValue1;            // 0x0040(0x000C)(IsPlainOldData, NoDestructor, HasGetValueTypeHash)
-};
-
 namespace FortAthenaSupplyDrop
 {
-	void (*SpawningLootOnDestruction)(AFortAthenaSupplyDrop* SupplyDrop, AController* EventInstigator);
+	/* ----------------------------------- AFortAthenaSupplyDropOG ----------------------------------- */
 
-	void SpawningLootOnDestructionHook(AFortAthenaSupplyDrop* SupplyDrop, AController* EventInstigator)
+
+
+	/* ------------------------------------ AFortAthenaSupplyDrop ------------------------------------ */
+
+	AFortPickup* SpawnPickup(AFortAthenaSupplyDrop* SupplyDrop, FFrame& Stack, AFortPickup** Ret)
 	{
-		UFunction* GetLootSpawnLocationFunc = nullptr;
+		UFortWorldItemDefinition* ItemDefinition = nullptr;
+		int32 NumberToSpawn = 1;
+		AFortPawn* TriggeringPawn = nullptr;
+		FVector Position = FVector();
+		FVector Direction = FVector();
 
-		if (GetLootSpawnLocationFunc == nullptr)
-			GetLootSpawnLocationFunc = SupplyDrop->Class->GetFunction("AthenaSupplyDrop_Llama_C", "GetLootSpawnLocation");
+		Stack.StepCompiledIn(&ItemDefinition);
+		Stack.StepCompiledIn(&NumberToSpawn);
+		Stack.StepCompiledIn(&TriggeringPawn);
+		Stack.StepCompiledIn(&Position);
+		Stack.StepCompiledIn(&Direction);
 
-		AthenaSupplyDrop_Llama_C_GetLootSpawnLocation GetLootSpawnLocationParms{};
+		Stack.Code += Stack.Code != nullptr;
 
-		if (GetLootSpawnLocationFunc)
-			SupplyDrop->ProcessEvent(GetLootSpawnLocationFunc, &GetLootSpawnLocationParms);
+		UWorld* World = GEngine->GetWorldFromContextObject(SupplyDrop, EGetWorldErrorMode::LogAndReturnNull);
 
-		FVector LootSpawnLocation = std::move(GetLootSpawnLocationParms.LootSpawnLocation);
-
-		int32 LootLevel = UFortKismetLibrary::GetLootLevel(SupplyDrop);
-
-		TArray<FFortItemEntry> LootToDrops;
-		bool bSuccess = UFortKismetLibrary::PickLootDrops(SupplyDrop, &LootToDrops, UKismetStringLibrary::Conv_StringToName(L"Loot_AthenaLlama"), LootLevel, -1); // SupplyDrop->LootTableName
-
-		if (!bSuccess)
+		if (!World || !ItemDefinition || (NumberToSpawn < 1))
 		{
-			FN_LOG(LogPlayerController, Error, "[AFortAthenaSupplyDrop::SpawningLootOnDestruction] Failed PickLootDrops!");
-			return;
+			*Ret = nullptr;
+			return *Ret;
 		}
 
-		for (int32 i = 0; i < LootToDrops.Num(); i++)
-		{
-			FFortItemEntry LootToDrop = LootToDrops[i];
-			UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(LootToDrop.ItemDefinition);
-			if (!WorldItemDefinition) continue;
+		FFortItemEntry ItemEntry;
+		Inventory::MakeItemEntry(&ItemEntry, ItemDefinition, NumberToSpawn, -1, -1, -1.0f);
 
-			FVector LootSpawnDirection = FVector({ 0, 0, 0 });
-			SupplyDrop->SpawnPickup(WorldItemDefinition, LootToDrop.Count, nullptr, LootSpawnLocation, LootSpawnDirection);
+		FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
+		CreatePickupData.World = World;
+		CreatePickupData.ItemEntry = &ItemEntry;
+		CreatePickupData.SpawnLocation = &Position;
+		CreatePickupData.SpawnRotation = nullptr;
+		CreatePickupData.PlayerController = nullptr;
+		CreatePickupData.OverrideClass = nullptr;
+		CreatePickupData.NullptrIdk = nullptr;
+		CreatePickupData.bRandomRotation = true;
+		CreatePickupData.PickupSourceTypeFlags = 0;
+
+		AFortPickup* Pickup = AFortPickup::CreatePickupFromData(&CreatePickupData);
+
+		if (Pickup)
+		{
+			FRotator PlayerRotation = SupplyDrop->K2_GetActorRotation();
+			PlayerRotation.Yaw += UKismetMathLibrary::RandomFloatInRange(-180.0f, 180.0f);
+
+			float RandomDistance = UKismetMathLibrary::RandomFloatInRange(350.0f, 700.0f);
+			FVector FinalDirection = UKismetMathLibrary::GetForwardVector(PlayerRotation);
+
+			FVector FinalLocation = Position + FinalDirection * RandomDistance;
+
+			Pickup->TossPickup(FinalLocation, nullptr, 0, true);
 		}
 
-		SpawningLootOnDestruction(SupplyDrop, EventInstigator);
-	}
+		ItemEntry.FreeItemEntry();
 
-	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms, bool* bCallOG)
-	{
-		if (!Object || !Function)
-			return;
-
-		if (!Object->IsA(AFortAthenaSupplyDrop::StaticClass()))
-			return;
-
-		const std::string& FunctionName = Function->GetName();
-
-		if (FunctionName.contains("SpawnPickup"))
-		{
-			AFortAthenaSupplyDrop* SupplyDrop = (AFortAthenaSupplyDrop*)Object;
-			auto Params = (Params::FortAthenaSupplyDrop_SpawnPickup*)Parms;
-
-			UFortWorldItemDefinition* ItemDefinition = Params->ItemDefinition;
-			AFortPawn* TriggeringPawn = Params->TriggeringPawn;
-
-			if (!SupplyDrop || !ItemDefinition)
-			{
-				FN_LOG(LogAthenaSupplyDrop, Error, "[AFortAthenaSupplyDrop::SpawnPickup] failed to get SupplyDrop!");
-				return;
-			}
-
-			int32 NumberToSpawn = Params->NumberToSpawn;
-
-			FFortItemEntry ItemEntry;
-			Inventory::MakeItemEntry(&ItemEntry, ItemDefinition, NumberToSpawn, -1, -1, 0.f);
-
-			FVector Direction = Params->Direction;
-
-			FVector SpawnLocation = Params->Position;
-			FRotator SpawnRotation = FRotator({ 0, 0, 0 });
-
-			FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
-			CreatePickupData.World = Globals::GetWorld();
-			CreatePickupData.ItemEntry = &ItemEntry;
-			CreatePickupData.SpawnLocation = &SpawnLocation;
-			CreatePickupData.SpawnRotation = &SpawnRotation;
-			CreatePickupData.PlayerController = nullptr;
-			CreatePickupData.OverrideClass = nullptr;
-			CreatePickupData.NullptrIdk = nullptr;
-			CreatePickupData.bRandomRotation = true;
-			CreatePickupData.PickupSourceTypeFlags = 0;
-
-			AFortPickup* Pickup = Inventory::CreatePickupFromData(&CreatePickupData);
-
-			if (Pickup)
-			{
-				Pickup->TossPickup(SpawnLocation, nullptr, 0, true);
-			}
-
-			Params->ReturnValue = Pickup;
-
-			*bCallOG = false;
-		}
+		*Ret = Pickup;
+		return *Ret;
 	}
 
 	void InitFortAthenaSupplyDrop()
 	{
-		static auto FortAthenaSupplyDropDefault = AFortAthenaSupplyDrop::GetDefaultObj();
+		AFortAthenaSupplyDrop* FortAthenaSupplyDropDefault = AFortAthenaSupplyDrop::GetDefaultObj();
 
-		uintptr_t AddressSpawningLootOnDestruction = MinHook::FindPattern(Patterns::SpawningLootOnDestruction);
+		/* ------------------------------------ AFortAthenaSupplyDrop ------------------------------------ */
 
-		MH_CreateHook((LPVOID)(AddressSpawningLootOnDestruction), SpawningLootOnDestructionHook, (LPVOID*)(&SpawningLootOnDestruction));
-		MH_EnableHook((LPVOID)(AddressSpawningLootOnDestruction));
+		UFunction* SpawnPickupFunc = AFortAthenaSupplyDrop::StaticClass()->GetFunction("FortAthenaSupplyDrop", "SpawnPickup");
+		MinHook::HookFunctionExec(SpawnPickupFunc, SpawnPickup, nullptr);
+
+		/* ----------------------------------------------------------------------------------------------- */
 
 		FN_LOG(LogInit, Log, "FortAthenaSupplyDrop Success!");
 	}

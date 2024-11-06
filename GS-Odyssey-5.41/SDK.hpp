@@ -47,6 +47,7 @@
 #include "SDK/OnlineSubsystemUtils_classes.hpp"
 #include "SDK/AIModule_classes.hpp"
 #include "SDK/GameplayAbilities_classes.hpp"
+#include "SDK/GameplayAbilities_parameters.hpp"
 #include "SDK/McpProfileSys_classes.hpp"
 #include "SDK/Party_classes.hpp"
 #include "SDK/Account_classes.hpp"

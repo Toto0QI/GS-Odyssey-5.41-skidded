@@ -6537,6 +6537,112 @@ public:
 	uint8                                         Pad_125A[0x4];                                     // 0x00AC(0x0004)(Fixing Size After Last Property [ Dumper-7 ])
 	TArray<class UFortAlterationItemDefinition*>  AlterationInstances;                               // 0x00B0(0x0010)(ZeroConstructor, Transient, NativeAccessSpecifierPrivate)
 	TArray<float>                                 GenericAttributeValues;                            // 0x00C0(0x0010)(ZeroConstructor, Transient, NativeAccessSpecifierPrivate)
+
+	// Check if ParentInventory is Valid and Update ItemEntry
+	void UpdateItemEntry()
+	{
+		// 7FF66F5F9300
+		void (*UpdateItemEntry)(struct FFortItemEntry* ItemEntry) = decltype(UpdateItemEntry)(0xFA9300 + uintptr_t(GetModuleHandle(0)));
+		UpdateItemEntry(this);
+	}
+
+	void SetCount(int32 NewCount)
+	{
+		if (NewCount < 0)
+			NewCount = 0;
+
+		if (NewCount != Count)
+		{
+			Count = NewCount;
+			UpdateItemEntry();
+		}
+	}
+
+	void SetDurability(float NewDurability)
+	{
+		if (NewDurability != Durability)
+		{
+			Durability = NewDurability;
+			UpdateItemEntry();
+		}
+	}
+
+	void SetLevel(int32 NewLevel)
+	{
+		if (NewLevel != Level && NewLevel >= 0)
+		{
+			Level = NewLevel;
+			UpdateItemEntry();
+		}
+	}
+
+	void SetLoadedAmmo(int32 NewLoadedAmmo)
+	{
+		if (NewLoadedAmmo < 0)
+			NewLoadedAmmo = 0;
+
+		if (NewLoadedAmmo != LoadedAmmo)
+		{
+			LoadedAmmo = NewLoadedAmmo;
+			UpdateItemEntry();
+		}
+	}
+
+	struct FFortItemEntry* CreateItemEntry()
+	{
+		// 7FF66F5DDC40
+		struct FFortItemEntry* (*CreateItemEntry)(struct FFortItemEntry* ItemEntry) = decltype(CreateItemEntry)(0xF8DC40 + uintptr_t(GetModuleHandle(0)));
+		return CreateItemEntry(this);
+	}
+
+	struct FFortItemEntry* CreateDefaultItemEntry(class UFortItemDefinition* ItemDefinition, int32 Count, int32 Level)
+	{
+		// 7FF66F5DD940
+		struct FFortItemEntry* (*CreateDefaultItemEntry)(struct FFortItemEntry* ItemEntry, class UFortItemDefinition* ItemDefinition, int32 Count, int32 Level) = decltype(CreateDefaultItemEntry)(0xF8D940 + uintptr_t(GetModuleHandle(0)));
+		return CreateDefaultItemEntry(this, ItemDefinition, Count, Level);
+	}
+
+	struct FFortItemEntry* CopyItemEntry(struct FFortItemEntry* ItemEntry)
+	{
+		// 7FF66F5DFCE0
+		struct FFortItemEntry* (*CopyItemEntry)(struct FFortItemEntry* PrimaryItemEntry, struct FFortItemEntry* ItemEntry) = decltype(CopyItemEntry)(0xF8FCE0 + uintptr_t(GetModuleHandle(0)));
+		return CopyItemEntry(this, ItemEntry);
+	}
+
+	struct FFortItemEntry* CopyItemEntryWithReset(struct FFortItemEntry* ItemEntry)
+	{
+		// 7FF66F5DD910
+		struct FFortItemEntry* (*CopyItemEntryWithReset)(struct FFortItemEntry* PrimaryItemEntry, struct FFortItemEntry* ItemEntry) = decltype(CopyItemEntryWithReset)(0xF8D910 + uintptr_t(GetModuleHandle(0)));
+		return CopyItemEntryWithReset(this, ItemEntry);
+	}
+
+	void SetParentInventory(class AFortInventory* Inventory, bool bIsReplicatedCopy = true)
+	{
+		// 7FF66F5F89D0
+		void (*SetParentInventory)(struct FFortItemEntry* ItemEntry, class AFortInventory* Inventory, bool bIsReplicatedCopy) = decltype(SetParentInventory)(0xFA89D0 + uintptr_t(GetModuleHandle(0)));
+		SetParentInventory(this, Inventory, bIsReplicatedCopy);
+	}
+
+	void SetStateValue(const EFortItemEntryState& StateType, int32 IntValue)
+	{
+		// 7FF66F5A9000
+		void (*SetStateValue)(struct FFortItemEntry* ItemEntry, const EFortItemEntryState& StateType, int32 IntValue) = decltype(SetStateValue)(0xF59000 + uintptr_t(GetModuleHandle(0)));
+		SetStateValue(this, StateType, IntValue);
+	}
+
+	void FreeItemEntry()
+	{
+		// 7FF66F307240
+		void (*FreeItemEntry)(struct FFortItemEntry* ItemEntry) = decltype(FreeItemEntry)(0xCB7240 + uintptr_t(GetModuleHandle(0)));
+		FreeItemEntry(this);
+	}
+
+	static void FreeItemEntries(TArray<struct FFortItemEntry>* ItemEntries)
+	{
+		// 7FF66F2637E0
+		void (*FreeItemEntries)(TArray<struct FFortItemEntry>* ItemEntries) = decltype(FreeItemEntries)(0xC137E0 + uintptr_t(GetModuleHandle(0)));
+		FreeItemEntries(ItemEntries);
+	}
 };
 
 // ScriptStruct FortniteGame.FortDeliveryInfoRequirementsFilter
@@ -6905,8 +7011,8 @@ public:
 struct FBuildingClassData final
 {
 public:
-	//TSubclassOf<class ABuildingActor>             BuildingClass;                                     // 0x0000(0x0008)(ZeroConstructor, Transient, IsPlainOldData, NoDestructor, UObjectWrapper, HasGetValueTypeHash, NativeAccessSpecifierPublic)
-	TSubclassOf<class ABuildingSMActor>		      BuildingClass;
+	TSubclassOf<class ABuildingActor>             BuildingClass;                                     // 0x0000(0x0008)(ZeroConstructor, Transient, IsPlainOldData, NoDestructor, UObjectWrapper, HasGetValueTypeHash, NativeAccessSpecifierPublic)
+	//TSubclassOf<class ABuildingSMActor>		      BuildingClass;
 	int32                                         PreviousBuildingLevel;                             // 0x0008(0x0004)(ZeroConstructor, Transient, IsPlainOldData, NoDestructor, HasGetValueTypeHash, NativeAccessSpecifierPublic)
 	int32                                         UpgradeLevel;                                      // 0x000C(0x0004)(ZeroConstructor, Transient, IsPlainOldData, NoDestructor, HasGetValueTypeHash, NativeAccessSpecifierPublic)
 };

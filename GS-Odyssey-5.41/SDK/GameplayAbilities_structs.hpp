@@ -874,6 +874,13 @@ public:
 	TArray<class UGameplayAbility*>               ReplicatedInstances;                               // 0x0060(0x0010)(ZeroConstructor, NativeAccessSpecifierPublic)
 	struct FActiveGameplayEffectHandle            GameplayEffectHandle;                              // 0x0070(0x0008)(RepSkip, NoDestructor, HasGetValueTypeHash, NativeAccessSpecifierPublic)
 	uint8                                         Pad_F7E[0x50];                                     // 0x0078(0x0050)(Fixing Struct Size After Last Property [ Dumper-7 ])
+
+	struct FGameplayAbilitySpec* CreateDefaultAbilitySpec(class UGameplayAbility* Ability, int32 Level, int32 InputID, class UObject* SourceObject)
+	{
+		// 7FF66EC9BC90
+		struct FGameplayAbilitySpec* (*CreateDefaultAbilitySpec)(struct FGameplayAbilitySpec* AbilitySpec, class UGameplayAbility* Ability, int32 Level, int32 InputID, class UObject* SourceObject) = decltype(CreateDefaultAbilitySpec)(0x64BC90 + uintptr_t(GetModuleHandle(0)));
+		return CreateDefaultAbilitySpec(this, Ability, Level, InputID, SourceObject);
+	}
 };
 
 // ScriptStruct GameplayAbilities.GameplayAbilitySpecContainer

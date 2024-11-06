@@ -1,255 +1,187 @@
 #pragma once
 
+/*
+ * - The explanations were made with chatgpt (I was too lazy to do it)
+*/
+
 namespace Pawn
 {
-	void (*SetPickupTarget)(AFortPickup* Pickup, AFortPlayerPawn* Pawn, float InFlyTime, const FVector& InStartDirection, bool bPlayPickupSound);
+	/* -------------------------------------- AFortPlayerPawnOG -------------------------------------- */
+	/* ----------------------------------------- AFortPawnOG ----------------------------------------- */
+	void (*OnDeathServerOG)(AFortPawn* Pawn, float Damage, const FGameplayTagContainer& DamageTags, const FVector& Momentum, const FHitResult& HitInfo, AController* InstigatedBy, AActor* DamageCauser, const FGameplayEffectContextHandle& EffectContext);
+;
+	
 
-	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms, bool* bCallOG)
+	/* --------------------------------------- AFortPlayerPawn --------------------------------------- */
+
+	/*
+	 * Rewrite AFortPlayerPawn::ServerHandlePickup (1.8)
+	 *
+	 * - https://imgur.com/pKR6Nlh
+	 * - https://imgur.com/Yi6yLaC
+	 */
+	void ServerHandlePickup(AFortPlayerPawn* PlayerPawn, AFortPickup* Pickup, float InFlyTime, const FVector& InStartDirection, bool bPlayPickupSound)
 	{
-		if (!Object || !Function)
+		if (!PlayerPawn || !Pickup)
 			return;
 
-		if (!Object->IsA(AFortPawn::StaticClass()))
-			return;
+		float FlyTime = InFlyTime / PlayerPawn->PickupSpeedMultiplier;
 
-		const std::string& FunctionName = Function->GetName();
-
-		if (FunctionName.contains("ServerHandlePickupWithSwap")) // Finir la fonction
-		{
-			AFortPlayerPawn* PlayerPawn = Cast<AFortPlayerPawn>(Object);
-			auto Params = (Params::FortPlayerPawn_ServerHandlePickupWithSwap*)Parms;
-
-			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(PlayerPawn->Controller);
-			AFortPickup* Pickup = Params->Pickup;
-
-			if (!PlayerPawn || !PlayerController || !Pickup)
-			{
-				FN_LOG(LogPawn, Error, "[AFortPlayerPawn::ServerHandlePickup] Failed to get PlayerPawn/PlayerController/Pickup!");
-				return;
-			}
-
-			FN_LOG(LogPawn, Log, "[AFortPlayerPawn::ServerHandlePickupWithSwap] func called!");
-		}
-		else if (FunctionName.contains("ServerHandlePickup"))
-		{
-			AFortPlayerPawn* PlayerPawn = Cast<AFortPlayerPawn>(Object);
-			auto Params = (Params::FortPlayerPawn_ServerHandlePickup*)Parms;
-
-			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(PlayerPawn->Controller);
-			AFortPickup* Pickup = Params->Pickup;
-
-			if (!PlayerPawn || !PlayerController || !Pickup)
-			{
-				FN_LOG(LogPawn, Error, "[AFortPlayerPawn::ServerHandlePickup] Failed to get PlayerPawn/PlayerController/Pickup!");
-				return;
-			}
-
-			if (Pickup->bPickedUp)
-				return;
-
-#ifdef ANTICHEAT
-			UAntiCheatOdyssey* AntiCheatOdyssey = FindOrCreateAntiCheatOdyssey(PlayerController);
-
-			if (AntiCheatOdyssey)
-			{
-				const float Distance = PlayerPawn->GetDistanceTo(Pickup);
-				const float MaxDistance = AntiCheatOdyssey->GetMaxPickupDistance();
-
-				if (Distance > MaxDistance && !PlayerPawn->bIsSkydiving)
-				{
-					const FString& PlayerName = AntiCheatOdyssey->GetPlayerName();
-
-					if (PlayerName.IsValid())
-					{
-						AC_LOG(ACWarning, "Player [%s] tries to ServerHandlePickup when the distance is [%.2f] and the max is [%.2f]",
-							AntiCheatOdyssey->GetPlayerName().ToString().c_str(), Distance, MaxDistance);
-					}
-
-					AntiCheatOdyssey->BanByAntiCheat(L"AC - You took a pickup too far away!");
-					return;
-				}
-			}
-#endif // ANTICHEAT
-
-			SetPickupTarget(Pickup, PlayerPawn, UKismetMathLibrary::RandomFloatInRange(0.40f, 0.54f), FVector(), true);
-
-			FFortPickupLocationData* PickupLocationData = &Pickup->PickupLocationData;
-			PickupLocationData->PickupGuid = PlayerPawn->LastEquippedWeaponGUID;
-			Pickup->OnRep_PickupLocationData();
-		}
-		else if (FunctionName.contains("OnCapsuleBeginOverlap"))
-		{
-			AFortPlayerPawn* PlayerPawn = Cast<AFortPlayerPawn>(Object);
-			auto Params = (Params::FortPlayerPawn_OnCapsuleBeginOverlap*)Parms;
-
-			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(PlayerPawn->Controller);
-			AActor* OtherActor = Params->OtherActor;
-
-			if (!PlayerPawn || !PlayerController || !OtherActor)
-				return;
-
-			AFortPickup* Pickup = Cast<AFortPickup>(OtherActor);
-
-			if (Pickup)
-			{
-				if (Pickup->bPickedUp || !Pickup->bWeaponsCanBeAutoPickups)
-					return;
-
-				if (!Pickup->bServerStoppedSimulation && Pickup->PawnWhoDroppedPickup)
-					return;
-
-				UFortItemDefinition* ItemDefinition = Pickup->PrimaryPickupItemEntry.ItemDefinition;
-
-				if (ItemDefinition)
-				{
-					if (ItemDefinition->IsA(UFortAmmoItemDefinition::StaticClass()) ||
-						ItemDefinition->IsA(UFortTrapItemDefinition::StaticClass()) ||
-						ItemDefinition->IsA(UFortResourceItemDefinition::StaticClass()))
-					{
-						UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_FindExistingItemForDefinition(ItemDefinition, false));
-
-						if (WorldItem)
-						{
-							if (WorldItem->ItemEntry.Count >= WorldItem->ItemEntry.ItemDefinition->MaxStackSize && !WorldItem->ItemEntry.ItemDefinition->bAllowMultipleStacks)
-								return;
-						}
-
-						const FVector& InStartDirection = Params->OtherActor->K2_GetActorLocation();
-						PlayerPawn->ServerHandlePickup(Pickup, 0.f, InStartDirection, true);
-					}
-				}
-			}
-		}
-		else if (FunctionName.contains("OnDeathServer"))
-		{
-			AFortPawn* Pawn = Cast<AFortPawn>(Object);
-
-			if (Pawn)
-			{
-				AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Pawn->Controller);
-
-				if (PlayerController && PlayerController->WorldInventory)
-				{
-					FVector SpawnLocation = Pawn->K2_GetActorLocation();
-
-					SpawnLocation.Z += 15.0f;
-
-					for (int32 i = 0; i < PlayerController->WorldInventory->Inventory.ItemInstances.Num(); i++)
-					{
-						UFortWorldItem* ItemInstance = PlayerController->WorldInventory->Inventory.ItemInstances[i];
-						if (!ItemInstance) continue;
-
-						FFortItemEntry* ItemEntry = &ItemInstance->ItemEntry;
-						if (!ItemEntry) continue;
-
-						UFortWorldItemDefinition* ItemDefinition = Cast<UFortWorldItemDefinition>(ItemEntry->ItemDefinition);
-						if (!ItemDefinition) continue;
-
-						if (!ItemDefinition->bCanBeDropped)
-							continue;
-
-						FFortItemEntry NewItemEntry;
-						Inventory::CreateItemEntry(&NewItemEntry);
-						Inventory::CopyItemEntry(&NewItemEntry, &ItemInstance->ItemEntry);
-
-						FVector RandomOffset = UKismetMathLibrary::RandomUnitVector() * UKismetMathLibrary::RandomFloatInRange(400.0f, 600.0f);
-						FVector FinalLocation = UKismetMathLibrary::Add_VectorVector(SpawnLocation, RandomOffset);
-
-						Inventory::SpawnPickup(Pawn, NewItemEntry, SpawnLocation, FinalLocation, true);
-						Inventory::FreeItemEntry(&NewItemEntry);
-					}
-
-					Inventory::ResetInventory(PlayerController->WorldInventory);
-				}
-			}
-		}
-
-#ifdef ANTICHEAT
-		else if (FunctionName.contains("OnDamageServer"))
-		{
-			AFortPawn* Pawn = Cast<AFortPawn>(Object);
-			auto Params = (Params::FortPawn_OnDamageServer*)Parms;
-
-			AActor* DamageCauser = Params->DamageCauser;
-
-			if (!Pawn || !DamageCauser)
-				return;
-
-			float Damage = Params->Damage;
-
-			APlayerController* PlayerController = Cast<APlayerController>(Params->InstigatedBy);
-			UAntiCheatOdyssey* AntiCheatOdyssey = FindOrCreateAntiCheatOdyssey(PlayerController);
-
-			if (AntiCheatOdyssey)
-			{
-				AFortWeapon* Weapon = Cast<AFortWeapon>(DamageCauser);
-
-				if (Weapon && Weapon->WeaponData)
-				{
-					UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(Weapon->WeaponData);
-
-					if (!WorldItemDefinition)
-						return;
-
-					const float Distance = PlayerController->Pawn ? PlayerController->Pawn->GetDistanceTo(Pawn) : Weapon->GetDistanceTo(Pawn);
-
-					EFortItemType ItemType = WorldItemDefinition->ItemType;
-
-					if (ItemType == EFortItemType::WeaponHarvest)
-					{
-						const float MaxDistance = AntiCheatOdyssey->GetMaxPickaxeDistance();
-
-						if (Distance > MaxDistance)
-						{
-							const FString& PlayerName = AntiCheatOdyssey->GetPlayerName();
-
-							if (PlayerName.IsValid())
-							{
-								AC_LOG(ACWarning, "Player [%s] attempted to damage a player with a pickaxe at a distance of [%.2f] with a maximum of [%.2f]",
-									AntiCheatOdyssey->GetPlayerName().ToString().c_str(), Distance, MaxDistance);
-							}
-
-							AntiCheatOdyssey->BanByAntiCheat(L"AC - You put pickaxe damage at too long a distance!");
-							*bCallOG = false;
-							return;
-						}
-					}
-					else if (ItemType == EFortItemType::WeaponMelee)
-					{
-
-					}
-
-					AC_LOG(ACLog, "Player [%s] attempted to damage a player at a distance of [%.2f]", AntiCheatOdyssey->GetPlayerName().ToString().c_str(), Distance);
-					AC_LOG(ACLog, "ItemType: %i", ItemType);
-				}
-			}
-
-			FN_LOG(LogPawn, Log, "Pawn: %s", Pawn->GetName().c_str());
-
-			FN_LOG(LogPawn, Log, "DamageCauser: %s", DamageCauser->GetName().c_str());
-			FN_LOG(LogPawn, Log, "Damage: %.2f", Damage);
-			FN_LOG(LogPawn, Log, "InstigatedBy: %s", PlayerController->GetName().c_str());
-
-			FHitResult HitInfo = Params->HitInfo;
-
-			FN_LOG(LogPawn, Log, "Time: %.2f", HitInfo.Time);
-			FN_LOG(LogPawn, Log, "Distance: %.2f", HitInfo.Distance);
-			FN_LOG(LogPawn, Log, "Location: [X: %.2f, Y: %.2f, Z: %.2f]", HitInfo.Location.X, HitInfo.Location.Y, HitInfo.Location.Z);
-			FN_LOG(LogPawn, Log, "ImpactPoint: [X: %.2f, Y: %.2f, Z: %.2f]", HitInfo.ImpactPoint.X, HitInfo.ImpactPoint.Y, HitInfo.ImpactPoint.Z);
-
-			FN_LOG(LogPawn, Log, "AFortPawn::OnDamageServer called!");
-		}
-#endif // ANTICHEAT
+		Pickup->PickupLocationData.PickupGuid = PlayerPawn->LastEquippedWeaponGUID;
+		Pickup->SetPickupTarget(PlayerPawn, FlyTime, InStartDirection, bPlayPickupSound);
 	}
 
+	void ServerHandlePickupWithSwap(AFortPlayerPawn* PlayerPawn, AFortPickup* Pickup, const FGuid& Swap, float InFlyTime, const FVector& InStartDirection, bool bPlayPickupSound)
+	{
+		if (!PlayerPawn || !Pickup)
+			return;
+
+		float FlyTime = InFlyTime / PlayerPawn->PickupSpeedMultiplier;
+
+		Pickup->PickupLocationData.PickupGuid = PlayerPawn->LastEquippedWeaponGUID;
+		Pickup->SetPickupTarget(PlayerPawn, FlyTime, InStartDirection, bPlayPickupSound);
+	}
+
+	/*
+	 * OnCapsuleBeginOverlap handles the event when a player's capsule (collision component) overlaps with another object, typically a pickup item.
+	 *
+	 * - Retrieves parameters from the stack:
+	 *		- `OverlappedComp`: The component that triggered the overlap.
+	 *		- `OtherActor`: The other actor involved in the overlap (likely a pickup).
+	 *		- `OtherComp`, `OtherBodyIndex`, `bFromSweep`, `SweepResult`: Additional overlap parameters.
+	 * - Checks if the player controller is valid and if the other actor is a valid pickup object.
+	 * - Calculates a delay for auto-picking up the dropped item:
+	 *		- Evaluates a curve table to determine the repickup delay based on player-specific factors.
+	 * - Validates conditions for auto-pickup:
+	 *		- Ensures `GAutoResourceGathering` is enabled.
+	 *		- Confirms that the player is not in certain states (e.g., down but not out, skydiving).
+	 *		- Checks that the item can be auto-picked, hasn’t been picked up, and wasn't recently dropped by the player within the repickup delay.
+	 * - Retrieves the item definition and calculates the player's current quantity of the item, considering both the inventory and queued pickups.
+	 * - If the player’s total quantity of the item does not exceed the max stack size and allows for additional stacks, adds the pickup to the auto-pickup queue.
+	 * - Finally, calls `ServerHandlePickup` to initiate the auto-pickup process with a generated fly time for the pickup animation.
+	 */
+	void OnCapsuleBeginOverlap(AFortPlayerPawn* PlayerPawn, FFrame& Stack, void* Ret)
+	{
+		UPrimitiveComponent* OverlappedComp = nullptr;
+		AActor* OtherActor = nullptr;
+		UPrimitiveComponent* OtherComp = nullptr;
+		int32 OtherBodyIndex = -1;
+		bool bFromSweep = true;
+		FHitResult SweepResult = FHitResult();
+
+		Stack.StepCompiledIn(&OverlappedComp);
+		Stack.StepCompiledIn(&OtherActor);
+		Stack.StepCompiledIn(&OtherComp);
+		Stack.StepCompiledIn(&OtherBodyIndex);
+		Stack.StepCompiledIn(&bFromSweep);
+		Stack.StepCompiledIn(&SweepResult);
+
+		Stack.Code += Stack.Code != nullptr;
+
+		AFortPlayerController* PlayerController = Cast<AFortPlayerController>(PlayerPawn->Controller);
+		if (!PlayerController) return;
+
+		AFortPickup* Pickup = Cast<AFortPickup>(OtherActor);
+		if (!Pickup) return;
+
+		float RepickupDelayXY = 0.0f;
+
+		FString ContextString;
+		EEvaluateCurveTableResult Result;
+		UDataTableFunctionLibrary::EvaluateCurveTableRow(PlayerPawn->AutoPickupDropRepickupDelay.Curve.CurveTable, PlayerPawn->AutoPickupDropRepickupDelay.Curve.RowName, 0, &Result, &RepickupDelayXY, ContextString);
+
+		float RepickupDelay = (RepickupDelayXY * PlayerPawn->AutoPickupDropRepickupDelay.Value);
+
+		if (!GAutoResourceGathering)
+			return;
+
+		if (!PlayerPawn->bIsDBNO ||
+			!PlayerPawn->bIsSkydiving)
+		{
+			if (Pickup->bPickedUp || !Pickup->bWeaponsCanBeAutoPickups)
+				return;
+
+			if (!Pickup->bServerStoppedSimulation && (Pickup->PawnWhoDroppedPickup == PlayerPawn))
+				return;
+
+			if (Pickup->PawnWhoDroppedPickup == PlayerPawn)
+			{
+				const float LastDropPickupTime = Pickup->LastDropPickupTime();
+				const float TimeSeconds = PlayerPawn->GetWorld()->GetTimeSeconds();
+
+				if ((TimeSeconds - LastDropPickupTime) <= RepickupDelay)
+					return;
+			}
+			
+			UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(Pickup->PrimaryPickupItemEntry.ItemDefinition);
+			if (!WorldItemDefinition) return;
+
+			int32 ItemQuantity = UFortKismetLibrary::K2_GetItemQuantityOnPlayer(PlayerController, WorldItemDefinition);
+
+			for (int32 i = 0; i < PlayerPawn->QueuedAutoPickups.Num(); i++)
+			{
+				AFortPickup* QueuedAutoPickup = PlayerPawn->QueuedAutoPickups[i];
+				if (!QueuedAutoPickup) continue;
+
+				UFortWorldItemDefinition* QueuedWorldItemDefinition = Cast<UFortWorldItemDefinition>(QueuedAutoPickup->PrimaryPickupItemEntry.ItemDefinition);
+				if (!QueuedWorldItemDefinition) continue;
+
+				if (QueuedWorldItemDefinition != WorldItemDefinition)
+					continue;
+
+				ItemQuantity += QueuedAutoPickup->PrimaryPickupItemEntry.Count;
+			}
+
+			if (ItemQuantity >= WorldItemDefinition->MaxStackSize && !WorldItemDefinition->bAllowMultipleStacks)
+				return;
+
+			PlayerPawn->QueuedAutoPickups.Add(Pickup);
+
+			float InFlyTime = Globals::GenFlyTime();
+			PlayerPawn->ServerHandlePickup(Pickup, InFlyTime, FVector(), true);
+		}
+	}
+
+	/*
+	 * OnDeathServer is triggered when a player pawn dies on the server, handling additional actions specific to player death.
+	 *
+	 * - Attempts to cast the pawn’s controller to `AFortPlayerControllerAthena` to check if it’s a player in Athena mode.
+	 * - If the controller is valid and belongs to `AFortPlayerControllerAthena`:
+	 *		- Calls `ServerDropAllItems` to drop all items from the player's inventory on death.
+	 *		- Calls `ResetInventory` to clear the player's world inventory after dropping items.
+	 */
+	void OnDeathServer(AFortPawn* Pawn, float Damage, const FGameplayTagContainer& DamageTags, const FVector& Momentum, const FHitResult& HitInfo, AController* InstigatedBy, AActor* DamageCauser, const FGameplayEffectContextHandle& EffectContext)
+	{
+		OnDeathServerOG(Pawn, Damage, DamageTags, Momentum, HitInfo, InstigatedBy, DamageCauser, EffectContext);
+
+		AFortPlayerControllerAthena* PlayerControllerAthena = Cast<AFortPlayerControllerAthena>(Pawn->Controller);
+		if (!PlayerControllerAthena) return;
+
+		if (PlayerControllerAthena)
+		{
+			PlayerControllerAthena->ServerDropAllItems(nullptr);
+			Inventory::ResetInventory(PlayerControllerAthena->WorldInventory);
+		}
+	}
 
 	void InitPawn()
 	{
-		static auto FortPlayerPawnAthenaDefault = AFortPlayerPawnAthena::GetDefaultObj();
+		AFortPlayerPawnAthena* FortPlayerPawnAthenaDefault = AFortPlayerPawnAthena::GetDefaultObj();
 
-		uintptr_t PatternSetPickupTarget = MinHook::FindPattern(Patterns::SetPickupTarget);
+		/* --------------------------------------- AFortPlayerPawn --------------------------------------- */
 
-		SetPickupTarget = decltype(SetPickupTarget)(PatternSetPickupTarget);
+		MinHook::HookVTable(FortPlayerPawnAthenaDefault, 0xD40 / 8, ServerHandlePickup, nullptr, "AFortPlayerPawn::ServerHandlePickup");
+		MinHook::HookVTable(FortPlayerPawnAthenaDefault, 0xD30 / 8, ServerHandlePickupWithSwap, nullptr, "AFortPlayerPawn::ServerHandlePickupWithSwap");
+
+		UFunction* OnCapsuleBeginOverlapFunc = AFortPlayerPawnAthena::StaticClass()->GetFunction("FortPlayerPawn", "OnCapsuleBeginOverlap");
+		MinHook::HookFunctionExec(OnCapsuleBeginOverlapFunc, OnCapsuleBeginOverlap, nullptr);
+
+		/* ------------------------------------------ AFortPawn ------------------------------------------ */
+
+		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x14B4330), OnDeathServer, (LPVOID*)(&OnDeathServerOG));
+		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x14B4330));
+
+		/* ----------------------------------------------------------------------------------------------- */
 
 		FN_LOG(LogInit, Log, "InitPawn Success!");
 	}

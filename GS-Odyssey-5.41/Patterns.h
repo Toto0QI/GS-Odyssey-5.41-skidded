@@ -20,8 +20,8 @@ namespace Patterns
 	constexpr const char* OnSearchedContainer = "40 53 56 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 48 8B 01 B2 01 48 8B D9";
 	constexpr const char* DetermineMaxResourcesToSpawn = "48 89 5C 24 ? 48 89 7C 24 ? 41 56 48 83 EC 50 65 48 8B 04 25 ? ? ? ? 4C 8B F1";
 
-	// FortPickup
-	constexpr const char* PickupDelay = "40 53 56 57 48 83 EC 30 4C 89 6C 24 ? 48 8B F1";
+	// Pickup
+	constexpr const char* PickupAddInventoryOwnerInterface = "40 53 48 83 EC 20 80 B9 ? ? ? ? ? 48 8B D9 75 29 48 85 D2 74 24 F3 0F 10 15 ? ? ? ? 0F 57 DB B2 05";
 	constexpr const char* PickupCombine = "4C 8B DC 53 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 48 83 B9 ? ? ? ? ? 48 8B D9";
 
 	// GameMode
@@ -29,6 +29,9 @@ namespace Patterns
 	constexpr const char* RemoveFromAlivePlayers = "4C 89 4C 24 ? 4C 89 44 24 ? 55 41 55 41 56 41 57 48 8D 6C 24 ?";
 	constexpr const char* SpawnDefaultPawnFor = "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 30 49 8B F0 48 8B FA 48 8B D9 48 85 D2";
 	constexpr const char* HandleMatchHasStarted = "4C 8B DC 53 48 83 EC 70 80 3D ? ? ? ? ? 48 8B D9 49 89 73 18 49 89 7B F0 72 3B";
+	constexpr const char* HandlePostSafeZonePhaseChanged = "48 89 5C 24 ? 55 56 57 41 56 41 57 48 81 EC ? ? ? ? 48 8B B9 ? ? ? ? 33 DB";
+	constexpr const char* StartAircraftPhase = "4C 8B DC 55 49 8D 6B 98 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 20 49 89 73 18 48 8D 05 ? ? ? ? 33 F6";
+	// constexpr const char* SetGameMode = "48 89 6C 24 ? 56 48 81 EC ? ? ? ? 48 8B F1 48 8B EA 48 8B 49 38 48 85 C9";
 
 	// Pawn
 	constexpr const char* SetPickupTarget = "40 55 53 56 41 54 48 8D 6C 24 B8";
@@ -86,7 +89,7 @@ namespace Patterns
 	constexpr const char* GetPlayerViewPoint = "48 89 5C 24 ? 48 89 74 24 ? 55 41 56 41 57 48 8B EC 48 83 EC 40 48 8B F2 48 C7 45 ? ? ? ? ? 48 8B 55 38";
 	constexpr const char* DispatchRequest = "48 89 5C 24 20 55 56 57 41 56 41 57 48 8B EC 48 83 EC 70 48 8B F1";
 	constexpr const char* ServerSpawnDeco = "40 53 55 41 56 48 83 EC 60 41 8B 41 08 49 8B E8 F2 41 0F 10 01 4C 8B F1";
-	constexpr const char* ApplyCharacterCustomization = "48 8B C4 48 89 50 10 55 57 48 8D 68 A1 48 81 EC ? ? ? ? 80 B9 ? ? ? ? ? 48 8B F9";
+	constexpr const char* ApplyCustomizationToCharacter = "40 53 55 56 57 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 80 B9 ? ? ? ? ? 48 8B F9";
 	constexpr const char* KickPlayer = "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 20 49 8B F0 48 8B DA 48 85 D2 0F 84 ? ? ? ? 48 8B BA ? ? ? ? 48 85 FF";
 	constexpr const char* ChangingGameSessionId = "40 55 56 41 56 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 01 4C 8B F2 48 8B F1 FF 90 ? ? ? ? 48 8B 0D ? ? ? ? 48 8B D0";
 	constexpr const char* LocalSpawnPlayActor = "40 55 53 56 57 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 40 48 8B D9 4D 8B F1 49 8B C9 4D 8B F8 48 8B F2";

@@ -1,7 +1,5 @@
 #pragma once
 
-#undef min
-
 enum ENetMode
 {
 	NM_Standalone,
@@ -62,6 +60,11 @@ namespace Hooks
 		DispatchRequest(a1, a2);
 	}
 
+	FVector GetPawnViewLocation(APawn* Pawn)
+	{
+		return Pawn->K2_GetActorLocation() + FVector(0.f, 0.f, Pawn->BaseEyeHeight);
+	}
+
 	void GetPlayerViewPointHook(APlayerController* PlayerController, FVector& out_Location, FRotator& out_Rotation)
 	{
 		APawn* Pawn = PlayerController->Pawn;
@@ -86,23 +89,12 @@ namespace Hooks
 			return;
 		}
 
-		return GetPlayerViewPoint(PlayerController, out_Location, out_Rotation);
-	}
-
-	void PickupCombineHook(AFortPickup* Pickup)
-	{
-		if (!Pickup)
-		{
-			FN_LOG(LogHooks, Error, "[AFortPickup::PickupCombine] Failed to get Pickup!");
-			return;
-		}
-
-		CreateThread(0, 0, Threads::CompletePickupCombine, Pickup, 0, 0);
-
-		PickupCombine(Pickup);
+		GetPlayerViewPoint(PlayerController, out_Location, out_Rotation);
 	}
 
 	int32 CubeIndex = 561;
+
+	bool bLogs = false;
 
 	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms)
 	{
@@ -114,17 +106,17 @@ namespace Hooks
 
 		bool bCallOG = true;
 
-		GameMode::ProcessEventHook(Object, Function, Parms);
-		PlayerController::ProcessEventHook(Object, Function, Parms, &bCallOG);
-		Pawn::ProcessEventHook(Object, Function, Parms, &bCallOG);
-		FortKismetLibrary::ProcessEventHook(Object, Function, Parms, &bCallOG);
+		GameMode::ProcessEventHook(Object, Function, Parms, &bCallOG);
 		Cheats::ProcessEventHook(Object, Function, Parms);
-		FortAthenaSupplyDrop::ProcessEventHook(Object, Function, Parms, &bCallOG);
 		BuildingActor::ProcessEventHook(Object, Function, Parms);
 
 #ifdef ANTICHEAT
 		AntiCheatOdyssey::ProcessEventHook(Object, Function, Parms);
 #endif // ANTICHEAT
+
+#ifdef BOTS
+		BotOdyssey::ProcessEventHook(Object, Function, Parms);
+#endif // BOTS
 
 		const std::string& FunctionName = Function->GetName();
 
@@ -169,7 +161,55 @@ namespace Hooks
 
 			if (GetAsyncKeyState(VK_F3) & 0x1)
 			{
-				TArray<AActor*> OutActors;
+				AFortPlayerControllerAthena* PlayerController = Cast<AFortPlayerControllerAthena>(UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0));
+
+				if (!PlayerController || !PlayerController->WorldInventory)
+					return;
+				
+				AFortPlayerPawnAthena* PlayerPawn = Cast<AFortPlayerPawnAthena>(PlayerController->MyFortPawn);
+				AFortPlayerStateAthena* PlayerState = Cast<AFortPlayerStateAthena>(PlayerController->PlayerState);
+
+				if (!PlayerPawn || !PlayerState)
+					return;
+
+				// 7FF66FE971B0
+				void* (*GetInterfaceAddress)(UObject* Object, UClass* InterfaceClass) = decltype(GetInterfaceAddress)(0x18471B0 + uintptr_t(GetModuleHandle(0)));
+				void* InventoryOwnerInterfaceAddress = GetInterfaceAddress(PlayerController, IFortInventoryOwnerInterface::StaticClass());
+
+				// 7FF66F5C1B60
+				int32 (*GetInventoryCapacity)(void* InventoryOwnerInterfaceAddress, EFortInventoryType InventoryType) = decltype(GetInventoryCapacity)(0xF71B60 + uintptr_t(GetModuleHandle(0)));
+				int32 InventoryCapacity = GetInventoryCapacity(InventoryOwnerInterfaceAddress, PlayerController->WorldInventory->InventoryType);
+
+				// 7FF66F5C21C0
+				int32 (*GetInventorySize)(void* InventoryOwnerInterfaceAddress, EFortInventoryType InventoryType) = decltype(GetInventorySize)(0xF721C0 + uintptr_t(GetModuleHandle(0)));
+				int32 InventorySize = GetInventorySize(InventoryOwnerInterfaceAddress, PlayerController->WorldInventory->InventoryType);
+
+				FFortItemEntry ItemEntry;
+				Inventory::MakeItemEntry(&ItemEntry, Globals::GetGameData()->WoodItemDefinition, 999, 0, 0, 0.0f);
+
+				// 7FF66F5C4A40
+				int32 (*GetOverflowCountIfItemWasAddedToInventory)(AFortInventory* Inventory, FFortItemEntry* ItemEntry) = decltype(GetOverflowCountIfItemWasAddedToInventory)(0xF74A40 + uintptr_t(GetModuleHandle(0)));
+				int32 OverflowCountIfItemWasAddedToInventory = GetOverflowCountIfItemWasAddedToInventory(PlayerController->WorldInventory, &ItemEntry);
+
+				Inventory::FreeItemEntry(&ItemEntry);
+
+				FN_LOG(LogHooks, Log, "InventoryCapacity: %i, InventorySize: %i, OverflowCountIfItemWasAddedToInventory: %i", InventoryCapacity, InventorySize, OverflowCountIfItemWasAddedToInventory);
+
+				UFortInventoryContext;
+				AFortPlayerController;
+
+				/*  
+					------ A TESTER ------
+					- int32 K2_GetOverflowCountIfItemWasAddedToInventory(TScriptInterface<class IFortInventoryOwnerInterface> InventoryOwner, struct FFortItemEntry& ItemEntry); 7FF66F5C4A40
+					- bool sub_7FF66F7EB8A0(AFortPlayerController* PlayerController, const FGuid& ItemGuid)
+					- __int64 sub_7FF66F5C4AA0(__int64 ItemEntry, __int64 InventoryOwner, unsigned int a3, int a4) // a3, a4 = 0 - Return = BackpackOverflowFromAddingItem
+					-
+					-
+					-
+					----------------------
+				*/
+
+				/*TArray<AActor*> OutActors;
 				UGameplayStatics::GetAllActorsOfClass(Globals::GetWorld(), ACUBE_C::StaticClass(), &OutActors);
 
 				for (int32 i = 0; i < OutActors.Num(); i++)
@@ -182,18 +222,7 @@ namespace Hooks
 					CubeIndex++;
 
 					FN_LOG(LogHooks, Log, "CubeIndex: %i", CubeIndex);
-				}
-
-				// 7FF66F6694B0
-				/*char (*Restart)(AFortGameSessionDedicated* GameSession) = decltype(Restart)(0x10194B0 + uintptr_t(GetModuleHandle(0)));
-
-				char Result = Restart((AFortGameSessionDedicated*)Globals::GetGameMode()->FortGameSession);
-
-				GameMode::bPreReadyToStartMatch = false;
-				GameMode::bWorldReady = false;
-
-				FN_LOG(LogHooks, Log, "Restart called, Result: %i", Result);*/
-
+				}*/
 			}
 
 			if (GetAsyncKeyState(VK_F4) & 0x1)
@@ -203,164 +232,7 @@ namespace Hooks
 				if (!PlayerController)
 					return;
 
-				/*AFortPlayerPawn* PlayerPawnStart = PlayerController->MyFortPawn;
-
-				if (!PlayerPawnStart)
-					return;*/
-
-				CreateBotOdyssey();
-				return;
-				FName LootTierGroup = UKismetStringLibrary::Conv_StringToName(L"Loot_AthenaTreasure"); // Activity_Crafting_Ore_High_MediumMats
-
-				TArray<FFortItemEntry> LootToDrops;
-				bool bSuccess = UFortKismetLibrary::PickLootDrops(Globals::GetWorld(), &LootToDrops, LootTierGroup, -1, -1);
-
-				for (auto& LootToDrop : LootToDrops)
-				{
-					if (!LootToDrop.ItemDefinition)
-						continue;
-
-					FN_LOG(LogBuildingActor, Log, "ItemDefinition: %s, Count: %i, Level: %i, Durability: %.2f", LootToDrop.ItemDefinition->GetName().c_str(), LootToDrop.Count, LootToDrop.Level, LootToDrop.Durability);
-				}
-
-				FN_LOG(LogBuildingActor, Log, "PickLootDrops - bSuccess: %i, LootToDrops: %i", bSuccess, LootToDrops.Num());
-
-				/*FFortLootTierDataCheck LootTierDataCheck;
-				LootTierDataCheck.TierGroup = LootTierGroup;
-				LootTierDataCheck.LootTier = -1;
-				LootTierDataCheck.QuotaLevel = ELootQuotaLevel::Unlimited;
-				LootTierDataCheck.GameplayTags = FGameplayTagContainer();
-				LootTierDataCheck.WorldLevel = -1;
-
-				float TotalWeight = 0.0f;
-
-				std::map<FName, FFortLootTierData*> LootTierDatas;
-
-				UFortGameData* GameData = Globals::GetGameData();
-				Loots::ChooseLootTierDatas(GameData, &LootTierDatas, &TotalWeight, LootTierDataCheck);
-
-				for (auto& [LootTierKey, LootTierData] : LootTierDatas)
-				{
-					FN_LOG(LogBuildingActor, Log, "LootTierKey: %s, TierGroup: %s, LootPackage: %s", LootTierKey.ToString().c_str(), LootTierData->TierGroup.ToString().c_str(), LootTierData->LootPackage.ToString().c_str());
-				}
-
-				FN_LOG(LogBuildingActor, Log, "ChooseLootTierDatas - TotalWeight: %.2f", TotalWeight);*/
-
-				// 1:1 mieux que Nathael OG God GS
-				/*bool bSuccess2 = Loots::PickLootDrops(&LootToDrops, -1, LootTierKey, 0, 0, FGameplayTagContainer(), false, false);
-
-				for (auto& LootToDrop : LootToDrops)
-				{
-					if (!LootToDrop.ItemDefinition)
-						continue;
-
-					FN_LOG(LogBuildingActor, Log, "ItemDefinition: %s, Count: %i, Level: %i, Durability: %.2f", LootToDrop.ItemDefinition->GetName().c_str(), LootToDrop.Count, LootToDrop.Level, LootToDrop.Durability);
-				}
-
-				FN_LOG(LogBuildingActor, Log, "PickLootDrops - bSuccess: %i, LootToDrops: %i", bSuccess2, LootToDrops.Num());*/
-				return;
-
-				/*AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
-				UFortPlaylistAthena* Playlist = Globals::GetPlaylist();
-
-				if (!PlayerController || !Playlist)
-					return;
-
-				UFortRegisteredPlayerInfo* RegisteredPlayerInfo = UFortKismetLibrary::GetPlayerInfoFromUniqueID(PlayerController, PlayerController->GetGameAccountId());
-
-				if (!RegisteredPlayerInfo)
-					return;
-
-				UFortMcpProfileAthena* AthenaProfile = RegisteredPlayerInfo->AthenaProfile;
-
-				if (!AthenaProfile)
-					return;
-
-				AthenaProfile->EndBattleRoyaleGame({}, UKismetStringLibrary::Conv_IntToString(Playlist->PlaylistId), FAthenaMatchStats(), 0, 0, 0.f, true, true, {}, nullptr);
-
-				UFortKismetLibrary::FortShippingLog(PlayerController, L"erergergergergerg", true);
-
-				FN_LOG(LogHooks, Log, "PlayerController: %s, RegisteredPlayerInfo: %s, AthenaProfile: %s", PlayerController->GetName().c_str(), RegisteredPlayerInfo->GetName().c_str(), AthenaProfile->GetName().c_str());
-
-				UGameInstance* GameInstance = UGameplayStatics::GetGameInstance(PlayerController);
-				AGameModeBase* GameMode = UGameplayStatics::GetGameMode(PlayerController);
-				AGameStateBase* GameState = UGameplayStatics::GetGameState(PlayerController);
-
-				FN_LOG(LogHooks, Log, "GameInstance: %s, GameMode: %s, GameState: %s", GameInstance->GetName().c_str(), GameMode->GetName().c_str(), GameState->GetName().c_str());
-
-				TArray<UAthenaCosmeticItemDefinition*> AthenaCosmetics = UFortniteAutomationBlueprintLibrary::GetAllAthenaCosmetics(EFortItemType::AthenaCharacter);
-
-				FN_LOG(LogHooks, Log, "AthenaCosmetics: %i", AthenaCosmetics.Num());
-
-				for (int32 i = 0; i < AthenaCosmetics.Num(); i++)
-				{
-					UAthenaCosmeticItemDefinition* AthenaCosmetic = AthenaCosmetics[i];
-					if (!AthenaCosmetic) continue;
-
-					FN_LOG(LogHooks, Log, "[%i] - AthenaCosmetics - CosmeticItemDefinition: %s", i, AthenaCosmetic->GetName().c_str());
-				}*/
-
-				//UKismetGuidLibrary::NewGuid();
-
-				//UKismetMathLibrary::Abs(10.f);
-
-				/*UAthenaSeasonItemDefinition* Season5 = StaticLoadObject<UAthenaSeasonItemDefinition>(L"/Game/Athena/Items/Seasons/AthenaSeason5.AthenaSeason5");
-
-				if (Season5)
-				{
-					FN_LOG(LogHooks, Log, "SeasonNumber: %i", Season5->SeasonNumber);
-					FN_LOG(LogHooks, Log, "NumSeasonLevels: %i", Season5->NumSeasonLevels);
-					FN_LOG(LogHooks, Log, "NumBookLevels: %i", Season5->NumBookLevels);
-					FN_LOG(LogHooks, Log, "SeasonStorefront: %s", Season5->SeasonStorefront.ToString().c_str());
-					FN_LOG(LogHooks, Log, "FreeLevelsThatNavigateToBattlePass: %i", Season5->FreeLevelsThatNavigateToBattlePass.Num());
-					FN_LOG(LogHooks, Log, "FreeLevelsThatAutoOpenTheAboutScreen: %i", Season5->FreeLevelsThatAutoOpenTheAboutScreen.Num());
-
-					TArray<FAthenaRewardScheduleLevel> BookXpScheduleFrees = Season5->BookXpScheduleFree.Levels;
-
-					for (int32 i = 0; i < BookXpScheduleFrees.Num(); i++)
-					{
-						FAthenaRewardScheduleLevel BookXpScheduleFree = BookXpScheduleFrees[i];
-
-						for (int32 j = 0; j < BookXpScheduleFree.Rewards.Num(); j++)
-						{
-							FAthenaRewardItemReference Reward = BookXpScheduleFree.Rewards[j];
-
-							if (!Reward.ItemDefinition.Get())
-								continue;
-
-							FN_LOG(LogHooks, Log, "[%i] - BookXpScheduleFrees - ItemDefinition: %s, Quantity: %i", i, Reward.ItemDefinition.Get()->GetName().c_str(), Reward.Quantity);
-						}
-					}
-
-					TArray<FAthenaRewardScheduleLevel> BookXpSchedulePaids = Season5->BookXpSchedulePaid.Levels;
-
-					for (int32 i = 0; i < BookXpSchedulePaids.Num(); i++)
-					{
-						FAthenaRewardScheduleLevel BookXpSchedulePaid = BookXpSchedulePaids[i];
-
-						for (int32 j = 0; j < BookXpSchedulePaid.Rewards.Num(); j++)
-						{
-							FAthenaRewardItemReference Reward = BookXpSchedulePaid.Rewards[j];
-
-							if (!Reward.ItemDefinition.Get())
-								continue;
-
-							FN_LOG(LogHooks, Log, "[%i] - BookXpSchedulePaids - ItemDefinition: %s, Quantity: %i", i, Reward.ItemDefinition.Get()->GetName().c_str(), Reward.Quantity);
-						}
-					}
-
-					TArray<FAthenaRewardItemReference> SeasonGrantsToEveryones = Season5->SeasonGrantsToEveryone.Rewards;
-
-					for (int32 i = 0; i < SeasonGrantsToEveryones.Num(); i++)
-					{
-						FAthenaRewardItemReference SeasonGrantsToEveryone = SeasonGrantsToEveryones[i];
-
-						if (!SeasonGrantsToEveryone.ItemDefinition.Get())
-							continue;
-
-						FN_LOG(LogHooks, Log, "[%i] - BookXpSchedulePaids - ItemDefinition: %s, Quantity: %i, i", i, SeasonGrantsToEveryone.ItemDefinition.Get()->GetName().c_str(), SeasonGrantsToEveryone.Quantity);
-					}
-				}*/
+				PlayerController->ServerDropAllItems(nullptr);
 			}
 
 			if (GetAsyncKeyState(VK_F5) & 0x1)
@@ -370,20 +242,27 @@ namespace Hooks
 				if (!PlayerController)
 					return;
 
-				AFortPlayerPawn* Pawn = PlayerController->MyFortPawn;
+				AFortPlayerPawn* PlayerPawn = PlayerController->MyFortPawn;
 
-				if (!Pawn)
+				if (!PlayerPawn)
 					return;
 
-				auto Tiered_Chest_6_ParentClass = FindObjectFast<UBlueprintGeneratedClass>("/Game/Building/ActorBlueprints/Containers/Tiered_Chest_6_Parent.Tiered_Chest_6_Parent_C");
-				auto WID_Shotgun_Standard_Athena_UC_Ore_T03 = FindObjectFast<UFortWeaponRangedItemDefinition>("/Game/Athena/Items/Weapons/WID_Shotgun_Standard_Athena_UC_Ore_T03.WID_Shotgun_Standard_Athena_UC_Ore_T03");
+				auto QuestManager = PlayerController->GetQuestManager(ESubGame::Athena);
+				UFortQuestItemDefinition* QuestItemDefinition = StaticLoadObject<UFortQuestItemDefinition>(L"/Game/Athena/Items/Quests/BattlePass/Quest_BR_Interact_Chests_Location_RetailRow.Quest_BR_Interact_Chests_Location_RetailRow");
 
-				FVector SpawnLocation = Pawn->K2_GetActorLocation();
-				SpawnLocation.X += 50;
+				if (QuestManager && QuestItemDefinition)
+				{
+					TArray<FFortMcpQuestObjectiveInfo> Objectives = QuestItemDefinition->Objectives;
 
-				ABuildingContainer* BuildingContainer = Util::SpawnActor<ABuildingContainer>(Tiered_Chest_6_ParentClass, SpawnLocation);
+					for (int32 i = 0; i < Objectives.Num(); i++)
+					{
+						FFortMcpQuestObjectiveInfo* QuestObjectiveInfo = &Objectives[i];
+						if (!QuestObjectiveInfo) continue;
 
-				BuildingContainer->LootTestingData = WID_Shotgun_Standard_Athena_UC_Ore_T03;
+						QuestManager->SendCustomStatEvent(QuestObjectiveInfo->ObjectiveStatHandle, 1, true);
+						QuestManager->ForceTriggerQuestsUpdated();
+					}
+				}
 
 				/*
 					OdysseyLog: LogHook: Debug: Index not found: 0x0, Offset: 0xc17a88, IdaAddress [00007FF66F267A88] - Pleins de Free Memory
@@ -403,9 +282,9 @@ namespace Hooks
 					OdysseyLog: LogHook: Debug: Index not found: 0xe, Offset: 0x11c60b0, IdaAddress [00007FF66F8160B0] - Un truc stw je crois
 					OdysseyLog: LogHook: Debug: Index not found: 0xf, Offset: 0x11c6010, IdaAddress [00007FF66F816010] - Un truc stw je crois
 					OdysseyLog: LogHook: Debug: Index not found: 0x10, Offset: 0xc28550, IdaAddress [00007FF66F278550] - La fonction est énorme
-					OdysseyLog: LogHook: Debug: Index not found: 0x11, Offset: 0x11a9910, IdaAddress [00007FF66F7F9910] - UFortItem* FindExistingItemForDefinition(void* idk, const UFortItemDefinition* ItemDefinition, bool bInStorageVault)
-					OdysseyLog: LogHook: Debug: Index not found: 0x12, Offset: 0x11a9c40, IdaAddress [00007FF66F7F9C40] - bool (*FindItemInstancesFromDefinition)(void* idk, UFortItemDefinition* ItemDefinition, TArray<UFortItem*>& ItemArray)
-					OdysseyLog: LogHook: Debug: Index not found: 0x13, Offset: 0x11ae410, IdaAddress [00007FF66F7FE410] - UFortItem* GetInventoryItemWithGuid(void* idk, const FGuid& ItemGuid)
+					OdysseyLog: LogHook: Debug: Index not found: 0x11, Offset: 0x11a9910, IdaAddress [00007FF66F7F9910] - UFortItem* FindExistingItemForDefinition(void* InventoryOwner, const UFortItemDefinition* ItemDefinition, bool bInStorageVault)
+					OdysseyLog: LogHook: Debug: Index not found: 0x12, Offset: 0x11a9c40, IdaAddress [00007FF66F7F9C40] - bool (*FindItemInstancesFromDefinition)(void* InventoryOwner, UFortItemDefinition* ItemDefinition, TArray<UFortItem*>& ItemArray)
+					OdysseyLog: LogHook: Debug: Index not found: 0x13, Offset: 0x11ae410, IdaAddress [00007FF66F7FE410] - UFortItem* GetInventoryItemWithGuid(void* InventoryOwner, const FGuid& ItemGuid)
 					OdysseyLog: LogHook: Debug: Index not found: 0x14, Offset: 0x11d1cc0, IdaAddress [00007FF66F821CC0] - RemoveInventoryItem
 					OdysseyLog: LogHook: Debug: Index not found: 0x15, Offset: 0xc17ba0, IdaAddress [00007FF66F267BA0] - Pleins de Free Memory ------------------------- Je crois qu'on change de class
 					OdysseyLog: LogHook: Debug: Index not found: 0x16, Offset: 0x2ccb70, IdaAddress [00007FF66E91CB70] - WITH_SERVER_CODE (nullsub) 
@@ -421,80 +300,32 @@ namespace Hooks
 					OdysseyLog: LogHook: Debug: Index not found: 0x20, Offset: 0x2ccb70, IdaAddress [00007FF66E91CB70] - WITH_SERVER_CODE (nullsub)
 					OdysseyLog: LogHook: Debug: Index not found: 0x21, Offset: 0x3530d0, IdaAddress [00007FF66E9A30D0] - WITH_SERVER_CODE (nullsub)
 				*/
-
-				//MinHook::FindIndexVTable((UObject*)IdkDefault, 0x0, 0x21);
 			}
 
 			if (GetAsyncKeyState(VK_F6) & 0x1)
-			{
-				TArray<AFortPlayerController*> PlayerControllers = UFortKismetLibrary::GetAllFortPlayerControllers(Globals::GetWorld(), true, true);
-				AFortGameModeAthena* GameMode = Cast<AFortGameModeAthena>(Globals::GetGameMode());
-
-				for (int32 i = 0; i < PlayerControllers.Num(); i++)
-				{
-					AFortPlayerControllerAthena* PlayerController = Cast<AFortPlayerControllerAthena>(PlayerControllers[i]);
-					if (!PlayerController) continue;
-
-					AFortPlayerStateAthena* PlayerState = Cast<AFortPlayerStateAthena>(PlayerController->PlayerState);
-
-					if (!PlayerController->Pawn && PlayerState)
-					{
-						GameMode->RestartPlayer(PlayerController);
-
-						GameMode->ShouldReset(PlayerState);
-
-						FTransform Transform;
-						Transform.Rotation = FQuat({1, 1, 1, 1});
-						Transform.Translation = FVector({0, 0, 3000});
-						Transform.Scale3D = FVector({1, 1, 1});
-
-						GameMode->RestartPlayerAtTransform(PlayerController, Transform);
-
-						AFortPlayerPawn* PlayerPawn = Util::SpawnPlayer(PlayerController, FVector({ 0, 0, 3000 }), FRotator(), false);
-
-						//UFortKismetLibrary::ApplyGlobalEnvironmentGameplayEffectToActor(PlayerPawn, UGE_Generic_Revive_C::StaticClass(), 0, FGameplayTagContainer());
-
-						PlayerState->AbilitySystemComponent->BP_ApplyGameplayEffectToSelf(UGE_Generic_Revive_C::StaticClass(), 0.0f, FGameplayEffectContextHandle());
-
-						PlayerController->OnPlayerStartedRespawn__DelegateSignature();
-
-						PlayerController->ServerReadyToStartMatch();
-
-						PlayerController->ServerRestartPlayer();
-						PlayerController->ClientOnPawnRevived(PlayerController);
-
-						PlayerController->bEnterCameraModeOnDeath = false;
-						PlayerController->RespawnPlayerAfterDeath();
-
-						PlayerPawn->SetMaxHealth(100);
-						PlayerPawn->SetHealth(100);
-						PlayerPawn->SetMaxShield(100);
-
-						// 7FF66F7BC760 (Je suis sévèrement autiste)
-						void (*SetShield)(AFortPawn* Pawn, float NewShieldValue) = decltype(SetShield)(0x116C760 + uintptr_t(GetModuleHandle(0)));
-						SetShield(PlayerPawn, 0);
-
-						PlayerController->ClientReset();
-						PlayerController->ClientRestart(PlayerPawn);
-						PlayerController->ClientRetryClientRestart(PlayerPawn);	
-
-						GameMode::AddFromAlivePlayers(GameMode, PlayerController);
-
-						FN_LOG(LogHooks, Log, "IsDead [%i]", PlayerPawn->IsDead());
-						FN_LOG(LogHooks, Log, "IsDBNO [%i]", PlayerPawn->IsDBNO());
-					}
-				}
-			}
-
-			if (GetAsyncKeyState(VK_F7) & 0x1)
 			{
 				AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
 
 				if (!PlayerController)
 					return;
 
-				UKismetSystemLibrary::ExecuteConsoleCommand(PlayerController, L"SPAWNLLAMA", PlayerController);
+				AFortPlayerPawn* PlayerPawn = PlayerController->MyFortPawn;
 
+				if (!PlayerPawn)
+					return;
+
+				AAIBotOdyssey* BotOdyssey = CreateBotOdyssey();
+
+				if (BotOdyssey)
+				{
+					BotOdyssey->SetTargetActor(PlayerPawn);
+				}
+			}
+
+			if (GetAsyncKeyState(VK_F7) & 0x1)
+			{
+				bLogs = bLogs ? false : true;
+				FN_LOG(LogHooks, Log, "bLogs set to %i", bLogs);
 				return;
 
 				TArray<AFortPlayerController*> PlayerControllers = UFortKismetLibrary::GetAllFortPlayerControllers(Globals::GetWorld(), true, true);
@@ -524,37 +355,115 @@ namespace Hooks
 
 			if (GetAsyncKeyState(VK_F9) & 0x1)
 			{
-				UAthenaBattleBusItemDefinition* BattleBusItemDefinition = FindObjectFast<UAthenaBattleBusItemDefinition>("/Game/Athena/Items/Cosmetics/BattleBuses/BBID_BirthdayBus.BBID_BirthdayBus");
+				AFortPlayerController* PlayerControllerGGGG = Cast<AFortPlayerController>(UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0));
 
-				TArray<AActor*> Actors;
-				UGameplayStatics::GetAllActorsOfClass(Globals::GetWorld(), AFortAthenaAircraft::StaticClass(), &Actors);
-
-				for (int32 i = 0; i < Actors.Num(); i++)
-				{
-					AFortAthenaAircraft* AthenaAircraft = Cast<AFortAthenaAircraft>(Actors[i]);
-					if (!AthenaAircraft) continue;
-
-					AthenaAircraft->DefaultBusSkin = BattleBusItemDefinition;
-					AthenaAircraft->SpawnedCosmeticActor->ActiveSkin = BattleBusItemDefinition;
-					AthenaAircraft->ForceNetUpdate();
-				}
-
-				/*AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
-
-				if (!PlayerController)
+				if (!PlayerControllerGGGG)
 					return;
 
-				if (!PlayerController->CheatManager)
-					PlayerController->CheatManager = (UCheatManager*)UGameplayStatics::SpawnObject(UCheatManager::StaticClass(), PlayerController);
+				AFortPlayerPawn* PlayerPawnFFFF = PlayerControllerGGGG->MyFortPawn;
 
-				UKismetSystemLibrary::ExecuteConsoleCommand(PlayerController, L"toggledebugcamera", PlayerController);*/
+				if (!PlayerPawnFFFF)
+					return;
+
+
+				AAthena_PlayerController_C* PlayerControllerAthena = Util::SpawnActor<AAthena_PlayerController_C>(AAthena_PlayerController_C::StaticClass());
+				AFortGameModeAthena* GameModeAthena = Cast<AFortGameModeAthena>(Globals::GetGameMode());
+
+				if (PlayerControllerAthena && GameModeAthena)
+				{
+					// 7FF66F247000
+					void (*ChoosePlayerTeam)(AFortGameModeAthena* GameModeAthena, AFortPlayerControllerAthena* PlayerController) = decltype(ChoosePlayerTeam)(0xBF7000 + uintptr_t(GetModuleHandle(0)));
+					ChoosePlayerTeam(GameModeAthena, PlayerControllerAthena);
+
+					GameMode::AddFromAlivePlayers(GameModeAthena, PlayerControllerAthena);
+
+					AFortInventory* WorldInventory = PlayerControllerAthena->WorldInventory;
+
+					if (!WorldInventory)
+					{
+						WorldInventory = Util::SpawnActor<AFortInventory>(AFortInventory::StaticClass());
+
+						if (WorldInventory)
+						{
+							WorldInventory->SetOwner(PlayerControllerAthena);
+							WorldInventory->OnRep_Owner();
+
+							PlayerControllerAthena->WorldInventory = WorldInventory;
+							PlayerControllerAthena->bHasInitializedWorldInventory = true;
+							PlayerControllerAthena->WorldInventory->HandleInventoryLocalUpdate();
+						}
+					}
+
+					AFortQuickBars* QuickBars = PlayerControllerAthena->QuickBars;
+
+					if (!QuickBars)
+					{
+						QuickBars = Util::SpawnActor<AFortQuickBars>(AFortQuickBars::StaticClass());
+
+						if (QuickBars)
+						{
+							QuickBars->SetOwner(PlayerControllerAthena);
+							QuickBars->OnRep_Owner();
+
+							PlayerControllerAthena->QuickBars = QuickBars;
+							PlayerControllerAthena->OnRep_QuickBar();
+						}
+					}
+
+					AFortPlayerPawn* PlayerPawn = Util::SpawnPlayer(PlayerControllerAthena, PlayerPawnFFFF->K2_GetActorLocation(), FRotator(), true);
+					AFortPlayerState* PlayerState = Cast<AFortPlayerState>(PlayerControllerAthena->PlayerState);
+					UFortAbilitySystemComponent* AbilitySystemComponent = PlayerState->AbilitySystemComponent;
+
+					if (!AbilitySystemComponent)
+						AbilitySystemComponent = Cast<UFortAbilitySystemComponent>(UGameplayStatics::SpawnObject(UFortAbilitySystemComponent::StaticClass(), PlayerState));
+
+					if (PlayerPawn && PlayerState && AbilitySystemComponent)
+					{
+						PlayerPawn->bCanBeDamaged = true;
+
+						// 7FF66EC68170
+						void (*ClearAllAbilities)(UAbilitySystemComponent* AbilitySystemComponent) = decltype(ClearAllAbilities)(0x618170 + uintptr_t(GetModuleHandle(0)));
+						ClearAllAbilities(PlayerState->AbilitySystemComponent);
+
+						UFortAbilitySet* DefaultAbilities = Globals::GetGameData()->GenericPlayerAbilitySet.Get();
+
+						Abilities::GrantGameplayAbility(DefaultAbilities, AbilitySystemComponent);
+						Abilities::GrantGameplayEffect(DefaultAbilities, AbilitySystemComponent);
+						Abilities::GrantModifierAbilityFromPlaylist(AbilitySystemComponent);
+
+						GameMode::ApplyCustomizationToCharacter(PlayerState, PlayerControllerAthena, PlayerPawn);
+					}
+
+					
+				}
 			}
 
 			if (GetAsyncKeyState(VK_F10) & 0x1)
 			{
-				// 7FF66F23FBE0
-				void (*HandleMatchHasStarted)(AFortGameModeAthena* GameMode) = decltype(HandleMatchHasStarted)(0xBEFBE0 + uintptr_t(GetModuleHandle(0)));
-				HandleMatchHasStarted(Cast<AFortGameModeAthena>(Globals::GetGameMode()));
+				AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
+
+				if (!PlayerController)
+					return;
+
+				void* InventoryOwnerInterface = PlayerController->GetInterfaceAddress(IFortInventoryOwnerInterface::StaticClass());
+
+				TScriptInterface<IFortInventoryOwnerInterface> ScriptInterface{};
+				ScriptInterface.SetInterface(InventoryOwnerInterface);
+				ScriptInterface.SetObject(PlayerController);
+
+				UFortKismetLibrary::GiveItemToInventoryOwner(ScriptInterface, Globals::GetGameData()->WoodItemDefinition, 10, true);
+
+				FN_LOG(LogHooks, Log, "GiveItemToInventoryOwner");
+			}
+
+			if (GetAsyncKeyState(VK_F12) & 0x1)
+			{
+				AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
+
+				if (!PlayerController)
+					return;
+
+				UKismetSystemLibrary::ExecuteConsoleCommand(PlayerController, L"SPAWNLLAMA", PlayerController);
 			}
 		}
 		else if (FunctionName.contains("ServerUpdatePhysicsParams"))
@@ -589,95 +498,361 @@ namespace Hooks
 		}
 		else if (FunctionName.contains("OnWorldReady"))
 		{
-			if (!GameMode::bWorldReady)
+			AFortGameModeAthena* GameModeAthena = Cast<AFortGameModeAthena>(Globals::GetGameMode());
+
+			if (!GameModeAthena)
+				return;
+
+			AFortGameStateAthena* GameStateAthena = Cast<AFortGameStateAthena>(GameModeAthena->GameState);
+
+			if (!GameStateAthena)
+				return;
+
+			if (!GameModeAthena->bWorldIsReady)
 			{
-				AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
-				AFortGameModeAthena* GameMode = Cast<AFortGameModeAthena>(Globals::GetGameMode());
+				float ServerWorldTimeSeconds = UGameplayStatics::GetTimeSeconds(GameModeAthena) + GameStateAthena->ServerWorldTimeSecondsDelta;
+				float Duration = 300.0f; // Seconds
 
-				int32 PlaylistId = 2; // Solo
-				//int32 PlaylistId = 10; // Duo
-				// int32 PlaylistId = 9; // Squad
-				//int32 PlaylistId = 35; // Playground
-				// int32 PlaylistId = 50; // 50VS50
+				UFortPlaylistAthena* PlaylistAthena = Globals::GetPlaylist();
 
-				// int32 PlaylistId = 140; // Bling (Solo)
-
-				// 7FF66F2504C0
-				void (*SetCurrentPlaylistId)(AFortGameModeAthena* GameMode, int32 NewPlaylistId) = decltype(SetCurrentPlaylistId)(0xC004C0 + uintptr_t(GetModuleHandle(0)));
-
-				SetCurrentPlaylistId(GameMode, PlaylistId);
-
-				// 7FF66F52DEC0
-				UFortPlaylistAthena* (*GetPlaylistByPlaylistId)(UFortPlaylistManager* PlaylistManager, int32 PlaylistId) = decltype(GetPlaylistByPlaylistId)(0xEDDEC0 + uintptr_t(GetModuleHandle(0)));
-
-				UFortPlaylistAthena* Playlist = GetPlaylistByPlaylistId(GameMode->PlaylistManager, PlaylistId);
-
-				if (GameState && Playlist)
+				if (PlaylistAthena && GameStateAthena)
 				{
-					GameState->CurrentPlaylistData = Playlist;
-					GameState->OnRep_CurrentPlaylistData();
+					GameStateAthena->WarmupCountdownStartTime = Duration;
+					GameStateAthena->WarmupCountdownEndTime = ServerWorldTimeSeconds + Duration;
 
-					FN_LOG(LogHooks, Log, "AdditionalLevels.Num() [%i]", Playlist->AdditionalLevels.Num());
+					GameModeAthena->WarmupEarlyCountdownDuration = ServerWorldTimeSeconds;
+					GameModeAthena->WarmupCountdownDuration = Duration;
 
-					for (int32 i = 0; i < Playlist->AdditionalLevels.Num(); i++)
+					for (int32 i = 0; i < PlaylistAthena->AdditionalLevels.Num(); i++)
 					{
-						TSoftObjectPtr<UWorld> AdditionalLevel = Playlist->AdditionalLevels[i];
+						TSoftObjectPtr<UWorld> AdditionalLevel = PlaylistAthena->AdditionalLevels[i];
 
-						if (!AdditionalLevel.Get())
-							continue;
+						FName FoundationName = AdditionalLevel.ObjectID.AssetPathName;
+						if (!FoundationName.IsValid()) continue;
 
-						FN_LOG(LogHooks, Log, "AdditionalLevel [%i]: %s", i, AdditionalLevel.Get()->GetFullName().c_str());
+						bool bSuccess = false;
+						ULevelStreamingDynamic::LoadLevelInstanceBySoftObjectPtr(GameStateAthena, AdditionalLevel, FVector(), FRotator(), &bSuccess);
+
+						if (bSuccess)
+						{
+							FName LevelName = AdditionalLevel.ObjectID.AssetPathName;
+							if (!LevelName.IsValid()) continue;
+
+							GameStateAthena->AdditionalPlaylistLevelsStreamed.Add(LevelName);
+						}
 					}
 
-					// GameState->OnRep_AdditionalPlaylistLevelsStreamed();
-
-					GameState->AirCraftBehavior = Playlist->AirCraftBehavior;
-
-					AFortGameSessionDedicated* GameSession = Cast<AFortGameSessionDedicated>(GameMode->GameSession);
-
-					GameSession->MaxPlayers = Playlist->MaxPlayers;
-					GameSession->MaxPartySize = Playlist->MaxSocialPartySize;
-
-					GameMode->PlaylistManager;
-					GameMode->CurrentZoneInstanceId;
+					GameStateAthena->OnRep_AdditionalPlaylistLevelsStreamed();
 				}
-
-				AFortAIDirector* AIDirector = GameMode->AIDirector;
-
-				if (!AIDirector)
-					AIDirector = Util::SpawnActor<AAthenaAIDirector>(AAthenaAIDirector::StaticClass());
-
-				if (AIDirector)
-				{
-					AIDirector->Activate();
-					AIDirector->bAIDisabled = false;
-				}
-
-				AFortAIGoalManager* AIGoalManager = GameMode->AIGoalManager;
-
-				if (!AIGoalManager)
-					AIGoalManager = Util::SpawnActor<AFortAIGoalManager>(AFortAIGoalManager::StaticClass());
-
-				UAthenaAISettings* AISettings = GameMode->AISettings;
-
-				if (!AISettings)
-					AISettings = Cast<UAthenaAISettings>(UGameplayStatics::SpawnObject(UAthenaAISettings::StaticClass(), GameMode));
 
 				FN_LOG(LogHooks, Log, "OnWorldReady called!");
-
-				GameMode::bWorldReady = true;
+				GameModeAthena->bWorldIsReady = true;
 			}
 		}
-		else if (FunctionName.contains("K2_OnEndAbility"))
+		else if (FunctionName.contains("K2_OnEndAbility") && false)
 		{
 			UFortGameplayAbility* GameplayAbility = Cast<UFortGameplayAbility>(Object);
 
 			if (GameplayAbility)
 			{
 				AFortPawn* ActivatingPawn = GameplayAbility->GetActivatingPawn();
+				if (!ActivatingPawn) return;
 
-				if (ActivatingPawn)
+				AFortPlayerController* PlayerController = Cast<AFortPlayerController>(ActivatingPawn->Controller);
+				if (!PlayerController) return;
+
+				UBlueprintGeneratedClass* C4DetonateClass = FindObjectFast<UBlueprintGeneratedClass>("/Game/Athena/Items/Consumables/C4/GAT_Athena_c4_Detonate.GAT_Athena_c4_Detonate_C");
+				UBlueprintGeneratedClass* HookGunDestroyClass = FindObjectFast<UBlueprintGeneratedClass>("/Game/Athena/Items/Weapons/Abilities/HookGun/GA_Athena_HookDestroy.GA_Athena_HookDestroy_C");
+
+				if (GameplayAbility->IsA(C4DetonateClass))
+				{
+					AFortWeapon* CurrentWeapon = ActivatingPawn->CurrentWeapon;
+
+					if (CurrentWeapon)
+					{
+						UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_GetInventoryItemWithGuid(CurrentWeapon->ItemEntryGuid));
+						if (!WorldItem) return;
+
+						int32 ItemQuantity = UFortKismetLibrary::K2_GetItemQuantityOnPlayer(PlayerController, WorldItem->ItemEntry.ItemDefinition);
+
+						if (ItemQuantity == 0)
+							Inventory::RemoveItem(PlayerController->WorldInventory, WorldItem->ItemEntry.ItemGuid);
+					}
+				}
+				else if (GameplayAbility->IsA(HookGunDestroyClass))
+				{
+					AFortWeapon* CurrentWeapon = ActivatingPawn->CurrentWeapon;
+
+					if (CurrentWeapon)
+					{
+						UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_GetInventoryItemWithGuid(CurrentWeapon->ItemEntryGuid));
+						if (!WorldItem) return;
+
+						if (WorldItem->ItemEntry.LoadedAmmo <= 0)
+							Inventory::RemoveItem(PlayerController->WorldInventory, WorldItem->ItemEntry.ItemGuid);
+					}
+				}
+				else if (GameplayAbility->IsA(UGAB_Emote_Generic_C::StaticClass()))
+				{
 					ActivatingPawn->bMovingEmote = false;
+				}
+
+				// FN_LOG(LogHooks, Log, "GameplayAbility: %s", GameplayAbility->GetFullName().c_str());
+			}
+		}
+
+		if (bLogs)
+		{
+			if (!FunctionName.contains("Tick") &&
+				!FunctionName.contains("Visual") &&
+				!FunctionName.contains("Clown Spinner") &&
+				!FunctionName.contains("CustomStateChanged") &&
+				!FunctionName.contains("ReceiveBeginPlay") &&
+				!FunctionName.contains("OnAttachToBuilding") &&
+				!FunctionName.contains("OnWorldReady") &&
+				!FunctionName.contains("K2_GetActorLocation") &&
+				!FunctionName.contains("ReceiveDrawHUD") &&
+				!FunctionName.contains("ServerUpdateCamera") &&
+				!FunctionName.contains("ServerMove") &&
+				!FunctionName.contains("ContrailCheck") &&
+				!FunctionName.contains("GetViewTarget") &&
+				!FunctionName.contains("GetAllActorsOfClass") &&
+				!FunctionName.contains("ClientAckGoodMove") &&
+				!FunctionName.contains("ReadyToEndMatch") &&
+				!FunctionName.contains("Check Closest Point") &&
+				!FunctionName.contains("ServerTriggerCombatEvent") &&
+				!FunctionName.contains("UpdateTime") &&
+				!FunctionName.contains("OnUpdateMusic") &&
+				!FunctionName.contains("UpdateStateEvent") &&
+				!FunctionName.contains("ServerTouchActiveTime") &&
+				!FunctionName.contains("OnCheckIfSurrounded") &&
+				!FunctionName.contains("ServerFireAIDirectorEventBatch") &&
+				!FunctionName.contains("ServerTriggerCombatEventBatch") &&
+				!FunctionName.contains("UserConstructionScript") &&
+				!FunctionName.contains("K2_OnReset") &&
+				!FunctionName.contains("K2_OnEndViewTarget") &&
+				!FunctionName.contains("K2_OnBecomeViewTarget") &&
+				!FunctionName.contains("ReceiveUnpossessed") &&
+				!FunctionName.contains("ClientGotoState") &&
+				!FunctionName.contains("K2_OnEndViewTarget") &&
+				!FunctionName.contains("K2_OnBecomeViewTarget") &&
+				!FunctionName.contains("ClientSetViewTarget") &&
+				!FunctionName.contains("ServerClientPawnLoaded") &&
+				!FunctionName.contains("ReceiveEndPlay") &&
+				!FunctionName.contains("OnPerceptionStimuliSourceEndPlay") &&
+				!FunctionName.contains("HandleOnHUDElementVisibilityChanged") &&
+				!FunctionName.contains("OnHUDElementVisibilityChanged") &&
+				!FunctionName.contains("HandleInteractionChanged") &&
+				!FunctionName.contains("BlueprintModifyCamera") &&
+				!FunctionName.contains("BlueprintModifyPostProcess") &&
+				!FunctionName.contains("ServerSetSpectatorLocation") &&
+				!FunctionName.contains("ServerFireAIDirectorEvent") &&
+				!FunctionName.contains("ServerTryActivateAbility") &&
+				!FunctionName.contains("ClientActivateAbilitySucceed") &&
+				!FunctionName.contains("ServerSetSpectatorLocation") &&
+				!FunctionName.contains("CanJumpInternal") &&
+				!FunctionName.contains("K2_OnMovementModeChanged") &&
+				!FunctionName.contains("OnJumped") &&
+				!FunctionName.contains("ServerModifyStat") &&
+				!FunctionName.contains("OnLanded") &&
+				!FunctionName.contains("ReceiveHit") &&
+				!FunctionName.contains("OnWalkingOffLedge") &&
+				!FunctionName.contains("ServerEndAbility") &&
+				!FunctionName.contains("Execute") &&
+				!FunctionName.contains("OnDamagePlayEffects") &&
+				!FunctionName.contains("OnMontageStarted") &&
+				!FunctionName.contains("OnNewDamageNumber") &&
+				!FunctionName.contains("BP_GetTokenizedDescriptionText") &&
+				!FunctionName.contains("GameplayCue_InstantDeath") &&
+				!FunctionName.contains("K2_GetActorRotation") &&
+				!FunctionName.contains("K2_DestroyActor") &&
+				!FunctionName.contains("OnDetachFromBuilding") &&
+				!FunctionName.contains("OnRep_bAlreadySearched") &&
+				!FunctionName.contains("OnSetSearched") &&
+				!FunctionName.contains("GetAircraft") &&
+				!FunctionName.contains("BeginSpawningActorFromClass") &&
+				!FunctionName.contains("BlueprintInitializeAnimation") &&
+				!FunctionName.contains("BlueprintUpdateAnimation") &&
+				!FunctionName.contains("BlueprintPostEvaluateAnimation") &&
+				!FunctionName.contains("FinishSpawningActor") &&
+				!FunctionName.contains("PawnUniqueIDSet") &&
+				!FunctionName.contains("OnRep_Owner") &&
+				!FunctionName.contains("OnRep_Pawn") &&
+				!FunctionName.contains("Possess") &&
+				!FunctionName.contains("ReceivePossessed") &&
+				!FunctionName.contains("ClientRestart") &&
+				!FunctionName.contains("SetControlRotation") &&
+				!FunctionName.contains("ClientRetryClientRestart") &&
+				!FunctionName.contains("ExecuteUbergraph_PlayerPawn_Athena_Generic") &&
+				!FunctionName.contains("ExecuteUbergraph_PlayerPawn_Athena") &&
+				!FunctionName.contains("ServerAcknowledgePossession") &&
+				!FunctionName.contains("IsInAircraft") &&
+				!FunctionName.contains("FindPlayerStart") &&
+				!FunctionName.contains("SpawnDefaultPawnFor") &&
+				!FunctionName.contains("MustSpectate") &&
+				!FunctionName.contains("GetDefaultPawnClassForController") &&
+				!FunctionName.contains("On Game Phase Change") &&
+				!FunctionName.contains("ClientAdjustPosition") &&
+				!FunctionName.contains("Movement Audio Crossfader__UpdateFunc") &&
+				!FunctionName.contains("Holding Audio Crossfader__UpdateFunc") &&
+				!FunctionName.contains("OnUpdateDirectionalLightForTimeOfDay") &&
+				!FunctionName.contains("OnMontageEnded") &&
+				!FunctionName.contains("ServerCancelAbility") &&
+				!FunctionName.contains("K2_ActivateAbility") &&
+				!FunctionName.contains("ServerHandleMissionEvent_ToggledCursorMode") &&
+				!FunctionName.contains("OnBlendOut_") &&
+				!FunctionName.contains("ClientEndAbility") &&
+				!FunctionName.contains("OnSafeZoneStateChange") &&
+				!FunctionName.contains("ClientVeryShortAdjustPosition") &&
+				!FunctionName.contains("OnDayPhaseChange") &&
+				!FunctionName.contains("On Day Phase Change") &&
+				!FunctionName.contains("K2_OnStartCrouch") &&
+				!FunctionName.contains("K2_OnEndCrouch") &&
+				!FunctionName.contains("On Player Won") &&
+				!FunctionName.contains("ClientFinishedInteractionInZone") &&
+				!FunctionName.contains("ClientReceiveKillNotification") &&
+				!FunctionName.contains("ReceiveCopyProperties") &&
+				!FunctionName.contains("K2_OnLogout") &&
+				!FunctionName.contains("ClientReceiveLocalizedMessage") &&
+				!FunctionName.contains("ClientCancelAbility") &&
+				!FunctionName.contains("ServerFinishedInteractionInZoneReport") &&
+				!FunctionName.contains("FallingTimeline__UpdateFunc") &&
+				!FunctionName.contains("BndEvt__InterceptCollision_K2Node_ComponentBoundEvent_5_ComponentBeginOverlapSignature__DelegateSignature") &&
+				!FunctionName.contains("ReceiveActorBeginOverlap") &&
+				!FunctionName.contains("Conv_StringToName") &&
+				!FunctionName.contains("OnRep_GamePhase") &&
+				!FunctionName.contains("K2_OnSetMatchState") &&
+				!FunctionName.contains("StartPlay") &&
+				!FunctionName.contains("StartMatch") &&
+				!FunctionName.contains("OnAircraftEnteredDropZone") &&
+				!FunctionName.contains("ServerShortTimeout") &&
+				!FunctionName.contains("UpdateStateWidgetContent") &&
+				!FunctionName.contains("PreConstruct") &&
+				!FunctionName.contains("Construct") &&
+				!FunctionName.contains("OnCurrentTextStyleChanged") &&
+				!FunctionName.contains("UpdateButtonState") &&
+				!FunctionName.contains("OnBangStateChanged") &&
+				!FunctionName.contains("OnPlayerInfoChanged") &&
+				!FunctionName.contains("Update") &&
+				!FunctionName.contains("OnBeginIntro") &&
+				!FunctionName.contains("HandleQuickBarChangedBP") &&
+				!FunctionName.contains("HandleInventoryUpdatedEvent") &&
+				!FunctionName.contains("OnActivated") &&
+				!FunctionName.contains("OnBeginOutro") &&
+				!FunctionName.contains("HandleActiveWidgetDeactivated") &&
+				!FunctionName.contains("OnDeactivated") &&
+				!FunctionName.contains("OnStateStarted") &&
+				!FunctionName.contains("SetRenderTransform") &&
+				!FunctionName.contains("OnAnimationFinished") &&
+				!FunctionName.contains("ReadyToStartMatch") &&
+				!FunctionName.contains("SetWidthOverride") &&
+				!FunctionName.contains("SetHeightOverride") &&
+				!FunctionName.contains("HandleMinimizeFinished") &&
+				!FunctionName.contains("ServerUpdateLevelVisibility") &&
+				!FunctionName.contains("OnDayPhaseChanged") &&
+				!FunctionName.contains("ServerLoadingScreenDropped") &&
+				!FunctionName.contains("On Game Phase Step Changed") &&
+				!FunctionName.contains("HandleGamePhaseStepChanged") &&
+				!FunctionName.contains("GamePhaseStepChanged") &&
+				!FunctionName.contains("SetColorAndOpacity") &&
+				!FunctionName.contains("OnAnimationStarted") &&
+				!FunctionName.contains("UpdateMessaging") &&
+				!FunctionName.contains("ServerSendLoadoutConfig") &&
+				!FunctionName.contains("CalculateBaseMagnitude") &&
+				!FunctionName.contains("ClientRegisterWithParty") &&
+				!FunctionName.contains("InitializeHUDForPlayer") &&
+				!FunctionName.contains("ClientSetHUD") &&
+				!FunctionName.contains("ClientEnableNetworkVoice") &&
+				!FunctionName.contains("ClientUpdateMultipleLevelsStreamingStatus") &&
+				!FunctionName.contains("ClientFlushLevelStreaming") &&
+				!FunctionName.contains("ClientOnGenericPlayerInitialization") &&
+				!FunctionName.contains("ClientCapBandwidth") &&
+				!FunctionName.contains("K2_PostLogin") &&
+				!FunctionName.contains("OnRep_bHasStartedPlaying") &&
+				!FunctionName.contains("ServerChoosePart") &&
+				!FunctionName.contains("SetOwner") &&
+				!FunctionName.contains("OnRep_QuickBar") &&
+				!FunctionName.contains("HandleStartingNewPlayer") &&
+				!FunctionName.contains("ServerUpdateMultipleLevelsVisibility") &&
+				!FunctionName.contains("ServerSetPartyOwner") &&
+				!FunctionName.contains("PlayerCanRestart") &&
+				!FunctionName.contains("ServerCreateCombatManager") &&
+				!FunctionName.contains("ServerCreateAIDirectorDataManager") &&
+				!FunctionName.contains("EnableSlot") &&
+				!FunctionName.contains("DisableSlot") &&
+				!FunctionName.contains("ServerSetShowHeroBackpack") &&
+				!FunctionName.contains("ServerSetShowHeroHeadAccessories") &&
+				!FunctionName.contains("ServerSetClientHasFinishedLoading") &&
+				!FunctionName.contains("ServerReadyToStartMatch") &&
+				!FunctionName.contains("Received_Notify") &&
+				!FunctionName.contains("Received_NotifyBegin") &&
+				!FunctionName.contains("AnimNotify_LeftFootStep") &&
+				!FunctionName.contains("AnimNotify_RightFootStep") &&
+				!FunctionName.contains("Completed_") &&
+				!FunctionName.contains("InputActionHoldStopped") &&
+				!FunctionName.contains("ServerCurrentMontageSetPlayRate") &&
+				!FunctionName.contains("ServerSetReplicatedTargetData") &&
+				!FunctionName.contains("Triggered_") &&
+				!FunctionName.contains("ActorHasTag") &&
+				!FunctionName.contains("RandomIntegerInRange") &&
+				!FunctionName.contains("GetItemDefinitionBP") &&
+				!FunctionName.contains("CreateTemporaryItemInstanceBP") &&
+				!FunctionName.contains("SetOwningControllerForTemporaryItem") &&
+				!FunctionName.contains("OnRep_PrimaryQuickBar") &&
+				!FunctionName.contains("OnRep_SecondaryQuickBar") &&
+				!FunctionName.contains("ServerSetupWeakSpotsOnBuildingActor") &&
+				!FunctionName.contains("OnStartDirectionEffect") &&
+				!FunctionName.contains("SetReplicates") &&
+				!FunctionName.contains("ServerCurrentMontageSetNextSectionName") &&
+				!FunctionName.contains("NetFadeOut") &&
+				!FunctionName.contains("OnFadeOut") &&
+				!FunctionName.contains("NetOnHitCrack") &&
+				!FunctionName.contains("OnHitCrack") &&
+				!FunctionName.contains("GameplayCue") &&
+				!FunctionName.contains("ReceiveActorEndOverlap") &&
+				!FunctionName.contains("PhysicsVolumeChanged") &&
+				!FunctionName.contains("ServerAddItemInternal") &&
+				!FunctionName.contains("FortClientPlaySound") &&
+				!FunctionName.contains("OnCapsuleBeginOverlap") &&
+				!FunctionName.contains("GetPlayerController") &&
+				!FunctionName.contains("TossPickup") &&
+				!FunctionName.contains("OnRep_PrimaryPickupItemEntry") &&
+				!FunctionName.contains("ServerActivateSlotInternal") &&
+				!FunctionName.contains("EquipWeaponDefinition") &&
+				!FunctionName.contains("OnInitAlteration") &&
+				!FunctionName.contains("OnInitCosmeticAlterations") &&
+				!FunctionName.contains("K2_OnUnEquip") &&
+				!FunctionName.contains("GetItemGuid") &&
+				!FunctionName.contains("InternalServerSetTargeting") &&
+				!FunctionName.contains("ServerReleaseInventoryItemKey") &&
+				!FunctionName.contains("OnPawnMontageBlendingOut") &&
+				!FunctionName.contains("OnSetTargeting") &&
+				!FunctionName.contains("OnRep_DefaultMetadata") &&
+				!FunctionName.contains("GetDataTableRowNames") &&
+				!FunctionName.contains("GetMaxDurability") &&
+				!FunctionName.contains("BeginDeferredActorSpawnFromClass") &&
+				!FunctionName.contains("OnRep_PickupLocationData") &&
+				!FunctionName.contains("GetControlRotation") &&
+				!FunctionName.contains("OnVisibilitySetEvent") &&
+				!FunctionName.contains("ShouldShowSoundIndicator") &&
+				!FunctionName.contains("WaitForPawn") &&
+				!FunctionName.contains("OnProjectileStopDelegate") &&
+				!FunctionName.contains("Handle Parachute Audio State") &&
+				!FunctionName.contains("GetDistanceTo") &&
+				!FunctionName.contains("GetSpectatorPawn") &&
+				!FunctionName.contains("OnHitCrack") &&
+				!FunctionName.contains("OnHitCrack") &&
+				!FunctionName.contains("OnHitCrack") &&
+				!FunctionName.contains("OnHitCrack") &&
+				!FunctionName.contains("OnHitCrack") &&
+				!FunctionName.contains("OnHitCrack") &&
+				!FunctionName.contains("OnHitCrack") &&
+				!FunctionName.contains("OnHitCrack") &&
+				!FunctionName.contains("OnHitCrack") &&
+				!FunctionName.contains("OnHitCrack") &&
+				!FunctionName.contains("EvaluateGraphExposedInputs_ExecuteUbergraph_Fortnite_M_Avg_Player_AnimBlueprint_AnimGraphNode_"))
+			{
+				FN_LOG(Logs, Log, "FunctionName: [%s]", FunctionName.c_str());
 			}
 		}
 
@@ -716,44 +891,12 @@ namespace Hooks
 		return Result;
 	}
 
-	// 00007FF66F5F11C0
-	bool (*PickupAddInventoryOwnerInterface)(AFortPickup* Pickup, void* InterfaceAddress);
-	bool PickupAddInventoryOwnerInterfaceHook(AFortPickup* Pickup, void* InterfaceAddress)
-	{
-		if (!Pickup)
-		{
-			FN_LOG(LogHooks, Error, "[AFortPickup::PickupAddInventoryOwnerInterface] Failed to get Pickup.");
-			return PickupAddInventoryOwnerInterface(Pickup, InterfaceAddress);
-		}
-
-		FFortPickupLocationData* PickupLocationData = &Pickup->PickupLocationData;
-		FFortItemEntry* ItemEntry = &Pickup->PrimaryPickupItemEntry;
-
-		if (!PickupLocationData || !ItemEntry)
-		{
-			FN_LOG(LogHooks, Error, "[AFortPickup::PickupAddInventoryOwnerInterface] Failed to get PickupLocationData/ItemEntry!");
-			return PickupAddInventoryOwnerInterface(Pickup, InterfaceAddress);
-		}
-
-		UObject* (*GetObjectByAddress)(void* InterfaceAddress) = decltype(GetObjectByAddress)(((UObject*)InterfaceAddress)->VTable[0x1]);
-		AFortPlayerController* PlayerController = Cast<AFortPlayerController>(GetObjectByAddress(InterfaceAddress));
-
-		if (!PlayerController)
-		{
-			FN_LOG(LogHooks, Error, "[AFortPickup::PickupAddInventoryOwnerInterface] Failed to get PlayerController!");
-			return PickupAddInventoryOwnerInterface(Pickup, InterfaceAddress);
-		}
-
-		Inventory::AddInventoryItem(PlayerController, *ItemEntry, PickupLocationData->PickupGuid);
-
-		return PickupAddInventoryOwnerInterface(Pickup, InterfaceAddress);
-	}
-
 	// 7FF66F481290
 	UClass** sub_7FF66F481290Hook(__int64 a1, UClass** OutGameSessionClass)
 	{
 		//*OutGameSessionClass = AFortGameSessionDedicatedAthena::StaticClass();
-		*OutGameSessionClass = AFortGameSessionDedicated::StaticClass();
+		//*OutGameSessionClass = AFortGameSessionDedicated::StaticClass();
+		*OutGameSessionClass = AFortGameSession::StaticClass();
 		return OutGameSessionClass;
 	}
 
@@ -769,17 +912,7 @@ namespace Hooks
 	void (*Restart)(AFortGameSessionDedicated* GameSession);
 	void RestartHook(AFortGameSessionDedicated* GameSession)
 	{
-		GameMode::bPreReadyToStartMatch = false;
-		GameMode::bWorldReady = false;
-
 		Restart(GameSession);
-	}
-
-	char (*execPickLootDrops)(UFortKismetLibrary* a1, __int64* a2, __int64* a3);
-	char execPickLootDropsHook(UFortKismetLibrary* a1, __int64* a2, __int64* a3)
-	{
-		FN_LOG(LogMinHook, Log, "execPickLootDropsHook called!");
-		return execPickLootDrops(a1, a2, a3);
 	}
 
 	void CollectGarbageHook()
@@ -787,12 +920,51 @@ namespace Hooks
 		FN_LOG(LogMinHook, Log, "CollectGarbageHook called!");
 	}
 
+#ifdef ANTICHEAT
+	// 7FF66ECBAF00
+	bool (*NetSerialize)(FGameplayAbilityTargetDataHandle* AbilityTargetDataHandle, __int64& a2, UPackageMap* Map, bool& bOutSuccess);
+	bool NetSerializeHook(FGameplayAbilityTargetDataHandle* AbilityTargetDataHandle, __int64& a2, UPackageMap* Map, bool& bOutSuccess)
+	{
+		bool bResult = NetSerialize(AbilityTargetDataHandle, a2, Map, bOutSuccess);
+
+		if (bResult)
+		{
+			UIpConnection* IpConnection = Cast<UIpConnection>(Map->Outer);
+
+			if (!IpConnection)
+				return bResult;
+
+			UAntiCheatOdyssey* AntiCheatOdyssey = FindOrCreateAntiCheatOdyssey(IpConnection->PlayerController);
+
+			if (AntiCheatOdyssey)
+			{
+				uint8 DataNum = 0;
+
+				if (*(int32*)(__int64(AbilityTargetDataHandle) + 0x18) <= 255)
+					DataNum = *(int32*)(__int64(AbilityTargetDataHandle) + 0x18);
+
+				if (DataNum > AntiCheatOdyssey->GetMaxDataNum())
+				{
+					const FString& PlayerName = AntiCheatOdyssey->GetPlayerName();
+
+					if (PlayerName.IsValid())
+					{
+						AC_LOG(ACWarning, "Player [%s] is trying to damage multiplier", AntiCheatOdyssey->GetPlayerName().ToString().c_str());
+					}
+
+					AntiCheatOdyssey->BanByAntiCheat(L"AC - You tried to damage multiplier!");
+				}
+			}
+		}
+
+		return bResult;
+	}
+#endif // ANTICHEAT
+
 	void InitHook()
 	{
 		static auto FortPickupAthenaDefault = AFortPickupAthena::GetDefaultObj();
 		static auto FortPlayerPawnAthenaDefault = AFortPlayerPawnAthena::GetDefaultObj();
-
-		MinHook::HookVTable(FortPickupAthenaDefault, 0xBF, PickupAddInventoryOwnerInterfaceHook, (LPVOID*)(&PickupAddInventoryOwnerInterface), "PickupAddInventoryOwnerInterface");
 
 		uintptr_t AddressLocalSpawnPlayActor = MinHook::FindPattern(Patterns::LocalSpawnPlayActor);
 		uintptr_t AddressInternalGetNetMode = MinHook::FindPattern(Patterns::InternalGetNetMode);
@@ -814,8 +986,6 @@ namespace Hooks
 		MH_EnableHook((LPVOID)(AddressChangingGameSessionId));
 		MH_CreateHook((LPVOID)(AddressKickPlayer), KickPlayerHook, nullptr);
 		MH_EnableHook((LPVOID)(AddressKickPlayer));
-		/*MH_CreateHook((LPVOID)(AddressPickupCombine), PickupCombineHook, (LPVOID*)(&PickupCombine));
-		MH_EnableHook((LPVOID)(AddressPickupCombine));*/
 		MH_CreateHook((LPVOID)(AddressDispatchRequest), DispatchRequestHook, (LPVOID*)(&DispatchRequest));
 		MH_EnableHook((LPVOID)(AddressDispatchRequest));
 		MH_CreateHook((LPVOID)(AddressGetPlayerViewPoint), GetPlayerViewPointHook, (LPVOID*)(&GetPlayerViewPoint));
@@ -829,16 +999,18 @@ namespace Hooks
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0xE31290), sub_7FF66F481290Hook, nullptr);
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0xE31290));
 
-		/*MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8E80), CollectGarbageHook, nullptr);
-		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8E80));*/
+		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8E80), CollectGarbageHook, nullptr);
+		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8E80));
 
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0xC56D70), InitalizePoiManager, nullptr);
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0xC56D70));
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x10194B0), RestartHook, (LPVOID*)(&Restart));
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x10194B0));
 
-		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x145E6C0), execPickLootDropsHook, (LPVOID*)(&execPickLootDrops));
-		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x145E6C0));
+#ifdef ANTICHEAT
+		/*MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x66AF00), NetSerializeHook, (LPVOID*)(&NetSerialize));
+		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x66AF00));*/
+#endif // ANTICHEAT
 
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + Offsets::ProcessEvent), ProcessEventHook, (LPVOID*)(&ProcessEvent));
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + Offsets::ProcessEvent));

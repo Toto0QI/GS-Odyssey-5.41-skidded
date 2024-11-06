@@ -1,11 +1,13 @@
 #pragma once
 
-uintptr_t IdkOffset = 0x680;
+uintptr_t InventoryOwnerOffset = 0x680;
 
 #define CHEATS
 // #define DEBUGS
 #define SIPHON
+#define QUESTS
 #define ANTICHEAT
+// #define LATEGAME
 #define BOTS
 
 template<typename T = UObject>
@@ -19,27 +21,17 @@ static T* Cast(UObject* Object)
 	return nullptr;
 }
 
-// 0x0040 (0x0040 - 0x0000)
-struct FFortCreatePickupData final
-{
-public:
-	UWorld*										  World;					                         // 0x0000(0x0008)()
-	FFortItemEntry*								  ItemEntry;									     // 0x0008(0x0008)()
-	const FVector*								  SpawnLocation;									 // 0x0010(0x0008)()
-	const FRotator*								  SpawnRotation;                                     // 0x0018(0x0008)()
-	AFortPlayerController*						  PlayerController;									 // 0x0020(0x0008)()
-	UClass*										  OverrideClass;									 // 0x0028(0x0008)()
-	void*									      NullptrIdk;										 // 0x0030(0x0008)()
-	bool										  bRandomRotation;									 // 0x0038(0x0001)()
-	uint8                                         Pad_1[0x3];                                        // 0x0039(0x0003)()
-	uint32										  PickupSourceTypeFlags;						     // 0x003C(0x0004)()
-};
+/** Global engine pointer. Can be 0 so don't use without checking. */
+UEngine* GEngine = *(UEngine**)(uintptr_t(GetModuleHandleW(0)) + 0x5524898);
+
+/* Automatically pick up ammo and other resources. */
+bool GAutoResourceGathering = *(bool*)(uintptr_t(GetModuleHandleW(0)) + 0x4DADCA4);
 
 namespace Globals
 {
 	UFortEngine* GetFortEngine()
 	{
-		return *(UFortEngine**)(uintptr_t(GetModuleHandleW(0)) + 0x5524898); // GEngine
+		return Cast<UFortEngine>(GEngine);
 	}
 
 	UWorld* GetWorld(bool SkipCheck = false)
@@ -107,10 +99,10 @@ namespace Globals
 
 		if (GameState)
 		{
-			UFortPlaylistAthena* Playlist = GameState->CurrentPlaylistData;
+			UFortPlaylistAthena* PlaylistAthena = GameState->CurrentPlaylistData;
 
-			if (Playlist)
-				return Playlist;
+			if (PlaylistAthena)
+				return PlaylistAthena;
 		}
 
 		return nullptr;
@@ -150,5 +142,18 @@ namespace Globals
 		}
 
 		return nullptr;
+	}
+
+	float GenFlyTime()
+	{
+		float MaxTime; // [rsp+48h] [rbp+10h] BYREF
+		float MinTime; // [rsp+50h] [rbp+18h] BYREF
+
+		UCurveVector* PickupSplineCurve = GetGameData()->PickupSplineCurve;
+		if (!PickupSplineCurve)
+			return 1.5f;
+		PickupSplineCurve->GetTimeRange(&MinTime, &MaxTime);
+		float PickupSplineRandomMax = GetGameData()->PickupSplineRandomMax;
+		return (float)(MaxTime - MinTime) * (float)((float)((float)((float)rand() * 0.000030518509f) * (float)(PickupSplineRandomMax - 1.0f)) + 1.0f);
 	}
 }

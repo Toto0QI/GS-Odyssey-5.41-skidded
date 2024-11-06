@@ -41,6 +41,13 @@ public:
 
 	void ExecuteUbergraph(int32 EntryPoint);
 
+	void* GetInterfaceAddress(UClass* InterfaceClass)
+	{
+		// 7FF66FE971B0
+		void* (*GetInterfaceAddress)(UObject* Object, UClass* InterfaceClass) = decltype(GetInterfaceAddress)(0x18471B0 + uintptr_t(GetModuleHandle(0)));
+		return GetInterfaceAddress(this, InterfaceClass);
+	}
+
 public:
 	static class UClass* FindClass(const std::string& ClassFullName)
 	{
@@ -245,6 +252,13 @@ public:
 
 public:
 	class UFunction* GetFunction(const std::string& ClassName, const std::string& FuncName) const;
+
+	class UObject* CreateDefaultObject()
+	{
+		// 7FF66FD5B4F0
+		class UObject* (*CreateDefaultObject)(class UClass* Class) = decltype(CreateDefaultObject)(0x170B4F0 + uintptr_t(GetModuleHandle(0)));
+		return CreateDefaultObject(this);
+	}
 
 public:
 	static class UClass* StaticClass()

@@ -1,5 +1,6 @@
 #pragma once
 
+#ifdef BOTS
 enum class EAIBotAction : uint8
 {
 	None = 0,
@@ -29,9 +30,9 @@ public:
 		return AIPlayerController;
 	}
 
-	AFortPlayerController* GetFortAIPlayerController() const
+	AFortPlayerControllerAthena* GetFortAIPlayerController() const
 	{
-		return Cast<AFortPlayerController>(AIPlayerController);
+		return Cast<AFortPlayerControllerAthena>(AIPlayerController);
 	}
 
 	APawn* GetAIPawn() const
@@ -39,9 +40,19 @@ public:
 		return AIPawn;
 	}
 
-	AFortPlayerPawn* GetFortAIPawn() const
+	AFortPlayerPawnAthena* GetFortAIPawn() const
 	{
-		return  Cast<AFortPlayerPawn>(AIPawn);
+		return  Cast<AFortPlayerPawnAthena>(AIPawn);
+	}
+
+	AActor* GetTargetActor() const
+	{
+		return TargetActor;
+	}
+
+	EAIBotAction GetBotAction() const
+	{
+		return BotAction;
 	}
 
 	EAthenaGamePhase GetGamePhase()
@@ -54,11 +65,37 @@ public:
 		return EAthenaGamePhase::None;
 	}
 
-	void SetAIPlayerController(APlayerController* InPC)
+	void SetAIPawn(APawn* NewAIPawn)
 	{
-		if (AIPlayerController != InPC)
+		if (AIPawn != NewAIPawn)
 		{
-			AIPlayerController = InPC;
+			AIPawn = NewAIPawn;
+			AIPawn->SetActorTickEnabled(true);
+		}
+	}
+
+	void SetAIPlayerController(APlayerController* NewAIPlayerController)
+	{
+		if (AIPlayerController != NewAIPlayerController)
+		{
+			AIPlayerController = NewAIPlayerController;
+			AIPlayerController->SetActorTickEnabled(true);
+		}
+	}
+
+	void SetTargetActor(AActor* NewTargetActor)
+	{
+		if (TargetActor != NewTargetActor)
+		{
+			TargetActor = NewTargetActor;
+		}
+	}
+
+	void SetBotAction(EAIBotAction NewBotAction)
+	{
+		if (BotAction != NewBotAction)
+		{
+			BotAction = NewBotAction;
 		}
 	}
 
@@ -84,27 +121,209 @@ public:
 			GameMode::AddFromAlivePlayers(GameModeAthena, FortAIPlayerControllerAthena);
 	}
 
-	AFortPlayerStateAthena* InitPlayerStateBot() const
+	AFortPlayerStateAthena* InitPlayerState() const
 	{
-		AFortPlayerStateAthena* PlayerState = Cast<AFortPlayerStateAthena>(GetAIPlayerController());
+		if (!AIPlayerController)
+			return nullptr;
 
-		if (!PlayerState)
+		void (*InitPlayerState)(AController* Controller) = decltype(InitPlayerState)(AIPlayerController->VTable[0xD5]);
+		InitPlayerState(AIPlayerController);
+
+		return Cast<AFortPlayerStateAthena>(AIPlayerController->PlayerState);
+	}
+
+	AFortInventory* InitWorldInventory() const
+	{
+		AFortPlayerController* FortAIPlayerController = GetFortAIPlayerController();
+
+		if (!FortAIPlayerController)
+			return nullptr;
+
+		AFortInventory* WorldInventory = FortAIPlayerController->WorldInventory;
+
+		if (!WorldInventory)
 		{
-			PlayerState = Util::SpawnActor<AFortPlayerStateAthena>(AFortPlayerStateAthena::StaticClass());
+			WorldInventory = Util::SpawnActor<AFortInventory>(AFortInventory::StaticClass());
 
-			if (PlayerState)
+			if (WorldInventory)
 			{
-				PlayerState->SetOwner(AIPlayerController);
-				PlayerState->OnRep_Owner();
+				WorldInventory->SetOwner(FortAIPlayerController);
+				WorldInventory->OnRep_Owner();
 
-				AIPlayerController->PlayerState = PlayerState;
-				AIPlayerController->OnRep_PlayerState();
-
-				PlayerState->bIsABot = true;
+				FortAIPlayerController->WorldInventory = WorldInventory;
+				FortAIPlayerController->bHasInitializedWorldInventory = true;
+				FortAIPlayerController->WorldInventory->HandleInventoryLocalUpdate();
 			}
 		}
 
-		return PlayerState;
+		return WorldInventory;
+	}
+
+	AFortQuickBars* InitQuickBars() const
+	{
+		AFortPlayerController* FortAIPlayerController = GetFortAIPlayerController();
+
+		if (!FortAIPlayerController)
+			return nullptr;
+
+		AFortQuickBars* QuickBars = FortAIPlayerController->QuickBars;
+
+		if (!QuickBars)
+		{
+			QuickBars = Util::SpawnActor<AFortQuickBars>(AFortQuickBars::StaticClass());
+
+			if (QuickBars)
+			{
+				QuickBars->SetOwner(FortAIPlayerController);
+				QuickBars->OnRep_Owner();
+
+				FortAIPlayerController->QuickBars = QuickBars;
+				FortAIPlayerController->OnRep_QuickBar();
+			}
+		}
+
+		return QuickBars;
+	}
+
+	void InitAbilities() const
+	{
+		AFortPlayerController* FortAIPlayerController = GetFortAIPlayerController();
+
+		if (!FortAIPlayerController)
+			return;
+
+		AFortPlayerState* PlayerState = Cast<AFortPlayerState>(FortAIPlayerController->PlayerState);
+
+		if (!PlayerState)
+			return;
+
+		UFortAbilitySystemComponent* AbilitySystemComponent = PlayerState->AbilitySystemComponent;
+
+		if (!AbilitySystemComponent)
+			AbilitySystemComponent = Cast<UFortAbilitySystemComponent>(UGameplayStatics::SpawnObject(UFortAbilitySystemComponent::StaticClass(), PlayerState));
+
+		AFortPlayerPawn* PlayerPawn = FortAIPlayerController->MyFortPawn;
+
+		if (AbilitySystemComponent && PlayerPawn)
+		{
+			// 7FF66EC68170
+			void (*ClearAllAbilities)(UAbilitySystemComponent* AbilitySystemComponent) = decltype(ClearAllAbilities)(0x618170 + uintptr_t(GetModuleHandle(0)));
+			ClearAllAbilities(PlayerState->AbilitySystemComponent);
+
+			UFortAbilitySet* DefaultAbilities = Globals::GetGameData()->GenericPlayerAbilitySet.Get();
+
+			Abilities::GrantGameplayAbility(DefaultAbilities, AbilitySystemComponent);
+			Abilities::GrantGameplayEffect(DefaultAbilities, AbilitySystemComponent);
+			Abilities::GrantModifierAbilityFromPlaylist(AbilitySystemComponent);
+		}
+	}
+
+	void InitStartInventory() const
+	{
+		AFortPlayerControllerAthena* FortAIPlayerController = Cast<AFortPlayerControllerAthena>(GetFortAIPlayerController());
+
+		if (!FortAIPlayerController)
+			return;
+
+		UAthenaPickaxeItemDefinition* AthenaPickaxeItemDefinition = FortAIPlayerController->CustomizationLoadout.Pickaxe;
+		UFortWeaponMeleeItemDefinition* WeaponMeleeItemDefinition = nullptr;
+
+		if (AthenaPickaxeItemDefinition)
+			WeaponMeleeItemDefinition = AthenaPickaxeItemDefinition->WeaponDefinition;
+
+		if (!WeaponMeleeItemDefinition)
+		{
+			UAthenaPickaxeItemDefinition* DefaultPickaxeSkin = Globals::GetGameData()->DefaultPickaxeSkin;
+
+			if (DefaultPickaxeSkin)
+				WeaponMeleeItemDefinition = DefaultPickaxeSkin->WeaponDefinition;
+		}
+
+		if (WeaponMeleeItemDefinition)
+		{
+			Inventory::SetupInventory(FortAIPlayerController, WeaponMeleeItemDefinition);
+
+			AFortInventory* WorldInventory = FortAIPlayerController->WorldInventory;
+
+			if (WorldInventory)
+			{
+				WorldInventory->Inventory.MarkArrayDirty();
+				WorldInventory->HandleInventoryLocalUpdate();
+
+				UFortWorldItem* WorldItem = Cast<UFortWorldItem>(FortAIPlayerController->K2_FindExistingItemForDefinition(WeaponMeleeItemDefinition, false));
+
+				if (WorldItem)
+					FortAIPlayerController->ServerExecuteInventoryItem(WorldItem->ItemEntry.ItemGuid);
+			}
+		}
+	}
+
+	void ApplyCustomization() const
+	{
+		AFortPlayerControllerAthena* FortAIPlayerController = GetFortAIPlayerController();
+
+		if (!FortAIPlayerController)
+			return;
+
+		AFortPlayerState* PlayerState = Cast<AFortPlayerState>(FortAIPlayerController->PlayerState);
+
+		if (!PlayerState)
+			return;
+
+		AFortPlayerPawn* PlayerPawn = FortAIPlayerController->MyFortPawn;
+
+		if (!PlayerPawn)
+			return;
+
+		PlayerState->ApplyCharacterCustomization(PlayerPawn);
+
+		UAthenaCharacterItemDefinition* AthenaCharacterItemDefinition = FortAIPlayerController->CustomizationLoadout.Character;
+		UAthenaBackpackItemDefinition* AthenaBackpackItemDefinition = FortAIPlayerController->CustomizationLoadout.Backpack;
+
+		if (AthenaCharacterItemDefinition)
+		{
+			UFortHeroType* HeroDefinition = AthenaCharacterItemDefinition->HeroDefinition;
+			if (!HeroDefinition) return;
+
+			for (int32 i = 0; i < HeroDefinition->Specializations.Num(); i++)
+			{
+				TSoftObjectPtr<UFortHeroSpecialization> Specialization = HeroDefinition->Specializations[i];
+				UFortHeroSpecialization* HeroSpecialization = Specialization.Get();
+
+				if (!HeroSpecialization)
+				{
+					const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(Specialization.ObjectID.AssetPathName); // ToString doesn't work idk
+					HeroSpecialization = StaticLoadObject<UFortHeroSpecialization>(AssetPathName.CStr());
+				}
+
+				if (!HeroSpecialization)
+					continue;
+
+				bool bChooseGender = false;
+				for (int32 j = 0; j < HeroSpecialization->CharacterParts.Num(); j++)
+				{
+					TSoftObjectPtr<UCustomCharacterPart> CharacterPart = HeroSpecialization->CharacterParts[j];
+					UCustomCharacterPart* CustomCharacterPart = CharacterPart.Get();
+
+					if (!CustomCharacterPart)
+					{
+						const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(CharacterPart.ObjectID.AssetPathName); // ToString doesn't work idk
+						CustomCharacterPart = StaticLoadObject<UCustomCharacterPart>(AssetPathName.CStr());
+					}
+
+					if (!CustomCharacterPart)
+						continue;
+
+					PlayerPawn->ServerChoosePart(CustomCharacterPart->CharacterPartType, CustomCharacterPart);
+
+					if (!bChooseGender)
+					{
+						PlayerPawn->ServerChooseGender(CustomCharacterPart->GenderPermitted);
+						bChooseGender = true;
+					}
+				}
+			}
+		}
 	}
 
 	TArray<UAthenaCosmeticItemDefinition*> GetAllCosmeticItems() const
@@ -135,148 +354,54 @@ public:
 
 	UAthenaSkyDiveContrailItemDefinition* ChooseRandomSkyDiveContrail() const
 	{
-		TArray<UAthenaCosmeticItemDefinition*> AllCosmeticItems = GetAllCosmeticItems();
-		static TArray<UAthenaSkyDiveContrailItemDefinition*> AllSkyDiveContrailItems;
-
-		if (AllSkyDiveContrailItems.Num() <= 0)
-		{
-			for (int32 i = 0; i < AllCosmeticItems.Num(); i++)
-			{
-				UAthenaSkyDiveContrailItemDefinition* SkyDiveContrailItemDefinition = Cast<UAthenaSkyDiveContrailItemDefinition>(AllCosmeticItems[i]);
-
-				if (!SkyDiveContrailItemDefinition)
-					continue;
-
-				AllSkyDiveContrailItems.Add(SkyDiveContrailItemDefinition);
-			}
-		}
-
-		int32 RandomIndex = UKismetMathLibrary::RandomIntegerInRange(0, AllSkyDiveContrailItems.Num());
-		return AllSkyDiveContrailItems[RandomIndex];
+		TArray<UAthenaCosmeticItemDefinition*> AllSkyDiveContrailItems = UFortniteAutomationBlueprintLibrary::GetAllAthenaCosmetics(EFortItemType::AthenaSkyDiveContrail);
+		return Cast<UAthenaSkyDiveContrailItemDefinition>(AllSkyDiveContrailItems[std::rand() % AllSkyDiveContrailItems.Num()]);
 	}
 
 	UAthenaGliderItemDefinition* ChooseRandomGlider() const
 	{
-		TArray<UAthenaCosmeticItemDefinition*> AllCosmeticItems = GetAllCosmeticItems();
-		static TArray<UAthenaGliderItemDefinition*> AllGliderItems;
-
-		if (AllGliderItems.Num() <= 0)
-		{
-			for (int32 i = 0; i < AllCosmeticItems.Num(); i++)
-			{
-				UAthenaGliderItemDefinition* GliderItemDefinition = Cast<UAthenaGliderItemDefinition>(AllCosmeticItems[i]);
-
-				if (!GliderItemDefinition)
-					continue;
-
-				AllGliderItems.Add(GliderItemDefinition);
-			}
-		}
-
-		int32 RandomIndex = UKismetMathLibrary::RandomIntegerInRange(0, AllGliderItems.Num());
-		return AllGliderItems[RandomIndex];
+		TArray<UAthenaCosmeticItemDefinition*> AllGliderItems = UFortniteAutomationBlueprintLibrary::GetAllAthenaCosmetics(EFortItemType::AthenaGlider);
+		return Cast<UAthenaGliderItemDefinition>(AllGliderItems[std::rand() % AllGliderItems.Num()]);
 	}
 
 	UAthenaPickaxeItemDefinition* ChooseRandomPickaxe() const
 	{
-		TArray<UAthenaCosmeticItemDefinition*> AllCosmeticItems = GetAllCosmeticItems();
-		static TArray<UAthenaPickaxeItemDefinition*> AllPickaxeItems;
-
-		if (AllPickaxeItems.Num() <= 0)
-		{
-			for (int32 i = 0; i < AllCosmeticItems.Num(); i++)
-			{
-				UAthenaPickaxeItemDefinition* PickaxeItemDefinition = Cast<UAthenaPickaxeItemDefinition>(AllCosmeticItems[i]);
-
-				if (!PickaxeItemDefinition)
-					continue;
-
-				AllPickaxeItems.Add(PickaxeItemDefinition);
-			}
-		}
-
-		int32 RandomIndex = UKismetMathLibrary::RandomIntegerInRange(0, AllPickaxeItems.Num());
-		return AllPickaxeItems[RandomIndex];
+		TArray<UAthenaCosmeticItemDefinition*> AllPickaxeItems = UFortniteAutomationBlueprintLibrary::GetAllAthenaCosmetics(EFortItemType::AthenaPickaxe);
+		return Cast<UAthenaPickaxeItemDefinition>(AllPickaxeItems[std::rand() % AllPickaxeItems.Num()]);
 	}
 
 	UAthenaCharacterItemDefinition* ChooseRandomCharacter() const
 	{
-		TArray<UAthenaCosmeticItemDefinition*> AllCosmeticItems = GetAllCosmeticItems();
-		static TArray<UAthenaCharacterItemDefinition*> AllCharacterItems;
-
-		if (AllCharacterItems.Num() <= 0)
-		{
-			for (int32 i = 0; i < AllCosmeticItems.Num(); i++)
-			{
-				UAthenaCharacterItemDefinition* CharacterItemDefinition = Cast<UAthenaCharacterItemDefinition>(AllCosmeticItems[i]);
-
-				if (!CharacterItemDefinition)
-					continue;
-
-				AllCharacterItems.Add(CharacterItemDefinition);
-			}
-		}
-
-		int32 RandomIndex = UKismetMathLibrary::RandomIntegerInRange(0, AllCharacterItems.Num());
-		return AllCharacterItems[RandomIndex];
+		TArray<UAthenaCosmeticItemDefinition*> AllCharacterItems = UFortniteAutomationBlueprintLibrary::GetAllAthenaCosmetics(EFortItemType::AthenaCharacter);
+		return Cast<UAthenaCharacterItemDefinition>(AllCharacterItems[std::rand() % AllCharacterItems.Num()]);
 	}
 
 	UAthenaBackpackItemDefinition* ChooseRandomBackpack() const
 	{
-		TArray<UAthenaCosmeticItemDefinition*> AllCosmeticItems = GetAllCosmeticItems();
-		static TArray<UAthenaBackpackItemDefinition*> AllBackpackItems;
-
-		if (AllBackpackItems.Num() <= 0)
-		{
-			for (int32 i = 0; i < AllCosmeticItems.Num(); i++)
-			{
-				UAthenaBackpackItemDefinition* BackpackItemDefinition = Cast<UAthenaBackpackItemDefinition>(AllCosmeticItems[i]);
-
-				if (!BackpackItemDefinition)
-					continue;
-
-				AllBackpackItems.Add(BackpackItemDefinition);
-			}
-		}
-
-		int32 RandomIndex = UKismetMathLibrary::RandomIntegerInRange(0, AllBackpackItems.Num());
-		return AllBackpackItems[RandomIndex];
+		TArray<UAthenaCosmeticItemDefinition*> AllBackpackItems = UFortniteAutomationBlueprintLibrary::GetAllAthenaCosmetics(EFortItemType::AthenaBackpack);
+		return Cast<UAthenaBackpackItemDefinition>(AllBackpackItems[std::rand() % AllBackpackItems.Num()]);
 	}
 
 	void ChooseRandomCosmetics() const
 	{
-		AFortPlayerControllerAthena* FortAIPlayerControllerAthena = Cast<AFortPlayerControllerAthena>(GetFortAIPlayerController());
+		AFortPlayerControllerAthena* FortAIPlayerControllerAthena = GetFortAIPlayerController();
 
 		if (FortAIPlayerControllerAthena)
 		{
-			/*FFortAthenaLoadout* CustomizationLoadout = &FortAIPlayerControllerAthena->CustomizationLoadout;
-			CustomizationLoadout->SkyDiveContrail = Cast<UAthenaSkyDiveContrailItemDefinition>(ChooseRandomCosmecticWithClass(UAthenaSkyDiveContrailItemDefinition::StaticClass()));
-			CustomizationLoadout->Glider = Cast<UAthenaGliderItemDefinition>(ChooseRandomCosmecticWithClass(UAthenaGliderItemDefinition::StaticClass()));
-			CustomizationLoadout->Pickaxe = Cast<UAthenaPickaxeItemDefinition>(ChooseRandomCosmecticWithClass(UAthenaPickaxeItemDefinition::StaticClass()));
-			CustomizationLoadout->Character = Cast<UAthenaCharacterItemDefinition>(ChooseRandomCosmecticWithClass(UAthenaCharacterItemDefinition::StaticClass()));
-			CustomizationLoadout->Backpack = Cast<UAthenaBackpackItemDefinition>(ChooseRandomCosmecticWithClass(UAthenaBackpackItemDefinition::StaticClass()));*/
+			FFortAthenaLoadout* CustomizationLoadout = &FortAIPlayerControllerAthena->CustomizationLoadout;
+			if (!CustomizationLoadout) return;
 
-			FFortAthenaLoadout CustomizationLoadout;
-			/*CustomizationLoadout.BannerIconId = FString(0);
-			CustomizationLoadout.BannerColorId = FString(0);*/
-			CustomizationLoadout.SkyDiveContrail = ChooseRandomSkyDiveContrail();
-			CustomizationLoadout.Glider = ChooseRandomGlider();
-			CustomizationLoadout.Pickaxe = ChooseRandomPickaxe();
-			CustomizationLoadout.Character = ChooseRandomCharacter();
-			CustomizationLoadout.Hat = nullptr;
-			CustomizationLoadout.Backpack = ChooseRandomBackpack();
-			CustomizationLoadout.LoadingScreen = nullptr;
-			CustomizationLoadout.BattleBus = nullptr;
-			CustomizationLoadout.VehicleDecoration = nullptr;
-			CustomizationLoadout.CallingCard = nullptr;
-			CustomizationLoadout.MapMarker = nullptr;
-			CustomizationLoadout.VictoryPose = nullptr;
-			CustomizationLoadout.MusicPack = nullptr;
-			CustomizationLoadout.WeaponSkin = nullptr;
-			CustomizationLoadout.PetSkin = nullptr;
+			UFortniteAutomationBlueprintLibrary::GetAllAthenaCosmetics(EFortItemType::AthenaCharacter); // à tester les trikiz
+
+			CustomizationLoadout->SkyDiveContrail = ChooseRandomSkyDiveContrail();
+			CustomizationLoadout->Glider = ChooseRandomGlider();
+			CustomizationLoadout->Pickaxe = ChooseRandomPickaxe();
+			CustomizationLoadout->Character = ChooseRandomCharacter();
+			CustomizationLoadout->Backpack = ChooseRandomBackpack();
+			return;
 
 			// 7FF66F7FB320
-			FFortAthenaLoadout* (*GetAthenaLoadoutWithOverrides)(AFortPlayerController* PlayerController, FFortAthenaLoadout * PrimaryAthenaLoadout, FFortAthenaLoadout * AthenaLoadout) = decltype(GetAthenaLoadoutWithOverrides)(0x11AB320 + uintptr_t(GetModuleHandle(0)));
+			/*FFortAthenaLoadout* (*GetAthenaLoadoutWithOverrides)(AFortPlayerController * PlayerController, FFortAthenaLoadout * PrimaryAthenaLoadout, FFortAthenaLoadout * AthenaLoadout) = decltype(GetAthenaLoadoutWithOverrides)(0x11AB320 + uintptr_t(GetModuleHandle(0)));
 			FFortAthenaLoadout* AthenaLoadoutWithOverrides = GetAthenaLoadoutWithOverrides(FortAIPlayerControllerAthena, &FortAIPlayerControllerAthena->CustomizationLoadout, &CustomizationLoadout);
 
 			if (AthenaLoadoutWithOverrides)
@@ -284,7 +409,7 @@ public:
 				// 7FF66F265030
 				FFortAthenaLoadout* (*CopyAthenaLoadout)(FFortAthenaLoadout* PrimaryAthenaLoadout, FFortAthenaLoadout* AthenaLoadout) = decltype(CopyAthenaLoadout)(0xC15030 + uintptr_t(GetModuleHandle(0)));
 				CopyAthenaLoadout(&FortAIPlayerControllerAthena->CustomizationLoadout, AthenaLoadoutWithOverrides);
-			}
+			}*/
 		}
 	}
 
@@ -302,28 +427,48 @@ public:
 
 			if (FortAIPlayerController && GameModeAthena)
 			{
-				FortAIPlayerController->ServerChangeName(L"Odyssey BOT");
-
+				InitPlayerState();
 				InitPlayerTeam();
 				InitAlivePlayers();
-				// ChooseRandomCosmetics();
+				InitWorldInventory();
+				InitQuickBars();
+
+				ChooseRandomCosmetics();
+
+				FortAIPlayerController->ServerChangeName(L"Odyssey BOT");
 
 				GameModeAthena->HandleStartingNewPlayer(FortAIPlayerController);
 
-				if (FortAIPlayerController->MyFortPawn)
+				if (FortAIPlayerController->Pawn)
+					SetAIPawn(FortAIPlayerController->Pawn);
+
+				InitAbilities();
+				InitStartInventory();
+				
+				ApplyCustomization();
+
+				if (FortAIPlayerController->Pawn)
 				{
-					GameMode::ApplyCharacterCustomization((AFortPlayerState*)FortAIPlayerController->PlayerState, FortAIPlayerController->MyFortPawn);
+					FortAIPlayerController->Pawn->SetNetDormancy(ENetDormancy::DORM_Awake);
+					FortAIPlayerController->Pawn->FlushNetDormancy();
+					FortAIPlayerController->Pawn->ForceNetUpdate();
 				}
+
+				SetBotAction(EAIBotAction::Warmup);
 			}
-
-			/*AFortPlayerStateAthena* PlayerState = InitPlayerStateBot();
-
-			
-
-			if (GameMode)
-				GameMode->HandleStartingNewPlayer(AIPlayerController);*/
-			
 		}
+	}
+
+	void TeleportBotPos(const FVector& Position) const
+	{
+		if (!AIPawn)
+			return;
+
+		AIPawn->K2_TeleportTo(Position, FRotator());
+		AIPawn->SetReplicateMovement(true);
+		AIPawn->OnRep_ReplicateMovement();
+		AIPawn->SetReplicates(true);
+		AIPawn->ForceNetUpdate();
 	}
 };
 
@@ -341,15 +486,29 @@ static AAIBotOdyssey* CreateBotOdyssey()
 		return NewClass;
 	}
 
+	PlayerController->K2_DestroyActor();
 	return nullptr;
+}
+
+static AAIBotOdyssey* FindBotOdyssey(APlayerController* PlayerController)
+{
+	AAIBotOdyssey* BotOdyssey = nullptr;
+
+	for (auto& Find : AAIBotOdyssey::BotOdysseyMap)
+	{
+		if (Find.first == PlayerController)
+		{
+			BotOdyssey = Find.second;
+			break;
+		}
+	}
+
+	return BotOdyssey;
 }
 
 static AAIBotOdyssey* FindOrCreateBotOdyssey(APlayerController* PlayerController)
 {
 	AAIBotOdyssey* BotOdyssey = nullptr;
-
-	if (!PlayerController)
-		return BotOdyssey;
 
 	for (auto& Find : AAIBotOdyssey::BotOdysseyMap)
 	{
@@ -365,3 +524,58 @@ static AAIBotOdyssey* FindOrCreateBotOdyssey(APlayerController* PlayerController
 
 	return BotOdyssey;
 }
+
+namespace BotOdyssey
+{
+	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms)
+	{
+		if (!Object || !Function)
+			return;
+
+		const std::string& FunctionName = Function->GetName();
+
+		if (FunctionName.contains("Tick"))
+		{
+			for (auto& Find : AAIBotOdyssey::BotOdysseyMap)
+			{
+				AAIBotOdyssey* BotOdyssey = Find.second;
+				if (!BotOdyssey) continue;
+
+				AFortPlayerControllerAthena* FortAIPlayerController = BotOdyssey->GetFortAIPlayerController();
+				if (!FortAIPlayerController) continue;
+
+				EAIBotAction BotAction = BotOdyssey->GetBotAction();
+
+				switch (BotAction)
+				{
+				case EAIBotAction::None:
+					break;
+				case EAIBotAction::Warmup:
+					break;
+				case EAIBotAction::Aircraft:
+					if (FortAIPlayerController->IsInAircraft())
+					{
+
+						FortAIPlayerController->ServerThankBusDriver();
+					}
+					break;
+				case EAIBotAction::Skydive:
+					break;
+				case EAIBotAction::Looting:
+					break;
+				case EAIBotAction::Fighting:
+					break;
+				case EAIBotAction::Building:
+					break;
+				case EAIBotAction::Dancing:
+					break;
+				case EAIBotAction::EndGame:
+					break;
+				default:
+					break;
+				}
+			}
+		}
+	}
+}
+#endif // BOTS

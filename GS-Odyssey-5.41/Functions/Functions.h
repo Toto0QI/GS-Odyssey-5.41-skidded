@@ -69,6 +69,22 @@ namespace Functions
 		}
 	}
 
+	UFortGameplayAbility* LoadGameplayAbility(TSoftClassPtr<UClass> SoftGameplayAbility)
+	{
+		UClass* GameplayAbilityClass = SoftGameplayAbility.Get();
+
+		if (!GameplayAbilityClass)
+		{
+			const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(SoftGameplayAbility.ObjectID.AssetPathName);
+			GameplayAbilityClass = StaticLoadObject<UClass>(AssetPathName.CStr());
+		}
+
+		if (GameplayAbilityClass)
+			return Cast<UFortGameplayAbility>(GameplayAbilityClass->CreateDefaultObject());
+
+		return nullptr;
+	}
+
 	int GetRandomRarity(const std::map<int32, float>& RarityAndWeight) 
 	{
 		std::random_device rd;
@@ -150,30 +166,67 @@ namespace Functions
 
 					SpawnLocation.Z += 45;
 
-					FRotator SpawnRotation = FRotator({ 0, 0, 0 });
-
-					FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
-					CreatePickupData.World = Globals::GetWorld();
-					CreatePickupData.ItemEntry = &LootToDrop;
-					CreatePickupData.SpawnLocation = &SpawnLocation;
-					CreatePickupData.SpawnRotation = &SpawnRotation;
-					CreatePickupData.PlayerController = nullptr;
-					CreatePickupData.OverrideClass = nullptr;
-					CreatePickupData.NullptrIdk = nullptr;
-					CreatePickupData.bRandomRotation = true;
-					CreatePickupData.PickupSourceTypeFlags = 0;
-
-					AFortPickup* Pickup = Inventory::CreatePickupFromData(&CreatePickupData);
+					AFortPickup* Pickup = AFortPickup::CreatePickup(
+						BuildingContainer->GetWorld(),
+						&LootToDrop,
+						&SpawnLocation,
+						nullptr,
+						nullptr,
+						nullptr,
+						true,
+						(uint32)EFortPickupSourceTypeFlag::FloorLoot);
 
 					if (Pickup)
-					{
 						Pickup->TossPickup(SpawnLocation, nullptr, 0, true);
-					}
 				}
 			}
 
 			BuildingContainer->K2_DestroyActor();
 		}
+	}
+
+	FVector GetLootSpawnLocation(AFortAthenaSupplyDrop* AthenaSupplyDrop)
+	{
+		if (!AthenaSupplyDrop)
+			return FVector();
+
+		UFunction* GetLootSpawnLocationFunc = nullptr;
+
+		if (GetLootSpawnLocationFunc == nullptr)
+			GetLootSpawnLocationFunc = AthenaSupplyDrop->Class->GetFunction("AthenaSupplyDrop_Llama_C", "GetLootSpawnLocation");
+
+		struct AthenaSupplyDrop_Llama_C_GetLootSpawnLocation final
+		{
+		public:
+			FVector LootSpawnLocation;
+			uint8 Pad_01[0x40];
+		};
+
+		AthenaSupplyDrop_Llama_C_GetLootSpawnLocation GetLootSpawnLocationParms{};
+
+		if (GetLootSpawnLocationFunc)
+			AthenaSupplyDrop->ProcessEvent(GetLootSpawnLocationFunc, &GetLootSpawnLocationParms);
+
+		return std::move(GetLootSpawnLocationParms.LootSpawnLocation);
+	}
+
+	FName GetLootTableName(AFortAthenaSupplyDrop* AthenaSupplyDrop)
+	{
+		if (!AthenaSupplyDrop)
+			return FName(0);
+
+		const UStruct* Clss = AthenaSupplyDrop->Class;
+
+		for (UField* Field = Clss->Children; Field; Field = Field->Next)
+		{
+			if (Field->HasTypeFlag(EClassCastFlags::NameProperty) && Field->GetName() == "LootTableName")
+			{
+				int32 LootTableNameOffset = ((UProperty*)Field)->Offset;
+				return *(FName*)(__int64(AthenaSupplyDrop) + LootTableNameOffset);
+			}
+		}
+
+		return FName(0);
 	}
 
 	void VendingMachinePlayVendFX(ABuildingItemCollectorActor* ItemCollectorActor)
@@ -272,7 +325,8 @@ namespace Functions
 			for (auto& LootToDrop : LootToDrops)
 				ItemCollections[i].OutputItemEntry.Add(LootToDrop);
 
-			ItemCollections[i].OutputItem = Cast<UFortWorldItemDefinition>(ItemCollections[i].OutputItemEntry[0].ItemDefinition);
+			if (ItemCollections[i].OutputItemEntry.IsValidIndex(0))
+				ItemCollections[i].OutputItem = Cast<UFortWorldItemDefinition>(ItemCollections[i].OutputItemEntry[0].ItemDefinition);
 		}
 
 		ItemCollectorActor->StartingGoalLevel = RandomRarity;
@@ -468,6 +522,60 @@ namespace Functions
 		}
 	}
 
+	void SetPlaylistData(AFortGameModeAthena* GameModeAthena, UFortPlaylistAthena* PlaylistAthena)
+	{
+		if (!GameModeAthena || !PlaylistAthena)
+			return;
+
+		AFortGameStateAthena* GameStateAthena = Cast<AFortGameStateAthena>(GameModeAthena->GameState);
+
+		if (GameStateAthena)
+		{
+			// 7FF66F2504C0
+			void (*SetCurrentPlaylistId)(AFortGameModeAthena* GameModeAthena, int32 NewPlaylistId) = decltype(SetCurrentPlaylistId)(0xC004C0 + uintptr_t(GetModuleHandle(0)));
+			SetCurrentPlaylistId(GameModeAthena, PlaylistAthena->PlaylistId);
+
+			GameStateAthena->CurrentPlaylistData = PlaylistAthena;
+			GameStateAthena->OnRep_CurrentPlaylistData();
+
+			GameStateAthena->AirCraftBehavior = PlaylistAthena->AirCraftBehavior;
+
+			GameModeAthena->AISettings = PlaylistAthena->AISettings;
+
+			AFortGameSession* GameSession = GameModeAthena->FortGameSession;
+
+			if (GameSession)
+			{
+				GameSession->MaxPlayers = PlaylistAthena->MaxPlayers;
+				GameSession->MaxPartySize = PlaylistAthena->MaxSocialPartySize;
+
+				GameSession->SessionName = UKismetStringLibrary::Conv_StringToName(L"OdysseySession");
+			}
+		}
+	}
+
+	bool HasGameplayTags(TArray<FGameplayTag> GameplayTags, FName TagNameRequired)
+	{
+		const FString& TagNameRequiredString = UKismetStringLibrary::Conv_NameToString(TagNameRequired);
+		const FString& TagNameRequiredLower = UKismetStringLibrary::ToLower(TagNameRequiredString);
+
+		for (int32 j = 0; j < GameplayTags.Num(); j++)
+		{
+			FGameplayTag GameplayTag = GameplayTags[j];
+
+			FName TagName = GameplayTag.TagName;
+			if (!TagName.IsValid()) continue;
+
+			const FString& TagNameString = UKismetStringLibrary::Conv_NameToString(TagName);
+			const FString& TagNameLower = UKismetStringLibrary::ToLower(TagNameString);
+
+			if (TagNameLower == TagNameRequiredLower)
+				return true;
+		}
+
+		return false;
+	}
+
 	TArray<UFortItemDefinition*> PickOnlyAthena(TArray<UFortItemDefinition*> AllItems)
 	{
 		static TArray<UFortItemDefinition*> AllAthenaItems;
@@ -518,6 +626,338 @@ namespace Functions
 
 		return bOnlyAthena ? PickOnlyAthena(AllItems) : AllItems;
 	}
+
+	TArray<UFortWorldItemDefinition*> GetAllItemsWithClass(bool bOnlyAthena, UClass* Class)
+	{
+		TArray<UFortItemDefinition*> AllItems = GetAllItems(bOnlyAthena);
+		TArray<UFortWorldItemDefinition*> AllItemsWithClass;
+
+		for (int32 i = 0; i < AllItems.Num(); i++)
+		{
+			UFortItemDefinition* ItemDefinition = AllItems[i];
+
+			if (!ItemDefinition)
+				continue;
+
+			if (ItemDefinition->IsA(Class))
+			{
+				UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(ItemDefinition);
+				if (!WorldItemDefinition) continue;
+
+				AllItemsWithClass.Add(WorldItemDefinition);
+			}
+		}
+
+		return AllItemsWithClass;
+	}
+
+	TArray<UFortWeaponItemDefinition*> GetAllItemsWithTag(const FName& TagNameRequired, TArray<UFortWorldItemDefinition*> BlackListWorldItemDefinitions, TArray<EFortRarity> BlackListRaritys, TArray<EFortItemType> BlackListItemTypes)
+	{
+		TArray<UFortItemDefinition*> AllItems = GetAllItems(true);
+		TArray<UFortWeaponItemDefinition*> AllItemsWithTag;
+
+		if (!TagNameRequired.IsValid())
+			return AllItemsWithTag;
+
+		for (int32 i = 0; i < AllItems.Num(); i++)
+		{
+			UFortWeaponItemDefinition* WeaponRangedItemDefinition = Cast<UFortWeaponItemDefinition>(AllItems[i]);
+			if (!WeaponRangedItemDefinition) continue;
+
+			bool bBlacklistItem = false;
+			for (int32 j = 0; j < BlackListWorldItemDefinitions.Num(); j++)
+			{
+				UFortWorldItemDefinition* BlackListWorldItemDefinition = BlackListWorldItemDefinitions[j];
+				if (!BlackListWorldItemDefinition) continue;
+
+				if (BlackListWorldItemDefinition == WeaponRangedItemDefinition)
+				{
+					bBlacklistItem = true;
+					break;
+				}
+			}
+
+			if (bBlacklistItem)
+				continue;
+
+			bool bBlackListRariry = false;
+			for (int32 j = 0; j < BlackListRaritys.Num(); j++)
+			{
+				EFortRarity BlackListRarity = BlackListRaritys[j];
+
+				if (BlackListRarity == WeaponRangedItemDefinition->Rarity)
+				{
+					bBlackListRariry = true;
+					break;
+				}
+			}
+
+			if (bBlackListRariry)
+				continue;
+
+			bool bBlackListItemType = false;
+			for (int32 j = 0; j < BlackListItemTypes.Num(); j++)
+			{
+				EFortItemType BlackListItemType = BlackListItemTypes[j];
+
+				if (BlackListItemType == WeaponRangedItemDefinition->ItemType)
+				{
+					bBlackListItemType = true;
+					break;
+				}
+			}
+
+			if (bBlackListItemType)
+				continue;
+
+			TArray<FGameplayTag> GameplayTags = WeaponRangedItemDefinition->GameplayTags.GameplayTags;
+
+			const FString& TagNameRequiredString = UKismetStringLibrary::Conv_NameToString(TagNameRequired);
+			const FString& TagNameRequiredLower = UKismetStringLibrary::ToLower(TagNameRequiredString);
+
+			bool bFindTagName = false;
+			for (int32 j = 0; j < GameplayTags.Num(); j++)
+			{
+				FGameplayTag GameplayTag = GameplayTags[j];
+
+				FName TagName = GameplayTag.TagName;
+				if (!TagName.IsValid()) continue;
+
+				const FString& TagNameString = UKismetStringLibrary::Conv_NameToString(TagName);
+				const FString& TagNameLower = UKismetStringLibrary::ToLower(TagNameString);
+
+				if (TagNameLower == TagNameRequiredLower)
+				{
+					bFindTagName = true;
+					break;
+				}
+			}
+
+			if (!bFindTagName)
+				continue;
+
+			AllItemsWithTag.Add(WeaponRangedItemDefinition);
+		}
+
+		return AllItemsWithTag;
+	}
+
+	UFortWeaponItemDefinition* ChooseRandomItemWithFilter(const FName& TagNameRequired, TArray<UFortWorldItemDefinition*> BlackListWorldItemDefinitions = {}, TArray<EFortRarity> BlackListRarity = {}, TArray<EFortItemType> BlackListItemTypes = {})
+	{
+		TArray<UFortWeaponItemDefinition*> AllItemsWithTag = GetAllItemsWithTag(TagNameRequired, BlackListWorldItemDefinitions, BlackListRarity, BlackListItemTypes);
+		return AllItemsWithTag[std::rand() % AllItemsWithTag.Num()];
+	}
+
+#ifdef SIPHON
+	void ApplySiphonEffect(AFortPlayerState* PlayerState)
+	{
+		if (PlayerState)
+		{
+			UFortAbilitySystemComponent* AbilitySystemComponent = PlayerState->AbilitySystemComponent;
+
+			if (AbilitySystemComponent)
+			{
+				FGameplayTag GameplayTag = FGameplayTag();
+				GameplayTag.TagName = UKismetStringLibrary::Conv_StringToName(L"GameplayCue.Shield.PotionConsumed");
+
+				AbilitySystemComponent->NetMulticast_InvokeGameplayCueAdded(GameplayTag, FPredictionKey(), FGameplayEffectContextHandle());
+				AbilitySystemComponent->NetMulticast_InvokeGameplayCueExecuted(GameplayTag, FPredictionKey(), FGameplayEffectContextHandle());
+			}
+		}
+	}
+
+	void GiveSiphonBonus(AFortPlayerController* PlayerController, AFortPawn* Pawn, bool bGiveBuildingResource = true, bool bHealPlayer = true)
+	{
+		if (PlayerController)
+		{
+			if (bGiveBuildingResource)
+			{
+				UFortKismetLibrary::K2_GiveBuildingResource(PlayerController, EFortResourceType::Wood, 50);
+				UFortKismetLibrary::K2_GiveBuildingResource(PlayerController, EFortResourceType::Stone, 50);
+				UFortKismetLibrary::K2_GiveBuildingResource(PlayerController, EFortResourceType::Metal, 50);
+			}
+
+			if (bHealPlayer)
+			{
+				float MaxHealth = Pawn->GetMaxHealth();
+				float MaxShield = Pawn->GetMaxShield();
+
+				float Health = Pawn->GetHealth();
+				float Shield = Pawn->GetShield();
+
+				float SiphonAmount = 50.0f;
+				float RemainingSiphonAmount = SiphonAmount;
+
+				if (Health < MaxHealth)
+				{
+					float NewHealth = UKismetMathLibrary::Clamp(Health + SiphonAmount, 0.0f, MaxHealth);
+
+					Pawn->SetHealth(NewHealth);
+
+					RemainingSiphonAmount -= (NewHealth - Health);
+				}
+
+				if (RemainingSiphonAmount > 0.0f)
+				{
+					float NewShield = UKismetMathLibrary::Clamp(Shield + RemainingSiphonAmount, 0.0f, MaxShield);
+
+					Pawn->SetShield(NewShield);
+				}
+			}
+
+			AFortPlayerState* PlayerState = Cast<AFortPlayerState>(PlayerController->PlayerState);
+
+			if (PlayerState)
+			{
+				ApplySiphonEffect(PlayerState);
+			}
+		}
+	}
+#endif // SIPHON
+
+#ifdef LATEGAME
+	void GiveLateGameInventory(AFortPlayerController* PlayerController)
+	{
+		UFortKismetLibrary::K2_GiveBuildingResource(PlayerController, EFortResourceType::Wood, 500);
+		UFortKismetLibrary::K2_GiveBuildingResource(PlayerController, EFortResourceType::Stone, 300);
+		UFortKismetLibrary::K2_GiveBuildingResource(PlayerController, EFortResourceType::Metal, 150);
+
+		// Give All Ammos
+		{
+			TArray<UFortWorldItemDefinition*> AllAmmoItems = Functions::GetAllItemsWithClass(true, UFortAmmoItemDefinition::StaticClass());
+
+			for (int32 i = 0; i < AllAmmoItems.Num(); i++)
+			{
+				UFortAmmoItemDefinition* AmmoItemDefinition = Cast<UFortAmmoItemDefinition>(AllAmmoItems[i]);
+				if (!AmmoItemDefinition) continue;
+
+				if (!AmmoItemDefinition->bCanBeDropped)
+					continue;
+
+				UFortKismetLibrary::K2_GiveItemToPlayer(PlayerController, AmmoItemDefinition, ((AmmoItemDefinition->MaxStackSize / 4) + 1), false);
+			}
+		}
+
+		// Assault Weapon
+		{
+			const FName& TagNameRequired = UKismetStringLibrary::Conv_StringToName(L"Weapon.Ranged.Assault");
+
+			TArray<EFortRarity> BlackListRarity;
+			BlackListRarity.Add(EFortRarity::Handmade);
+			BlackListRarity.Add(EFortRarity::Ordinary);
+
+			UFortWeaponItemDefinition* RandomItemWithTag = Functions::ChooseRandomItemWithFilter(TagNameRequired, {}, BlackListRarity);
+
+			if (RandomItemWithTag)
+				UFortKismetLibrary::K2_GiveItemToPlayer(PlayerController, RandomItemWithTag, RandomItemWithTag->MaxStackSize, false);
+
+			if (BlackListRarity.IsValid())
+				BlackListRarity.Free();
+		}
+
+		// Shotgun Weapon
+		{
+			const FName& TagNameRequired = UKismetStringLibrary::Conv_StringToName(L"Weapon.Ranged.Shotgun");
+
+			TArray<EFortRarity> BlackListRarity;
+			BlackListRarity.Add(EFortRarity::Handmade);
+			BlackListRarity.Add(EFortRarity::Ordinary);
+
+			UFortWeaponItemDefinition* RandomItemWithTag = Functions::ChooseRandomItemWithFilter(TagNameRequired, {}, BlackListRarity);
+
+			if (RandomItemWithTag)
+				UFortKismetLibrary::K2_GiveItemToPlayer(PlayerController, RandomItemWithTag, RandomItemWithTag->MaxStackSize, false);
+
+			if (BlackListRarity.IsValid())
+				BlackListRarity.Free();
+		}
+
+		// Smg Weapon
+		{
+			const FName& TagNameRequired = UKismetStringLibrary::Conv_StringToName(L"Weapon.Ranged.Smg");
+
+			TArray<EFortRarity> BlackListRarity;
+			BlackListRarity.Add(EFortRarity::Handmade);
+			BlackListRarity.Add(EFortRarity::Ordinary);
+
+			UFortWeaponItemDefinition* RandomItemWithTag = Functions::ChooseRandomItemWithFilter(TagNameRequired, {}, BlackListRarity);
+
+			if (RandomItemWithTag)
+				UFortKismetLibrary::K2_GiveItemToPlayer(PlayerController, RandomItemWithTag, RandomItemWithTag->MaxStackSize, false);
+
+			if (BlackListRarity.IsValid())
+				BlackListRarity.Free();
+		}
+
+		// Heal Weapon
+		{
+			const FName& TagNameRequired = UKismetStringLibrary::Conv_StringToName(L"Athena.ItemAction.Consume");
+
+			TArray<EFortRarity> BlackListRarity;
+			BlackListRarity.Add(EFortRarity::Quality);
+			BlackListRarity.Add(EFortRarity::Fine);
+
+			UFortWeaponItemDefinition* RandomItemWithTag = Functions::ChooseRandomItemWithFilter(TagNameRequired, {}, BlackListRarity);
+
+			if (RandomItemWithTag)
+				UFortKismetLibrary::K2_GiveItemToPlayer(PlayerController, RandomItemWithTag, RandomItemWithTag->MaxStackSize, false);
+
+			if (BlackListRarity.IsValid())
+				BlackListRarity.Free();
+		}
+
+		// Rota/Sniper Weapon
+		{
+			const FName& TagNameRequired = UKismetStringLibrary::Conv_StringToName(L"Weapon.Ranged.Sniper"); // UKismetMathLibrary::RandomBool() ? UKismetStringLibrary::Conv_StringToName(L"Weapon.Ranged.Sniper") : UKismetStringLibrary::Conv_StringToName(L"Weapon.Ranged.Heavy.Grenade");
+			UFortWeaponItemDefinition* RandomItemWithTag = Functions::ChooseRandomItemWithFilter(TagNameRequired);
+
+			if (RandomItemWithTag)
+				UFortKismetLibrary::K2_GiveItemToPlayer(PlayerController, RandomItemWithTag, RandomItemWithTag->MaxStackSize, false);
+		}
+
+		// Trap
+		{
+			const FName& TagNameRequired = UKismetStringLibrary::Conv_StringToName(L"Bacchus.Place.Trap.Damage");
+			UFortWeaponItemDefinition* RandomItemWithTag = Functions::ChooseRandomItemWithFilter(TagNameRequired);
+
+			if (RandomItemWithTag)
+				UFortKismetLibrary::K2_GiveItemToPlayer(PlayerController, RandomItemWithTag, 3, false);
+		}
+	}
+
+	void StartSafeZone(AFortGameModeAthena* GameModeAthena)
+	{
+		if (!GameModeAthena)
+			return;
+
+		AFortGameStateAthena* GameStateAthena = Cast<AFortGameStateAthena>(GameModeAthena->GameState);
+
+		if (GameStateAthena)
+		{
+			// 7FF66F254FC0
+			bool (*StartSafeZonesPhase)(AFortGameModeAthena* GameModeAthena, bool a2) = decltype(StartSafeZonesPhase)(0xC04FC0 + uintptr_t(GetModuleHandle(0)));
+
+			// 7FF66F254C70
+			bool (*sub_7FF66F254C70)(AFortGameModeAthena* GameModeAthena, bool a2, bool a3) = decltype(sub_7FF66F254C70)(0xC04C70 + uintptr_t(GetModuleHandle(0)));
+			sub_7FF66F254C70(GameModeAthena, true, true);
+
+			GameStateAthena->SafeZonesStartTime = 0.0f;
+		}
+	}
+
+	void InitLateGameSafeZone(AFortGameModeAthena* GameModeAthena)
+	{
+		if (!GameModeAthena)
+			return;
+
+		AFortGameStateAthena* GameStateAthena = Cast<AFortGameStateAthena>(GameModeAthena->GameState);
+
+		if (GameStateAthena)
+		{
+			StartSafeZone(GameModeAthena);
+		}
+	}
+#endif // LATEGAME
 
 	void InitFunctions()
 	{

@@ -16,11 +16,109 @@ namespace Beacon
 				NetDriver->ClientConnections.Num() > 0 &&
 				!NetDriver->ClientConnections[0]->InternalAck)
 			{
-				ServerReplicateActors((UReplicationGraph*)NetDriver->ReplicationDriver, DeltaSeconds);
+				UReplicationGraph* ReplicationDriver = Cast<UReplicationGraph>(NetDriver->ReplicationDriver);
+
+				if (ReplicationDriver)
+					ServerReplicateActors(ReplicationDriver, DeltaSeconds);
 			}
 		}
 
 		TickFlush(NetDriver, DeltaSeconds);
+	}
+
+	bool ListenServer(UWorld* World, FURL& InURL)
+	{
+		AOnlineBeaconHost* OnlineBeaconHost = Util::SpawnActor<AOnlineBeaconHost>(AOnlineBeaconHost::StaticClass());
+
+		if (!OnlineBeaconHost || !World)
+		{
+			FN_LOG(LogBeacon, Error, "Failed to create OnlineBeaconHost or to get World!");
+			return false;
+		}
+
+		OnlineBeaconHost->ListenPort = 7777 - 1;
+
+		if (World->NetDriver)
+		{
+			FN_LOG(LogBeacon, Warning, "OnlineBeaconHost already created!");
+			return false;
+		}
+
+		if (InitHost(OnlineBeaconHost))
+		{
+			World->NetDriver = OnlineBeaconHost->NetDriver;
+			FN_LOG(LogBeacon, Log, "Beacon created successful!");
+		}
+		else
+		{
+			FN_LOG(LogBeacon, Error, "Failed to InitHost!");
+			return false;
+		}
+
+		if (World->NetDriver)
+		{
+			World->NetDriver->World = World;
+			World->NetDriver->NetDriverName = UKismetStringLibrary::Conv_StringToName(L"GameNetDriver");
+
+			// 7FF670F69750
+			FLevelCollection* (*FindCollectionByType)(UWorld* World, int32 InType) = decltype(FindCollectionByType)(0x2919750 + uintptr_t(GetModuleHandle(0)));
+
+			FLevelCollection* const SourceCollection = FindCollectionByType(World, 0); // ELevelCollectionType::DynamicSourceLevels
+			if (SourceCollection)
+			{
+				SourceCollection->NetDriver = World->NetDriver;
+			}
+			FLevelCollection* const StaticCollection = FindCollectionByType(World, 2); // ELevelCollectionType::StaticLevels
+			if (StaticCollection)
+			{
+				StaticCollection->NetDriver = World->NetDriver;
+			}
+
+			FString Error;
+			if (!InitListen(World->NetDriver, World, InURL, true, Error))
+			{
+				FN_LOG(LogBeacon, Debug, "Failed to listen: %s", Error.ToString().c_str());
+
+				SetWorld(World->NetDriver, NULL);
+				World->NetDriver = NULL;
+
+				FLevelCollection* const SourceCollection = FindCollectionByType(World, 0); // ELevelCollectionType::DynamicSourceLevels
+				if (SourceCollection)
+				{
+					SourceCollection->NetDriver = nullptr;
+				}
+				FLevelCollection* const StaticCollection = FindCollectionByType(World, 2); // ELevelCollectionType::StaticLevels
+				if (StaticCollection)
+				{
+					StaticCollection->NetDriver = nullptr;
+				}
+
+				return false;
+			}
+
+			SetWorld(World->NetDriver, World);
+
+			static bool bHookTickFlush = false;
+
+			if (!bHookTickFlush)
+			{
+				uintptr_t PatternTickFlush = MinHook::FindPattern(Patterns::TickFlush);
+
+				MH_CreateHook((LPVOID)(PatternTickFlush), TickFlushHook, (LPVOID*)(&TickFlush));
+				MH_EnableHook((LPVOID)(PatternTickFlush));
+
+				bHookTickFlush = true;
+			}
+		}
+		else
+		{
+			FN_LOG(LogBeacon, Error, "Failed to listen!");
+			return false;
+		}
+
+		FN_LOG(LogBeacon, Debug, "Listen on port: %i", InURL.Port);
+
+		return true;
 	}
 
 	bool ListenHook(UWorld* World, FURL& InURL)
@@ -36,26 +134,26 @@ namespace Beacon
 
 			if (Engine)
 			{
-				AOnlineBeaconHost* Beacon = Util::SpawnActor<AOnlineBeaconHost>(AOnlineBeaconHost::StaticClass(), {}, {});
+				AOnlineBeaconHost* OnlineBeaconHost = Util::SpawnActor<AOnlineBeaconHost>(AOnlineBeaconHost::StaticClass(), {}, {});
 				UWorld* World = Globals::GetWorld();
 
-				if (!Beacon || !World)
+				if (!OnlineBeaconHost || !World)
 				{
-					FN_LOG(LogBeacon, Error, "Failed to create Beacon or to get World!");
+					FN_LOG(LogBeacon, Error, "Failed to create OnlineBeaconHost or to get World!");
 					return false;
 				}
 
-				Beacon->ListenPort = 7777 - 1;
+				OnlineBeaconHost->ListenPort = 7777 - 1;
 
 				if (World->NetDriver)
 				{
-					FN_LOG(LogBeacon, Warning, "Beacon already created!");
+					FN_LOG(LogBeacon, Warning, "OnlineBeaconHost already created!");
 					return false;
 				}
 
-				if (InitHost(Beacon))
+				if (InitHost(OnlineBeaconHost))
 				{
-					World->NetDriver = Beacon->NetDriver;
+					World->NetDriver = OnlineBeaconHost->NetDriver;
 					FN_LOG(LogBeacon, Log, "Beacon created successful!");
 				}
 				else
@@ -107,10 +205,17 @@ namespace Beacon
 
 					SetWorld(World->NetDriver, World);
 
-					uintptr_t PatternTickFlush = MinHook::FindPattern(Patterns::TickFlush);
+					static bool bHookTickFlush = false;
 
-					MH_CreateHook((LPVOID)(PatternTickFlush), TickFlushHook, (LPVOID*)(&TickFlush));
-					MH_EnableHook((LPVOID)(PatternTickFlush));
+					if (!bHookTickFlush)
+					{
+						uintptr_t PatternTickFlush = MinHook::FindPattern(Patterns::TickFlush);
+
+						MH_CreateHook((LPVOID)(PatternTickFlush), TickFlushHook, (LPVOID*)(&TickFlush));
+						MH_EnableHook((LPVOID)(PatternTickFlush));
+
+						bHookTickFlush = true;
+					}
 				}
 				else
 				{

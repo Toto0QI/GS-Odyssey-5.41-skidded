@@ -301,6 +301,10 @@ public:
 	class USceneComponent* K2_GetRootComponent() const;
 	bool WasRecentlyRendered(float Tolerance) const;
 
+	class ULevel* GetLevel() const { return (ULevel*)Outer; }
+
+	class UWorld* GetWorld();
+
 public:
 	static class UClass* StaticClass()
 	{
@@ -379,6 +383,18 @@ public:
 	{
 		return GetDefaultObjImpl<AEmitterCameraLensEffectBase>();
 	}
+};
+
+enum class EGetWorldErrorMode
+{
+	// Silently returns nullptr, the calling code is expected to handle this gracefully
+	ReturnNull,
+
+	// Raises a runtime error but still returns nullptr, the calling code is expected to handle this gracefully
+	LogAndReturnNull,
+
+	// Asserts, the calling code is not expecting to handle a failure gracefully
+	Assert
 };
 
 // Class Engine.Engine
@@ -621,6 +637,13 @@ public:
 
 public:
 	static class UEngine* GetEngine();
+
+	class UWorld* GetWorldFromContextObject(const class UObject* Object, EGetWorldErrorMode ErrorMode)
+	{
+		// 7FF670F12500
+		class UWorld* (*GetWorldFromContextObject)(UEngine* Engine, const class UObject* Object, EGetWorldErrorMode ErrorMode) = decltype(GetWorldFromContextObject)(0x28C2500 + uintptr_t(GetModuleHandle(0)));
+		return GetWorldFromContextObject(this, Object, ErrorMode);
+	}
 
 public:
 	static class UClass* StaticClass()
@@ -1759,6 +1782,11 @@ public:
 
 	void HandleTimelineScrubbed();
 
+	float GetTimeSeconds()
+	{
+		return *(float*)(__int64(this) + 0x758);
+	}
+
 public:
 	static class UClass* StaticClass()
 	{
@@ -2577,6 +2605,11 @@ public:
 	static class APawn* GetDefaultObj()
 	{
 		return GetDefaultObjImpl<APawn>();
+	}
+
+	void RecalculateBaseEyeHeight()
+	{
+		BaseEyeHeight = GetDefaultObj()->BaseEyeHeight;
 	}
 };
 

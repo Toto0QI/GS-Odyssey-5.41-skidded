@@ -49,6 +49,9 @@
     <ClCompile Include="SDK\AIModule_functions.cpp">
       <Filter>SDK</Filter>
     </ClCompile>
+    <ClCompile Include="SDK\FortniteUI_functions.cpp">
+      <Filter>SDK</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="util.h" />
@@ -79,9 +82,6 @@
     <ClInclude Include="Functions\Abilities.h">
       <Filter>Headers\Functions</Filter>
     </ClInclude>
-    <ClInclude Include="Functions\Inventory.h">
-      <Filter>Headers\Functions</Filter>
-    </ClInclude>
     <ClInclude Include="Globals\Pawn.h">
       <Filter>Headers\Globals</Filter>
     </ClInclude>
@@ -100,9 +100,6 @@
     <ClInclude Include="Functions\Cheats.h">
       <Filter>Headers\Functions</Filter>
     </ClInclude>
-    <ClInclude Include="Functions\Threads.h">
-      <Filter>Headers\Functions</Filter>
-    </ClInclude>
     <ClInclude Include="Globals\FortAthenaSupplyDrop.h">
       <Filter>Headers\Globals</Filter>
     </ClInclude>
@@ -114,6 +111,9 @@
     </ClInclude>
     <ClInclude Include="Functions\AntiCheatOdyssey.h">
       <Filter>Headers\Functions</Filter>
+    </ClInclude>
+    <ClInclude Include="Globals\Pickup.h">
+      <Filter>Headers\Globals</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
