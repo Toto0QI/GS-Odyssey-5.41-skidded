@@ -53,6 +53,32 @@ static T* FindObjectFast(std::string ObjectName, UClass* ObjectClass = UObject::
     return StaticFindObject(ObjectClass, nullptr, OrigInName, false);
 }
 
+
+struct FCommandLine
+{
+    /**
+     * Returns an edited version of the executable's command line with the game name and certain other parameters removed.
+     */
+    static const TCHAR* Get()
+    {
+        // 7FF66FC70AF0
+        const TCHAR* (*Get)() = decltype(Get)(0x1620AF0 + uintptr_t(GetModuleHandle(0)));
+        return Get();
+    }
+};
+
+struct FParse
+{
+    /** Checks if a command-line parameter exists in the stream. */
+    static bool Param(const TCHAR* Stream, const TCHAR* Params)
+    {
+        // 7FF66FCA24F0
+        bool (*Param)(const TCHAR * Stream, const TCHAR * Params) = decltype(Param)(0x16524F0 + uintptr_t(GetModuleHandle(0)));
+        return Param(Stream, Params);
+    }
+};
+
+
 #define RESULT_PARAM Z_Param__Result
 #define RESULT_DECL void*const RESULT_PARAM
 

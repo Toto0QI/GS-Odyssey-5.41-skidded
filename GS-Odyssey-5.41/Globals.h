@@ -1,9 +1,17 @@
 #pragma once
 
+#include <algorithm>
+#include <time.h>
+#include <vector>
+#include <unordered_map>
+#include <functional>
+#include <string>
+#include <sstream>
+
 uintptr_t InventoryOwnerOffset = 0x680;
 
 #define CHEATS
-// #define DEBUGS
+#define DEBUGS
 #define SIPHON
 #define QUESTS
 #define ANTICHEAT
@@ -21,8 +29,25 @@ static T* Cast(UObject* Object)
 	return nullptr;
 }
 
+std::vector<std::string> split(const std::string& s, char delimiter) 
+{
+	std::vector<std::string> tokens;
+	std::string token;
+	std::istringstream tokenStream(s);
+
+	while (std::getline(tokenStream, token, delimiter)) 
+	{
+		tokens.push_back(token);
+	}
+
+	return tokens;
+}
+
 /** Global engine pointer. Can be 0 so don't use without checking. */
 UEngine* GEngine = *(UEngine**)(uintptr_t(GetModuleHandleW(0)) + 0x5524898);
+
+/** Global UWorld pointer. Use of this pointer should be avoided whenever possible. */
+UWorld* GWorld = *(UWorld**)(uintptr_t(GetModuleHandleW(0)) + Offsets::GWorld);
 
 /* Automatically pick up ammo and other resources. */
 bool GAutoResourceGathering = *(bool*)(uintptr_t(GetModuleHandleW(0)) + 0x4DADCA4);
@@ -88,6 +113,21 @@ namespace Globals
 
 			if (GameState)
 				return GameState;
+		}
+
+		return nullptr;
+	}
+
+	AFortWorldManager* GetWorldManager()
+	{
+		AFortGameState* GameState = GetGameState();
+
+		if (GameState)
+		{
+			AFortWorldManager* WorldManager = GameState->WorldManager;
+
+			if (WorldManager)
+				return WorldManager;
 		}
 
 		return nullptr;

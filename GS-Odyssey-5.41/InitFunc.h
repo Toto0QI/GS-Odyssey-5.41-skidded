@@ -14,9 +14,11 @@ namespace InitFunc
 
 		// Globals
 		GameMode::InitGameMode();
+		GameState::InitGameState();
 		PlayerController::InitPlayerController();
 		Pawn::InitPawn();
 		BuildingActor::InitBuildingActor();
+		BuildingProp::InitBuildingProp();
 		FortKismetLibrary::InitFortKismetLibrary();
 		FortAthenaSupplyDrop::InitFortAthenaSupplyDrop();
 		Pickup::InitPickup();
@@ -26,7 +28,6 @@ namespace InitFunc
 		Abilities::InitAbilities();
 		Inventory::InitInventory();
 		Functions::InitFunctions();
-		Cheats::InitCheats();
 
 		return true;
 	}

@@ -14,7 +14,7 @@ namespace Patterns
 
 	// BuildingActor
 	constexpr const char* PickLootTierGroupAthena = "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 20 65 48 8B 04 25 ? ? ? ? 48 8B F2 8B 0D ? ? ? ? 49 8B D8";
-	constexpr const char* ABuildingSMActor_PostUpdate = "48 89 5C 24 ? 57 48 83 EC 50 49 8B F8 48 8B D9";
+	constexpr const char* ABuildingSMActor_PostUpdate = "40 53 48 83 EC 50 48 8B D9 E8 ? ? ? ? 80 3D ? ? ? ? ? 72 6C 45 33 C0 48 8D 54 24 ? 48 8B CB";
 	constexpr const char* SelectMeshSetByLootTier = "48 8B C4 89 50 10 55 53 41 55 48 8D 68 A1 48 81 EC ? ? ? ?";
 	constexpr const char* SetMeshSet = "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 20 48 8B FA 48 8B D9 E8 ? ? ? ? 48 8B 03 48 8B CB";
 	constexpr const char* OnSearchedContainer = "40 53 56 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 48 8B 01 B2 01 48 8B D9";

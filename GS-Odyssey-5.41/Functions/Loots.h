@@ -59,14 +59,14 @@ namespace Loots
         return DataTable;
     }
 
-    UFortItemDefinition* LoadItemDefinition(TSoftObjectPtr<UFortItemDefinition> ItemDefinitionToLoad)
+    UFortItemDefinition* LoadItemDefinition(TSoftObjectPtr<UFortItemDefinition> SoftItemDefinition)
     {
-        UFortItemDefinition* ItemDefinition = ItemDefinitionToLoad.Get();
+        UFortItemDefinition* ItemDefinition = SoftItemDefinition.Get();
 
         if (!ItemDefinition)
         {
-            std::string AssetPathName = ItemDefinitionToLoad.ObjectID.AssetPathName.ToString();
-            ItemDefinition = StaticLoadObject<UFortItemDefinition>(std::wstring(AssetPathName.begin(), AssetPathName.end()).c_str());
+            const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(SoftItemDefinition.ObjectID.AssetPathName);
+            ItemDefinition = StaticLoadObject<UFortItemDefinition>(AssetPathName.CStr());
         }
 
         return ItemDefinition;

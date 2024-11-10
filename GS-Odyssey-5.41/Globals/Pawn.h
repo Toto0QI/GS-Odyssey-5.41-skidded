@@ -164,22 +164,33 @@ namespace Pawn
 		}
 	}
 
+	void MovingEmoteStopped(AFortPawn* Pawn, FFrame& Stack, void* Ret)
+	{
+		Stack.Code += Stack.Code != nullptr;
+
+		Pawn->bMovingEmote = false;
+	}
+
 	void InitPawn()
 	{
 		AFortPlayerPawnAthena* FortPlayerPawnAthenaDefault = AFortPlayerPawnAthena::GetDefaultObj();
+		UClass* FortPlayerPawnAthenaClass = AFortPlayerPawnAthena::StaticClass();
 
 		/* --------------------------------------- AFortPlayerPawn --------------------------------------- */
 
 		MinHook::HookVTable(FortPlayerPawnAthenaDefault, 0xD40 / 8, ServerHandlePickup, nullptr, "AFortPlayerPawn::ServerHandlePickup");
 		MinHook::HookVTable(FortPlayerPawnAthenaDefault, 0xD30 / 8, ServerHandlePickupWithSwap, nullptr, "AFortPlayerPawn::ServerHandlePickupWithSwap");
 
-		UFunction* OnCapsuleBeginOverlapFunc = AFortPlayerPawnAthena::StaticClass()->GetFunction("FortPlayerPawn", "OnCapsuleBeginOverlap");
+		UFunction* OnCapsuleBeginOverlapFunc = FortPlayerPawnAthenaClass->GetFunction("FortPlayerPawn", "OnCapsuleBeginOverlap");
 		MinHook::HookFunctionExec(OnCapsuleBeginOverlapFunc, OnCapsuleBeginOverlap, nullptr);
 
 		/* ------------------------------------------ AFortPawn ------------------------------------------ */
 
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x14B4330), OnDeathServer, (LPVOID*)(&OnDeathServerOG));
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x14B4330));
+
+		UFunction* MovingEmoteStoppedFunc = FortPlayerPawnAthenaClass->GetFunction("FortPawn", "MovingEmoteStopped");
+		MinHook::HookFunctionExec(MovingEmoteStoppedFunc, MovingEmoteStopped, nullptr);
 
 		/* ----------------------------------------------------------------------------------------------- */
 

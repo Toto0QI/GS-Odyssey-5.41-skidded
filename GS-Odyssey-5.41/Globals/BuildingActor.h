@@ -1,291 +1,65 @@
 #pragma once
 
+/*
+ * - The explanations were made with chatgpt (I was too lazy to do it)
+*/
+
 namespace BuildingActor
 {
-    void (*ABuildingSMActor_PostUpdateOG)(ABuildingSMActor* BuildingActor);
-    FName (*PickLootTierGroupAthena)(ABuildingContainer* BuildingContainer, FName* OutLootTierGroup, FName SearchLootTierGroup);
-	void (*SelectMeshSetByLootTier)(ABuildingSMActor* BuildingActor, int32 LootTier);
-	void (*SetMeshSet)(ABuildingSMActor* BuildingActor, FMeshSet MeshSet);
-	bool (*OnSearchedContainer)(ABuildingContainer* BuildingContainer, AFortPlayerPawn* PlayerPawn);
-	int32 (*DetermineMaxResourcesToSpawn)(ABuildingSMActor* BuildingSMActor, char a2);
+	/* ------------------------------------ ABuildingContainerOG ------------------------------------- */
+	void (*ABuildingContainer_PostUpdateOG)(ABuildingContainer* BuildingContainer, EFortBuildingPersistentState BuildingPersistentState, __int64 a3);
+	/* ------------------------------------- ABuildingSMActorOG -------------------------------------- */
+	void (*ABuildingSMActor_PostUpdateOG)(ABuildingSMActor* BuildingSMActor);
+	/* -------------------------------------- ABuildingActorOG --------------------------------------- */
+	void (*OnDamageServerOG)(ABuildingActor* BuildingActor, float Damage, const FGameplayTagContainer& DamageTags, const FVector& Momentum, const FHitResult& HitInfo, AController* InstigatedBy, AActor* DamageCauser, const FGameplayEffectContextHandle& EffectContext);
 
-	void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms)
+
+
+	/* ------------------------------------- ABuildingContainer -------------------------------------- */
+
+	/*
+	 * Rewrite ABuildingContainer::PostUpdate (1.1)
+	 *
+	 * - https://imgur.com/fd1yviC
+	 * - https://imgur.com/LgvtgEJ
+	 * - https://imgur.com/xVvDs3A
+	 * - https://imgur.com/SLW9Mbo
+	 * - https://imgur.com/7umU78D
+	 */
+	void ABuildingContainer_PostUpdate(ABuildingContainer* BuildingContainer, EFortBuildingPersistentState BuildingPersistentState, __int64 a3)
 	{
-		if (!Object || !Function)
-			return;
+		// No need to call ABuildingSMActor::PostUpdate because it is already called in the OG
+		// BuildingContainer->PostUpdate();
+		// https://imgur.com/3aQHQSz
 
-		const std::string& FunctionName = Function->GetName();
-
-		if (FunctionName.contains("OnDamageServer"))
+		if (!a3)
 		{
-			ABuildingSMActor* BuildingSMActor = Cast<ABuildingSMActor>(Object);
-			auto Params = (Params::BuildingActor_OnDamageServer*)Parms;
-
-			AFortPlayerController* PlayerController = Cast<AFortPlayerController>(Params->InstigatedBy);
-			AFortWeapon* Weapon = Cast<AFortWeapon>(Params->DamageCauser);
-
-			if (!BuildingSMActor || !PlayerController || !Weapon)
-				return;
-
-			UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_GetInventoryItemWithGuid(Weapon->ItemEntryGuid));
-			AFortPlayerPawn* PlayerPawn = PlayerController->MyFortPawn;
-
-			if (WorldItem && PlayerPawn)
-			{
-				UFortWeaponMeleeItemDefinition* WeaponItemDefinition = Cast<UFortWeaponMeleeItemDefinition>(WorldItem->ItemEntry.ItemDefinition);
-
-				if (WeaponItemDefinition)
-				{
-					UFortResourceItemDefinition* ResourceItemDefinition = UFortKismetLibrary::K2_GetResourceItemDefinition(BuildingSMActor->ResourceType);
-
-					if (!ResourceItemDefinition)
-						return;
-
-					if (BuildingSMActor->MaxResourcesToSpawn < 0)
-						BuildingSMActor->MaxResourcesToSpawn = DetermineMaxResourcesToSpawn(BuildingSMActor, 1);
-
-					float MaxResourcesToSpawn = BuildingSMActor->MaxResourcesToSpawn;
-					float MaxHealth = BuildingSMActor->GetMaxHealth();
-					float ResourceRatio = MaxResourcesToSpawn / MaxHealth;
-					float ResourceDropAmount = ResourceRatio * Params->Damage;
-
-					int32 PotentialResourceCount = (int32)ResourceDropAmount;
-
-					bool bHasHealthLeft = BuildingSMActor->HasHealthLeft();
-					bool bDestroyed = false;
-
-					if (!bHasHealthLeft)
-					{
-						bDestroyed = true;
-
-						int32 MinResourceCount = 0;
-
-						if (!ResourceItemDefinition || (MinResourceCount = 1, ResourceRatio == 0.0))
-							MinResourceCount = 0;
-
-						if (PotentialResourceCount < MinResourceCount)
-							PotentialResourceCount = MinResourceCount;
-
-						if (BuildingSMActor->DestructionLootTierKey.IsValid())
-						{
-							int32 LootLevel = UFortKismetLibrary::GetLootLevel(BuildingSMActor);
-
-							TArray<FFortItemEntry> LootToDrops;
-							Loots::PickLootDrops(&LootToDrops, LootLevel, BuildingSMActor->DestructionLootTierKey, 0, 0, BuildingSMActor->StaticGameplayTags, true, false);
-
-							for (int32 i = 0; i < LootToDrops.Num(); i++)
-							{
-								FFortItemEntry* LootToDrop = &LootToDrops[i];
-								if (!LootToDrop) continue;
-
-								UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(LootToDrop->ItemDefinition);
-
-								if (!WorldItemDefinition)
-								{
-									FN_LOG(LogBuildingActor, Error, "Loot tier %s dropped entry with no item data!", BuildingSMActor->DestructionLootTierGroup.ToString().c_str());
-									continue;
-								}
-
-								FVector ComponentLocation = BuildingSMActor->RootComponent->K2_GetComponentLocation();
-								FVector RandomDirection = UKismetMathLibrary::RandomUnitVector();
-
-								ComponentLocation.X += RandomDirection.X * 200.0f;
-								ComponentLocation.Y += RandomDirection.Y * 200.0f;
-								ComponentLocation.Z += RandomDirection.Z * 200.0f;
-
-								FFortItemEntry ItemEntry;
-								Inventory::MakeItemEntry(&ItemEntry, WorldItemDefinition, LootToDrop->Count, LootToDrop->Level, LootToDrop->LoadedAmmo, LootToDrop->Durability);
-
-								Inventory::SetStateValue(&ItemEntry, EFortItemEntryState::DoNotShowSpawnParticles, 1);
-
-								FRotator SpawnRotation = FRotator({ 0, 0, 0 });
-
-								FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
-								CreatePickupData.World = Globals::GetWorld();
-								CreatePickupData.ItemEntry = &ItemEntry;
-								CreatePickupData.SpawnLocation = &ComponentLocation;
-								CreatePickupData.SpawnRotation = &SpawnRotation;
-								CreatePickupData.PlayerController = nullptr;
-								CreatePickupData.OverrideClass = nullptr;
-								CreatePickupData.NullptrIdk = nullptr;
-								CreatePickupData.bRandomRotation = true;
-								CreatePickupData.PickupSourceTypeFlags = 0;
-
-								AFortPickup* Pickup = Inventory::CreatePickupFromData(&CreatePickupData);
-
-								if (Pickup)
-								{
-									FVector ConeDir = { 0, 0, 0 };
-									FVector VectorInCone = UKismetMathLibrary::RandomUnitVectorInConeInDegrees(ConeDir, 1.0f);
-
-									float FlyTime = Globals::GenFlyTime();
-									Pickup->SetPickupTarget(PlayerPawn, (FlyTime + (i + 1) * 0.30000001192092896f), VectorInCone, true);
-								}
-
-								Inventory::FreeItemEntry(&ItemEntry);
-							}
-
-							if (LootToDrops.IsValid())
-								LootToDrops.Free();
-						}
-					}
-
-					if (PotentialResourceCount > 0)
-					{
-						FFortItemEntry ItemEntry;
-						Inventory::CreateDefaultItemEntry(&ItemEntry, ResourceItemDefinition, PotentialResourceCount, 0);
-
-						Inventory::SetStateValue(&ItemEntry, EFortItemEntryState::DoNotShowSpawnParticles, 1);
-						Inventory::SetStateValue(&ItemEntry, EFortItemEntryState::ShouldShowItemToast, 1);
-
-						FVector ComponentLocation = BuildingSMActor->RootComponent->K2_GetComponentLocation();
-						FVector RandomDirection = UKismetMathLibrary::RandomUnitVector();
-
-						ComponentLocation.X += RandomDirection.X * 200.0f;
-						ComponentLocation.Y += RandomDirection.Y * 200.0f;
-						ComponentLocation.Z += RandomDirection.Z * 200.0f;
-
-						Inventory::AddInventoryItem(PlayerController, ItemEntry);
-						PlayerController->ClientReportDamagedResourceBuilding(BuildingSMActor, BuildingSMActor->ResourceType, PotentialResourceCount, bDestroyed, (Params->Damage == 100.0f));
-
-						Inventory::FreeItemEntry(&ItemEntry);
-					}
-				}
-			}
-		}
-	}
-
-	void SelectMeshSetByLootTierKey(ABuildingSMActor* BuildingActor, FName LootTierKey)
-	{
-		int32 LootTier = Loots::FindLootTierFromKey(LootTierKey);
-
-		FTierMeshSets* MeshSets = nullptr;
-
-		if (BuildingActor->AlternateMeshes.Num() > 0)
-		{
-			for (int32 i = 0; i < BuildingActor->AlternateMeshes.Num(); i++)
-			{
-				FTierMeshSets* AlternateMeshe = &BuildingActor->AlternateMeshes[i];
-				int32 Tier = AlternateMeshe->Tier;
-
-				if (Tier <= LootTier && (!MeshSets || MeshSets->Tier < Tier))
-				{
-					if (AlternateMeshe->MeshSets.Num() <= 0)
-					{
-						FN_LOG(LogBuildingActor, Warning, "No Alternative Mesh available for Building: %s at LootTier: %d", BuildingActor->GetName().c_str(), Tier);
-					}
-					else
-					{
-						MeshSets = AlternateMeshe;
-					}
-				}
-			}
-
-			if (MeshSets)
-			{
-				int32 AltMeshIdx = BuildingActor->AltMeshIdx;
-
-				if (AltMeshIdx != -1)
-				{
-					SetMeshSet(BuildingActor, MeshSets->MeshSets[AltMeshIdx]);
-				}
-			}
-		}
-
-		FN_LOG(LogBuildingActor, Debug, "ABuildingSMActor::SelectMeshSet(FName LootTierKey) Building: %s, AltMeshIdx: %d", BuildingActor->GetName().c_str(), BuildingActor->AltMeshIdx);
-	}
-
-	void ABuildingSMActor_PostUpdate(ABuildingSMActor* BuildingActor)
-	{
-		EFortBuildingPersistentState PersistentState = EFortBuildingPersistentState::Default;
-		FName LootTierKey = BuildingActor->DestructionLootTierKey;
-
-		if (BuildingActor->DestructionLootTierKey.IsValid())
-		{
-			SelectMeshSetByLootTierKey(BuildingActor, LootTierKey);
+			((ABuildingSMActor*)BuildingContainer)->PostUpdate();
 		}
 		else
-		{
-			if (BuildingActor->DestructionLootTierGroup.IsValid())
-			{
-				int32 LootTier = -1;
-				int32 ChooseLootTier;
-
-				if (BuildingActor->DestructionLootTierChosenQuotaInfo.LootTierKey.ComparisonIndex > 0 || BuildingActor->DestructionLootTierChosenQuotaInfo.LootTierKey.Number > 0)
-				{
-					ChooseLootTier = BuildingActor->DestructionLootTierChosenQuotaInfo.LootTier;
-					LootTierKey = BuildingActor->DestructionLootTierChosenQuotaInfo.LootTierKey;
-					LootTier = ChooseLootTier;
-				}
-				else
-				{
-                    int32 LootLevel = UFortKismetLibrary::GetLootLevel(BuildingActor);
-
-					Loots::PickLootTierKeyAndLootTierFromTierGroup(&BuildingActor->DestructionLootTierKey, &LootTier, BuildingActor->DestructionLootTierGroup, LootLevel, 0, -1, BuildingActor->StaticGameplayTags);
-
-					ChooseLootTier = LootTier;
-				}
-
-				SelectMeshSetByLootTier(BuildingActor, ChooseLootTier);
-			}
-
-			if (!Loots::IsLootDropPossible(BuildingActor->DestructionLootTierKey, L"ABuildingSMActor::AttemptSpawnResources", 0))
-			{
-				LootTierKey = FName(0);
-				PersistentState = EFortBuildingPersistentState::Searched;
-			}
-
-			if (BuildingActor->AltMeshIdx != -1 && BuildingActor->bPersistToWorld)
-			{
-				AFortGameState* GameState = Globals::GetGameState();
-
-				if (GameState && GameState->WorldManager)
-				{
-					/*void (*sub_7FF71A0147F0)(AFortWorldManager * WorldManager, ABuildingSMActor * BuildingActor, EFortBuildingPersistentState PersistentState, char a4) = decltype(sub_7FF71A0147F0)(0x5947F0 + uintptr_t(GetModuleHandle(0)));
-					sub_7FF71A0147F0(GameState->WorldManager, BuildingActor, PersistentState, 1);*/
-				}
-			}
-		}
-
-		FN_LOG(LogBuildingActor, Debug, "ABuildingSMActor::PostUpdate() Building: %s, AltMeshIdx: %d", BuildingActor->GetName().c_str(), BuildingActor->AltMeshIdx);
-
-        ABuildingSMActor_PostUpdateOG(BuildingActor);
-	}
-
-	void ABuildingContainer_PostUpdate(ABuildingContainer* BuildingContainer, EFortBuildingPersistentState BuildingPersistentState, void* a3)
-	{
-		float v7;
-
-		FName* LootTierKey = nullptr;
-		int32 LootTier;
-		int32 ChooseLootTier;
+			ABuildingContainer_PostUpdateOG(BuildingContainer, BuildingPersistentState, a3);
 
 		if (BuildingPersistentState == EFortBuildingPersistentState::New)
 		{
-			v7 = 0.0f;
+			float LootSpawnThreshold = 0.0f;
 
-			// 7FF71AB8F090
-			/*const TCHAR* (*FCommandLine_Get)() = decltype(FCommandLine_Get)(0x110F090 + uintptr_t(GetModuleHandle(0)));
-
-			// 7FF71ABC5660
-			bool (*FParse_Param)(const TCHAR * Stream, const TCHAR * Param) = decltype(FParse_Param)(0x1145660 + uintptr_t(GetModuleHandle(0)));*/
-
-			bool bSpawnAllLoot = false; // FParse_Param(FCommandLine_Get(), L"SpawnAllLoot");
+			bool bSpawnAllLoot = FParse::Param(FCommandLine::Get(), TEXT("SpawnAllLoot"));
 
 			if (bSpawnAllLoot)
-				v7 = 1.0;
+				LootSpawnThreshold = 1.0f;
 
 			if (BuildingContainer->SearchLootTierGroup.IsValid())
 			{
-				PickLootTierGroupAthena(BuildingContainer, &BuildingContainer->SearchLootTierGroup, BuildingContainer->SearchLootTierGroup);
+				BuildingContainer->PickLootTierGroupAthena(&BuildingContainer->SearchLootTierGroup, BuildingContainer->SearchLootTierGroup);
 
-				LootTier = -1;
-				v7 = 1.0f;
+				FName* LootTierKey = nullptr;
+				int32 ChooseLootTier = -1;
+				int32 LootTier = -1;
 
-				AFortGameState* GameState = Globals::GetGameState();
-				AFortWorldManager* WorldManager = GameState->WorldManager;
+				LootSpawnThreshold = 1.0f;
 
-				if (BuildingContainer->SearchLootTierChosenQuotaInfo.LootTierKey.ComparisonIndex > 0 || BuildingContainer->SearchLootTierChosenQuotaInfo.LootTierKey.Number > 0)
+				if (BuildingContainer->SearchLootTierChosenQuotaInfo.LootTierKey.ComparisonIndex > 0 || 
+					BuildingContainer->SearchLootTierChosenQuotaInfo.LootTierKey.Number > 0)
 				{
 					LootTierKey = &BuildingContainer->ContainerLootTierKey;
 					ChooseLootTier = BuildingContainer->SearchLootTierChosenQuotaInfo.LootTier;
@@ -296,76 +70,92 @@ namespace BuildingActor
 				}
 				else
 				{
-                    int32 LootLevel = UFortKismetLibrary::GetLootLevel(BuildingContainer);
+					int32 LootLevel = UFortKismetLibrary::GetLootLevel(BuildingContainer);
 
 					LootTierKey = &BuildingContainer->ContainerLootTierKey;
 
-					Loots::PickLootTierKeyAndLootTierFromTierGroup(&BuildingContainer->ContainerLootTierKey, &LootTier, BuildingContainer->SearchLootTierGroup, LootLevel, 0, -1, BuildingContainer->StaticGameplayTags);
+					Loots::PickLootTierKeyAndLootTierFromTierGroup(
+						&BuildingContainer->ContainerLootTierKey, 
+						&LootTier, 
+						BuildingContainer->SearchLootTierGroup, 
+						LootLevel, 
+						0, 
+						-1, 
+						BuildingContainer->StaticGameplayTags
+					);
 
 					ChooseLootTier = LootTier;
 				}
 
-				SelectMeshSetByLootTier(BuildingContainer, ChooseLootTier);
+				BuildingContainer->SelectMeshSet(ChooseLootTier);
 
 				EFortBuildingPersistentState PersistentState = EFortBuildingPersistentState::Default;
 
-				if (!bSpawnAllLoot && !BuildingContainer->bAlwaysMaintainLoot && !Loots::IsLootDropPossible(*LootTierKey, L"ABuildingContainer::PostUpdate", 0))
+				if (!bSpawnAllLoot && 
+					!BuildingContainer->bAlwaysMaintainLoot && 
+					!Loots::IsLootDropPossible(*LootTierKey, L"ABuildingContainer::PostUpdate", 0))
 				{
 					LootTierKey = nullptr;
 					PersistentState = EFortBuildingPersistentState::Searched;
 
-					OnSearchedContainer(BuildingContainer, nullptr);
+					BuildingContainer->SetSearchedContainer(nullptr);
 
 					if (!BuildingContainer->bAlwaysShowContainer)
-						v7 = 0.0f;
+						LootSpawnThreshold = 0.0f;
 				}
 
-				if (BuildingContainer->bPersistToWorld && GameState && GameState->WorldManager)
+				AFortWorldManager* WorldManager = Globals::GetWorldManager();
+
+				if (BuildingContainer->bPersistToWorld && WorldManager)
 				{
-					if (PersistentState == EFortBuildingPersistentState::Searched)
-					{
-						/*void (*sub_7FF71A0147F0)(AFortWorldManager * WorldManager, ABuildingSMActor * BuildingActor, EFortBuildingPersistentState PersistentState, char a4) = decltype(sub_7FF71A0147F0)(0x5947F0 + uintptr_t(GetModuleHandle(0)));
-						sub_7FF71A0147F0(GameState->WorldManager, BuildingContainer, PersistentState, (BuildingContainer->AltMeshIdx == -1) ? 0 : 1);*/
-					}
+					// Idk what it does
+					// https://imgur.com/Tpw67IX
 				}
 
 				UBlueprintGeneratedClass* FloorLootClass = FindObjectFast<UBlueprintGeneratedClass>("/Game/Athena/Environments/Blueprints/Tiered_Athena_FloorLoot_01.Tiered_Athena_FloorLoot_01_C");
 				UBlueprintGeneratedClass* FloorLootWarmupClass = FindObjectFast<UBlueprintGeneratedClass>("/Game/Athena/Environments/Blueprints/Tiered_Athena_FloorLoot_Warmup.Tiered_Athena_FloorLoot_Warmup_C");
 
 				if (BuildingContainer->IsA(FloorLootClass) || BuildingContainer->IsA(FloorLootWarmupClass))
-				{
-					Functions::SpawnLootOnFloorLoot(BuildingContainer);
-				}
+					BuildingContainer->SpawnLoot(nullptr);
 			}
+
+			// to fix
+			// https://imgur.com/lvVgqrK
+
+			/*float v6 = 0.0f;
+
+			int v19 = *(int*)(a3 + 0x14);
+			if (v19 > 0)
+			{
+				if (*(int*)(a3 + 0x10) >= v19)
+					*(int*)(a3 + 0x10) = 0;
+
+				int v20 = *(int*)(a3 + 0x10);
+
+				*(int*)(a3 + 0x10) = v20 + 1;
+
+				v6 = *(float*)(a3 + 4i64 * v20);
+			}*/
 
 			float v6 = (float)rand() * 0.000030518509f;
 
-			if ((float)((float)(v6 * 1.0f) + 0.0000000099999999f) > v7)
+			if ((float)((float)(v6 * 1.0f) + 0.0000000099999999f) > LootSpawnThreshold)
 			{
+				// https://imgur.com/ldBugSY
 				if (BuildingContainer->bBuriedTreasure)
 				{
-					OnSearchedContainer(BuildingContainer, nullptr);
+					BuildingContainer->SetSearchedContainer(nullptr);
 
 					if (BuildingContainer->bPersistToWorld)
 					{
-						AFortWorldManager* WorldManager = Globals::GetGameState()->WorldManager;
-
-						if (WorldManager)
-						{
-							/*void (*sub_7FF66CC33420)(AFortWorldManager * WorldManager, ABuildingSMActor * BuildingActor, EFortBuildingPersistentState PersistentState, char a4) = decltype(sub_7FF66CC33420)(0x613420 + uintptr_t(GetModuleHandle(0)));
-							sub_7FF66CC33420(WorldManager, BuildingContainer, EFortBuildingPersistentState::Searched, 0);*/
-						}
+						// Idk what it does
+						// https://imgur.com/lfVX54g
 					}
 				}
 				else
 				{
-					/*void** VTable = BuildingContainer->VTable;
-					v5 = (__int64)sub_7FF719FA3120();
-					((void(__fastcall*)(ABuildingContainer*, _QWORD, _QWORD, _QWORD))VTable[0xF1])(
-						BuildingContainer,
-						*(_QWORD*)(v5 + 0x170),
-						0i64,
-						0i64);*/
+					// Idk what it does
+					// https://imgur.com/TA0cs9x
 				}
 
 				BuildingContainer->ContainerLootTierKey = FName(0);
@@ -375,434 +165,546 @@ namespace BuildingActor
 		{
 			if (BuildingContainer->ContainerLootTierKey.IsValid())
 			{
-				SelectMeshSetByLootTierKey(BuildingContainer, BuildingContainer->ContainerLootTierKey);
+				BuildingContainer->SelectMeshSet(BuildingContainer->ContainerLootTierKey);
 			}
 			else
 			{
-                int32 LootLevel = UFortKismetLibrary::GetLootLevel(BuildingContainer);
-				LootTier = -1;
+				int32 LootLevel = UFortKismetLibrary::GetLootLevel(BuildingContainer);
+				int32 LootTier = -1;
 
-				Loots::PickLootTierKeyAndLootTierFromTierGroup(&BuildingContainer->ContainerLootTierKey, &LootTier, BuildingContainer->SearchLootTierGroup, LootLevel, 0, -1, BuildingContainer->StaticGameplayTags);
+				Loots::PickLootTierKeyAndLootTierFromTierGroup(
+					&BuildingContainer->ContainerLootTierKey, 
+					&LootTier, 
+					BuildingContainer->SearchLootTierGroup, 
+					LootLevel, 
+					0, 
+					-1, 
+					BuildingContainer->StaticGameplayTags
+				);
 
-				SelectMeshSetByLootTier(BuildingContainer, LootTier);
+				BuildingContainer->SelectMeshSet(LootTier);
 			}
 
 			if (BuildingPersistentState == EFortBuildingPersistentState::Searched)
-			{
-				OnSearchedContainer(BuildingContainer, nullptr);
-			}
+				BuildingContainer->SetSearchedContainer(nullptr);
 		}
 
 		FN_LOG(LogBuildingActor, Debug, "ABuildingContainer::PostUpdate() on existing container Container: %s, ContainerLootTierKey: %s, AltMeshIdx: %d",
 			BuildingContainer->GetName().c_str(), BuildingContainer->ContainerLootTierKey.ToString().c_str(), BuildingContainer->AltMeshIdx);
 	}
 
-    bool SpawnLoot(ABuildingContainer* BuildingContainer, AFortPlayerPawn* PlayerPawn)
-    {
-        if (!BuildingContainer->HasAuthority() || !PlayerPawn)
-            return false;
+	bool SpawnLoot(ABuildingContainer* BuildingContainer, AFortPlayerPawn* PlayerPawn)
+	{
+		if (!BuildingContainer->HasAuthority())
+			return false;
 
-        BuildingContainer->ForceNetUpdate();
+		BuildingContainer->ForceNetUpdate();
 
-        bool bHasNewAlreadySearched = false;
-
-        if (!BuildingContainer->bAlreadySearched)
-        {
+		if (!BuildingContainer->bAlreadySearched)
+		{
 			bool bIsAthena = UFortGlobals::IsInAthena();
 
 			const float LootSpawnLocationX = bIsAthena ? BuildingContainer->LootSpawnLocation_Athena.X : BuildingContainer->LootSpawnLocation.X;
 			const float LootSpawnLocationY = bIsAthena ? BuildingContainer->LootSpawnLocation_Athena.Y : BuildingContainer->LootSpawnLocation.Y;
 			const float LootSpawnLocationZ = bIsAthena ? BuildingContainer->LootSpawnLocation_Athena.Z : BuildingContainer->LootSpawnLocation.Z;
 
-            FVector SpawnLocation = BuildingContainer->K2_GetActorLocation() + 
-				BuildingContainer->GetActorForwardVector() * LootSpawnLocationX + 
+			FVector SpawnLocation = BuildingContainer->K2_GetActorLocation() +
+				BuildingContainer->GetActorForwardVector() * LootSpawnLocationX +
 				BuildingContainer->GetActorRightVector() * LootSpawnLocationY +
 				BuildingContainer->GetActorUpVector() * LootSpawnLocationZ;
 
-			FRotator SpawnRotation = FRotator({ 0, 0, 0 });
+			/*FVector BaseTossDirection = UKismetMathLibrary::GetForwardVector(BuildingContainer->LootTossDirection_Athena);
 
-            UFortItemDefinition* LootTestingData = BuildingContainer->LootTestingData;
+			FVector FinalLocation = BuildingContainer->K2_GetActorLocation() +
+				BuildingContainer->GetActorForwardVector() * BuildingContainer->LootFinalLocation.X +
+				BuildingContainer->GetActorRightVector() * BuildingContainer->LootFinalLocation.Y +
+				BuildingContainer->GetActorUpVector() * BuildingContainer->LootFinalLocation.Z;
 
-            if (LootTestingData)
-            {
-                FFortItemEntry ItemEntry;
-                Inventory::MakeItemEntry(&ItemEntry, LootTestingData, 1, -1, -1, 1.0f);
+			FVector TossDirection = UKismetMathLibrary::GetForwardVector(BuildingContainer->LootTossDirection_Athena);
 
-                UFortWorldItemDefinition* ItemDefinition = Cast<UFortWorldItemDefinition>(ItemEntry.ItemDefinition);
+			FVector TossLocation = BuildingContainer->K2_GetActorLocation() +
+				BuildingContainer->GetActorForwardVector() * TossDirection.X +
+				BuildingContainer->GetActorRightVector() * TossDirection.Y +
+				BuildingContainer->GetActorUpVector() * TossDirection.Z;
 
-                if (ItemDefinition && ItemDefinition->ItemType == EFortItemType::WeaponMelee || ItemDefinition->ItemType == EFortItemType::WeaponRanged)
-                {
-                    int32 ItemLevel = ItemEntry.Level;
+			FVector RandomUnitTossDirection = UKismetMathLibrary::RandomUnitVectorInConeInDegrees(BaseTossDirection, BuildingContainer->LootTossConeHalfAngle_Athena);
 
-                    float NewDurability = 1.0f * BuildingContainer->LootedWeaponsDurabilityModifier;
+			TossLocation.X += RandomUnitTossDirection.X * 200.0f;
+			TossLocation.Y += RandomUnitTossDirection.Y * 200.0f;
+			TossLocation.Z += RandomUnitTossDirection.Z * 200.0f;
 
-					Inventory::SetDurability(&ItemEntry, NewDurability);
-                    Inventory::SetStateValue(&ItemEntry, EFortItemEntryState::DurabilityInitialized, 1);
-                }
+			FVector FinalTossLocation = TossLocation + FVector({ LootSpawnLocationX, LootSpawnLocationY, LootSpawnLocationZ });*/
 
-				FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
-				CreatePickupData.World = Globals::GetWorld();
-				CreatePickupData.ItemEntry = &ItemEntry;
-				CreatePickupData.SpawnLocation = &SpawnLocation;
-				CreatePickupData.SpawnRotation = &SpawnRotation;
-				CreatePickupData.PlayerController = nullptr;
-				CreatePickupData.OverrideClass = nullptr;
-				CreatePickupData.NullptrIdk = nullptr;
-				CreatePickupData.bRandomRotation = true;
-				CreatePickupData.PickupSourceTypeFlags = 0;
+			FVector FinalTossLocation = SpawnLocation;
 
-				AFortPickup* Pickup = Inventory::CreatePickupFromData(&CreatePickupData);
+			UFortWorldItemDefinition* LootTestingData = BuildingContainer->LootTestingData;
+
+			if (LootTestingData)
+			{
+				FFortItemEntry ItemEntry;
+				Inventory::MakeItemEntry(&ItemEntry, LootTestingData, 1, -1, -1, 1.0f);
+
+				UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(ItemEntry.ItemDefinition);
+
+				if (WorldItemDefinition && 
+					WorldItemDefinition->ItemType == EFortItemType::WeaponMelee ||
+					WorldItemDefinition->ItemType == EFortItemType::WeaponRanged)
+				{
+					float NewDurability = 1.0f * BuildingContainer->LootedWeaponsDurabilityModifier;
+
+					ItemEntry.SetDurability(NewDurability);
+					ItemEntry.SetStateValue(EFortItemEntryState::DurabilityInitialized, 1);
+				}
+
+				AFortPickup* Pickup = AFortPickup::CreatePickup(
+					BuildingContainer->GetWorld(),
+					&ItemEntry,
+					&SpawnLocation,
+					nullptr,
+					nullptr,
+					nullptr,
+					true,
+					(uint32)EFortPickupSourceTypeFlag::Container);
 
 				if (Pickup)
 				{
-					if (UFortGlobals::IsInAthena())
-					{
-						FVector FinalLocation = SpawnLocation;
+					Pickup->TossPickup(FinalTossLocation, nullptr, 0, true);
 
-						if (!Inventory::CombineNearestPickup(Pickup))
-							Pickup->TossPickup(FinalLocation, nullptr, 0, true);
-					}
-					else
-					{
-						FVector StartDirection = FVector({ 0, 0, 0 });
-						StartDirection.Z = 1.0f;
-
-						Pickup->SetPickupTarget(PlayerPawn, 0.0f, StartDirection, true);
-					}
+					Pickup->bTossedFromContainer = true;
+					Pickup->OnRep_TossedFromContainer();
 				}
 
-				Inventory::FreeItemEntry(&ItemEntry);
-            }
-            else if (BuildingContainer->ContainerLootTierKey.IsValid())
-            {
-                int32 LootLevel = UFortKismetLibrary::GetLootLevel(BuildingContainer);
+				ItemEntry.FreeItemEntry();
+			}
+			else if (BuildingContainer->ContainerLootTierKey.IsValid())
+			{
+				int32 LootLevel = UFortKismetLibrary::GetLootLevel(BuildingContainer);
 
-                TArray<FFortItemEntry> LootToDrops;
-                Loots::PickLootDrops(&LootToDrops, LootLevel, BuildingContainer->ContainerLootTierKey, 0, 0, BuildingContainer->StaticGameplayTags, true, false);
+				TArray<FFortItemEntry> LootToDrops;
+				Loots::PickLootDrops(&LootToDrops, LootLevel, BuildingContainer->ContainerLootTierKey, 0, 0, BuildingContainer->StaticGameplayTags, true, false);
 
-                BuildingContainer->HighestRarity = EFortRarity::Handmade;
+				BuildingContainer->HighestRarity = EFortRarity::Handmade;
 
 				for (int32 i = 0; i < LootToDrops.Num(); i++)
 				{
 					FFortItemEntry LootToDrop = LootToDrops[i];
+
 					UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(LootToDrop.ItemDefinition);
 
 					if (!WorldItemDefinition)
 					{
 						UFortItemDefinition* ItemDefinition = LootToDrop.ItemDefinition;
-						FN_LOG(LogBuildingActor, Warning, "Attempted to spawn non-world item %s!", ItemDefinition->GetName().c_str());
+						FN_LOG(LogBuildingContainer, Error, "Attempted to spawn non-world item %s!", ItemDefinition->GetName().c_str());
 						continue;
 					}
 
-					EFortRarity Rarity = BuildingContainer->HighestRarity;
-
-					if (WorldItemDefinition->bCalculateRarityFromQualityAndTier)
-					{
-						unsigned __int8 Tier = (unsigned __int8)WorldItemDefinition->Tier;
-						unsigned __int8 Quality = (unsigned __int8)WorldItemDefinition->Quality;
-
-						if (Tier > 0)
-							Quality += (Tier - 1) / 2;
-
-						Rarity = EFortRarity::Legendary;
-
-						if (Quality <= 9)
-							Rarity = (EFortRarity)Quality;
-					}
-					else
-					{
-						Rarity = WorldItemDefinition->Rarity;
-					}
-
+					EFortRarity Rarity = WorldItemDefinition->GetRarity();
 					EFortRarity HighestRarity = BuildingContainer->HighestRarity;
 
 					if (HighestRarity < Rarity)
 						BuildingContainer->HighestRarity = Rarity;
 
-					if (WorldItemDefinition->ItemType == EFortItemType::WeaponMelee || WorldItemDefinition->ItemType == EFortItemType::WeaponRanged)
+					if (WorldItemDefinition->ItemType == EFortItemType::WeaponMelee ||
+						WorldItemDefinition->ItemType == EFortItemType::WeaponRanged)
 					{
-						int32 ItemLevel = LootToDrop.Level;
-
 						float NewDurability = 1.0f * BuildingContainer->LootedWeaponsDurabilityModifier;
 
-						Inventory::SetDurability(&LootToDrop, NewDurability);
-						Inventory::SetStateValue(&LootToDrop, EFortItemEntryState::DurabilityInitialized, 1);
+						LootToDrop.SetDurability(NewDurability);
+						LootToDrop.SetStateValue(EFortItemEntryState::DurabilityInitialized, 1);
 					}
 
-					FFortCreatePickupData CreatePickupData = FFortCreatePickupData();
-					CreatePickupData.World = Globals::GetWorld();
-					CreatePickupData.ItemEntry = &LootToDrop;
-					CreatePickupData.SpawnLocation = &SpawnLocation;
-					CreatePickupData.SpawnRotation = &SpawnRotation;
-					CreatePickupData.PlayerController = nullptr;
-					CreatePickupData.OverrideClass = nullptr;
-					CreatePickupData.NullptrIdk = nullptr;
-					CreatePickupData.bRandomRotation = true;
-					CreatePickupData.PickupSourceTypeFlags = 0;
-
-					AFortPickup* Pickup = Inventory::CreatePickupFromData(&CreatePickupData);
+					AFortPickup* Pickup = AFortPickup::CreatePickup(
+						BuildingContainer->GetWorld(),
+						&LootToDrop,
+						&SpawnLocation,
+						nullptr,
+						nullptr,
+						nullptr,
+						true,
+						(uint32)EFortPickupSourceTypeFlag::Container);
 
 					if (Pickup)
 					{
-						if (UFortGlobals::IsInAthena())
-						{
-							FVector FinalLocation = SpawnLocation;
+						Pickup->TossPickup(FinalTossLocation, nullptr, 0, true);
 
-							if(!Inventory::CombineNearestPickup(Pickup))
-								Pickup->TossPickup(FinalLocation, nullptr, 0, true);
-						}
-						else
-						{
-							FVector ConeDir = FVector({ 0, 0, 0 });
-							FVector VectorInCone = UKismetMathLibrary::RandomUnitVectorInConeInRadians(ConeDir, 1.0f);
-
-							float FlyTime = Globals::GenFlyTime();
-							Pickup->SetPickupTarget(PlayerPawn, (FlyTime + i * 0.30000001192092896f), VectorInCone, true);
-						}
+						Pickup->bTossedFromContainer = true;
+						Pickup->OnRep_TossedFromContainer();
 					}
 				}
 
-				if (LootToDrops.IsValid())
-					LootToDrops.Free();
-            }
-
-            bHasNewAlreadySearched = true;
-        }
-
-        float LootNoiseRange = BuildingContainer->LootNoiseRange;
-
-        if (LootNoiseRange > 0.0f)
-        {
-			const FVector& NoiseLocation = BuildingContainer->K2_GetActorLocation();
-            UFortAIFunctionLibrary::MakeNoiseEventAtLocation(PlayerPawn, LootNoiseRange, NoiseLocation);
-        }
-
-        if (!BuildingContainer->bDestroyed)
-        {
-            OnSearchedContainer(BuildingContainer, PlayerPawn);
-
-            /*if (BuildingContainer->bPersistToWorld && WorldManager)
-            {
-
-            }*/
-        }
-
-        USceneComponent* PawnRootComponent = PlayerPawn->RootComponent;
-
-        FVector StartDirection = FVector({ 0, 0, 0 });
-
-        if (PawnRootComponent)
-        {
-            FVector PlayerLocation = PawnRootComponent->K2_GetComponentLocation();
-            StartDirection = PlayerLocation;
-        }
-        else
-        {
-            StartDirection = FVector({ 0, 0, 0 });
-        }
-
-        FVector* DirectionPtr = &StartDirection;
-        FRotator AdjustedRotation = FRotator({ 0, 0, 0 });
-
-        AdjustedRotation.Pitch = DirectionPtr->X;
-
-        USceneComponent* BuildingRootComponent = BuildingContainer->RootComponent;
-        FVector AdjustedDirection = FVector({ 0, 0, 0 });
-
-        if (BuildingRootComponent)
-        {
-            FVector BuildingLocation = BuildingRootComponent->K2_GetComponentLocation();
-            AdjustedDirection = BuildingLocation;
-        }
-        else
-        {
-            AdjustedDirection = FVector({ 0, 0, 0 });
-        }
-
-        float YawDiff = AdjustedRotation.Yaw - AdjustedDirection.Y;
-        float PitchDiff = AdjustedRotation.Pitch - AdjustedDirection.X;
-
-        BuildingContainer->SearchBounceData.BounceNormal = FVector(0, 0, 0);
-        FVector& BounceNormal = BuildingContainer->SearchBounceData.BounceNormal;
-
-        BounceNormal.X = PitchDiff;
-        BounceNormal.Y = YawDiff;
-
-        float VectorLength = UKismetMathLibrary::Sqrt((BounceNormal.X * BounceNormal.X) + (BounceNormal.Y * BounceNormal.Y));
-
-        if (VectorLength > 0.000000009999999f)
-        {
-            BounceNormal.X /= VectorLength;
-            BounceNormal.Y /= VectorLength;
-        }
-
-        BuildingContainer->SearchBounceData.SearchAnimationCount++;
-        BuildingContainer->BounceContainer();
-
-        if (bHasNewAlreadySearched && BuildingContainer->bAlreadySearched && !UFortGlobals::IsInAthena())
-        {
-            if (BuildingContainer->bDestroyContainerOnSearch)
-                BuildingContainer->K2_DestroyActor();
-        }
-
-        return true;
-    }
-
-	void HarvestLoot(ABuildingSMActor* BuildingSMActor, AFortPlayerPawn* PlayerPawn, float Damage, bool bJustHitWeakspot)
-	{
-		AFortPlayerController* PlayerController = Cast<AFortPlayerController>(PlayerPawn->Controller);
-
-		if (PlayerController)
-		{
-			EFortResourceType ResourceType = BuildingSMActor->ResourceType;
-
-			UFortGameData* GameData = Globals::GetGameData();
-			UFortResourceItemDefinition* ResourceItemDefinition = UFortKismetLibrary::K2_GetResourceItemDefinition(ResourceType);
-
-			if (!ResourceItemDefinition)
-				return;
-
-			if (BuildingSMActor->MaxResourcesToSpawn < 0)
-			{
-				BuildingSMActor->MaxResourcesToSpawn = DetermineMaxResourcesToSpawn(BuildingSMActor, 1);
+				FFortItemEntry::FreeItemEntries(&LootToDrops);
 			}
+
+			if (PlayerPawn)
+			{
+				AFortPlayerStateZone* PlayerStateZone = Cast<AFortPlayerStateZone>(PlayerPawn->PlayerState);
+
+				// https://imgur.com/sN7Bk4h
+				if (PlayerStateZone)
+				{
+
+				}
+
+				float LootNoiseRange = BuildingContainer->LootNoiseRange;
+
+				if (LootNoiseRange > 0.0f)
+				{
+					const FVector& NoiseLocation = BuildingContainer->K2_GetActorLocation();
+					UFortAIFunctionLibrary::MakeNoiseEventAtLocation(PlayerPawn, LootNoiseRange, NoiseLocation);
+				}
+			}
+			
+			if (!BuildingContainer->bDestroyed)
+			{
+				BuildingContainer->SetSearchedContainer(PlayerPawn);
+
+				AFortWorldManager* WorldManager = Globals::GetWorldManager();
+
+				// https://imgur.com/ZEhFcUn
+				if (BuildingContainer->bPersistToWorld && WorldManager)
+				{
+
+				}
+
+				if (PlayerPawn)
+				{
+					AFortPlayerController* PlayerController = Cast<AFortPlayerController>(PlayerPawn->Controller);
+
+					// https://imgur.com/tlGKgy0
+					if (PlayerController)
+					{
+
+					}
+				}
+			}
+		}
+
+		BuildingContainer->SearchBounceData.SearchAnimationCount++;
+		BuildingContainer->BounceContainer();
+
+		return true;
+	}
+
+	/* -------------------------------------- ABuildingSMActor --------------------------------------- */
+
+	/*
+	 * Rewrite ABuildingSMActor::SelectMeshSet(FName LootTierKey) (1.1)
+	 *
+	 * - https://imgur.com/5hzNiB0
+	 * - https://imgur.com/FMS3zQK
+	 */
+	void SelectMeshSet(ABuildingSMActor* BuildingSMActor, FFrame& Stack, void* Ret)
+	{
+		FName LootTierKey = FName(0);
+
+		Stack.StepCompiledIn(&LootTierKey);
+
+		Stack.Code += Stack.Code != nullptr;
+
+		int32 LootTier = Loots::FindLootTierFromKey(LootTierKey);
+		FTierMeshSets* MeshSets = nullptr;
+
+		if (BuildingSMActor->AlternateMeshes.Num() > 0)
+		{
+			for (int32 i = 0; i < BuildingSMActor->AlternateMeshes.Num(); i++)
+			{
+				FTierMeshSets* AlternateMeshe = &BuildingSMActor->AlternateMeshes[i];
+				int32 Tier = AlternateMeshe->Tier;
+
+				if (Tier <= LootTier && (!MeshSets || MeshSets->Tier < Tier))
+				{
+					if (AlternateMeshe->MeshSets.Num() <= 0)
+					{
+						FN_LOG(LogBuildingSMActor, Warning, "No Alternative Mesh available for Building: %s at LootTier: %d", BuildingSMActor->GetName().c_str(), Tier);
+					}
+					else
+					{
+						MeshSets = AlternateMeshe;
+					}
+				}
+			}
+
+			if (MeshSets)
+			{
+				int32 AltMeshIdx = BuildingSMActor->AltMeshIdx;
+
+				if (AltMeshIdx != -1)
+				{
+					BuildingSMActor->SetMeshSet(MeshSets->MeshSets[AltMeshIdx]);
+				}
+			}
+		}
+
+		FN_LOG(LogBuildingSMActor, Debug, "ABuildingSMActor::SelectMeshSet(FName LootTierKey) Building: %s, AltMeshIdx: %d", BuildingSMActor->GetName().c_str(), BuildingSMActor->AltMeshIdx);
+	}
+
+
+	/*
+	 * Rewrite ABuildingSMActor::PostUpdate (1.1)
+	 *
+	 * - https://imgur.com/B3MAqOw
+	 * - https://imgur.com/AbJvx6u
+	 * - https://imgur.com/EyyvQGv
+	 */
+	void ABuildingSMActor_PostUpdate(ABuildingSMActor* BuildingSMActor)
+	{
+		EFortBuildingPersistentState PersistentState = EFortBuildingPersistentState::Default;
+		FName LootTierKey = BuildingSMActor->DestructionLootTierKey;
+
+		if (BuildingSMActor->DestructionLootTierKey.IsValid())
+		{
+			BuildingSMActor->SelectMeshSet(LootTierKey);
+		}
+		else
+		{
+			int32 LootTier = 0;
+			int32 ChooseLootTier = 0;
+
+			if (BuildingSMActor->DestructionLootTierGroup.IsValid())
+			{
+				LootTier = -1;
+
+				if (BuildingSMActor->DestructionLootTierChosenQuotaInfo.LootTierKey.ComparisonIndex > 0 ||
+					BuildingSMActor->DestructionLootTierChosenQuotaInfo.LootTierKey.Number > 0)
+				{
+					ChooseLootTier = BuildingSMActor->DestructionLootTierChosenQuotaInfo.LootTier;
+					LootTierKey = BuildingSMActor->DestructionLootTierChosenQuotaInfo.LootTierKey;
+
+					LootTier = ChooseLootTier;
+				}
+				else
+				{
+					int32 LootLevel = UFortKismetLibrary::GetLootLevel(BuildingSMActor);
+
+					Loots::PickLootTierKeyAndLootTierFromTierGroup(
+						&BuildingSMActor->DestructionLootTierKey,
+						&LootTier, 
+						BuildingSMActor->DestructionLootTierGroup,
+						LootLevel, 
+						0, 
+						-1, 
+						BuildingSMActor->StaticGameplayTags
+					);
+
+					ChooseLootTier = LootTier;
+				}
+
+				BuildingSMActor->SelectMeshSet(ChooseLootTier);
+
+				if (Loots::IsLootDropPossible(LootTierKey, L"ABuildingSMActor::AttemptSpawnResources", 0))
+				{
+					// Idk what it does
+					// https://imgur.com/bfa7h9o
+				}
+				else
+				{
+					LootTierKey = FName(0);
+					PersistentState = EFortBuildingPersistentState::Searched;
+				}
+
+				if (BuildingSMActor->AltMeshIdx != -1 && BuildingSMActor->bPersistToWorld)
+				{
+					// Idk what it does
+					// https://imgur.com/6sCJOpg
+				}
+			}
+		}
+
+		FN_LOG(LogBuildingSMActor, Debug, "ABuildingSMActor::PostUpdate() Building: %s, AltMeshIdx: %d", BuildingSMActor->GetName().c_str(), BuildingSMActor->AltMeshIdx);
+
+		ABuildingSMActor_PostUpdateOG(BuildingSMActor);
+	}
+
+	/* --------------------------------------- ABuildingActor ---------------------------------------- */
+
+	/*
+	 * Rewrite ABuildingSMActor::ResourceHarvesting (1.1)
+	 *
+	 * - PS: Idk why but in hook the real function is called only on certain actors.
+	 * 
+	 * - https://imgur.com/rtNXcue
+	 * - https://imgur.com/bwmrN5k
+	 * - https://imgur.com/2VUBSmw
+	 * - https://imgur.com/xLp51BB
+	 * - https://imgur.com/dBXzVy6
+	 * - https://imgur.com/eqMtWQd
+	 */
+	void OnDamageServer(
+		ABuildingActor* BuildingActor, 
+		float Damage, 
+		const FGameplayTagContainer& DamageTags, 
+		const FVector& Momentum, 
+		const FHitResult& HitInfo, 
+		AController* InstigatedBy, 
+		AActor* DamageCauser, 
+		const FGameplayEffectContextHandle& EffectContext)
+	{
+		OnDamageServerOG(
+			BuildingActor,
+			Damage,
+			DamageTags,
+			Momentum,
+			HitInfo,
+			InstigatedBy,
+			DamageCauser,
+			EffectContext);
+
+		ABuildingSMActor* BuildingSMActor = Cast<ABuildingSMActor>(BuildingActor);
+		AFortPlayerController* PlayerController = Cast<AFortPlayerController>(InstigatedBy);
+		AFortWeapon* Weapon = Cast<AFortWeapon>(DamageCauser);
+		
+		if (!BuildingSMActor || !PlayerController || !Weapon)
+			return;
+
+		AFortPlayerPawn* PlayerPawn = PlayerController->MyFortPawn;
+
+		if (!Weapon->WeaponData->IsA(UFortWeaponMeleeItemDefinition::StaticClass()) || 
+			!BuildingSMActor->bAllowResourceDrop ||
+			!PlayerPawn)
+			return;
+
+		UFortResourceItemDefinition* ResourceItemDefinition = UFortKismetLibrary::K2_GetResourceItemDefinition(BuildingSMActor->ResourceType);
+
+		int32 ResourceDropAmount = 0;
+		float ResourceRatio = 0.0f;
+
+		if (ResourceItemDefinition)
+		{
+			if (BuildingSMActor->MaxResourcesToSpawn < 0)
+				BuildingSMActor->MaxResourcesToSpawn = BuildingSMActor->DetermineMaxResourcesToSpawn();
 
 			float MaxResourcesToSpawn = BuildingSMActor->MaxResourcesToSpawn;
 			float MaxHealth = BuildingSMActor->GetMaxHealth();
-			float ResourceRatio = MaxResourcesToSpawn / MaxHealth;
-			float ResourceDropAmount = ResourceRatio * Damage;
 
-			int32 PotentialResourceCount = (int32)ResourceDropAmount;
+			ResourceRatio = MaxResourcesToSpawn / MaxHealth;
+			ResourceDropAmount = (int32)(ResourceRatio * Damage);
+		}
 
-			bool bHasHealthLeft = BuildingSMActor->HasHealthLeft();
-			bool bDestroyed = false;
+		bool bHasHealthLeft = BuildingSMActor->HasHealthLeft();
+		bool bDestroyed = false;
 
-			if (!bHasHealthLeft)
+		if (!bHasHealthLeft)
+		{
+			bDestroyed = true;
+
+			int32 MinResourceCount = 0;
+
+			if (!ResourceItemDefinition || (MinResourceCount = 1, ResourceRatio == 0.0))
+				MinResourceCount = 0;
+
+			if (ResourceDropAmount < MinResourceCount)
+				ResourceDropAmount = MinResourceCount;
+
+			if (BuildingSMActor->DestructionLootTierKey.IsValid())
 			{
-				bDestroyed = true;
+				int32 LootLevel = UFortKismetLibrary::GetLootLevel(BuildingSMActor);
 
-				int32 MinResourceCount = 0;
+				TArray<FFortItemEntry> LootToDrops;
+				Loots::PickLootDrops(&LootToDrops, LootLevel, BuildingSMActor->DestructionLootTierKey, 0, 0, BuildingSMActor->StaticGameplayTags, true, false);
 
-				if (!ResourceItemDefinition || (MinResourceCount = 1, ResourceRatio == 0.0))
-					MinResourceCount = 0;
-
-				if (PotentialResourceCount < MinResourceCount)
-					PotentialResourceCount = MinResourceCount;
-
-				if (BuildingSMActor->DestructionLootTierKey.IsValid())
+				for (int32 i = 0; i < LootToDrops.Num(); i++)
 				{
-					int32 WorldLevel = -1;
+					FFortItemEntry LootToDrop = LootToDrops[i];
 
-					AFortGameState* GameState = Cast<AFortGameState>(UGameplayStatics::GetGameState(BuildingSMActor));
+					UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(LootToDrop.ItemDefinition);
 
-					if (GameState)
-						WorldLevel = GameState->WorldLevel;
-
-					TArray<FFortItemEntry> LootToDrops;
-					Loots::PickLootDrops(&LootToDrops, WorldLevel, BuildingSMActor->DestructionLootTierKey, 0, 0, BuildingSMActor->StaticGameplayTags, true, false);
-
-					for (int32 i = 0; i < LootToDrops.Num(); i++)
+					if (!WorldItemDefinition)
 					{
-						FFortItemEntry LootToDrop = LootToDrops[i];
-						UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(LootToDrop.ItemDefinition);
-
-						if (!WorldItemDefinition)
-						{
-							FN_LOG(LogBuildingActor, Error, "Loot tier %s dropped entry with no item data!", BuildingSMActor->DestructionLootTierGroup.ToString().c_str());
-							continue;
-						}
-
-						FVector ComponentLocation = BuildingSMActor->RootComponent->K2_GetComponentLocation();
-						FVector RandomDirection = UKismetMathLibrary::RandomUnitVector();
-
-						ComponentLocation.X += RandomDirection.X * 200.0f;
-						ComponentLocation.Y += RandomDirection.Y * 200.0f;
-						ComponentLocation.Z += RandomDirection.Z * 200.0f;
-
-						FFortItemEntry ItemEntry;
-						Inventory::MakeItemEntry(&ItemEntry, WorldItemDefinition, LootToDrop.Count, LootToDrop.Level, LootToDrop.LoadedAmmo, LootToDrop.Durability);
-
-						Inventory::SetStateValue(&ItemEntry, EFortItemEntryState::DoNotShowSpawnParticles, 1);
-
-						AFortPickup* Pickup = Inventory::CreateSimplePickup(Globals::GetWorld(), &ItemEntry, ComponentLocation, FRotator());
-
-						if (Pickup)
-						{
-							FVector ConeDir = { 0, 0, 0 };
-							FVector VectorInCone = UKismetMathLibrary::RandomUnitVectorInConeInDegrees(ConeDir, 1.0f);
-
-							float FlyTime = Globals::GenFlyTime();
-							Pickup->SetPickupTarget(PlayerPawn, (FlyTime + (i + 1) * 0.30000001192092896f), VectorInCone, true);
-						}
-
-						Inventory::FreeItemEntry(&ItemEntry);
+						FN_LOG(LogBuildingSMActor, Error, "Loot tier %s dropped entry with no item data!", BuildingSMActor->DestructionLootTierGroup.ToString().c_str());
+						continue;
 					}
 
-					if (LootToDrops.IsValid())
-						LootToDrops.Free();
+					FVector BuildingSMActorLocation = BuildingSMActor->K2_GetActorLocation();
+					FVector RandomDirection = UKismetMathLibrary::RandomUnitVector();
+
+					BuildingSMActorLocation.X += RandomDirection.X * 200.0f;
+					BuildingSMActorLocation.Y += RandomDirection.Y * 200.0f;
+					BuildingSMActorLocation.Z += RandomDirection.Z * 200.0f;
+
+					FFortItemEntry ItemEntry;
+					Inventory::MakeItemEntry(&ItemEntry, WorldItemDefinition, LootToDrop.Count, LootToDrop.Level, LootToDrop.LoadedAmmo, LootToDrop.Durability);
+					ItemEntry.SetStateValue(EFortItemEntryState::DoNotShowSpawnParticles, 1);
+
+					AFortPickup* Pickup = AFortPickup::CreatePickup(
+						PlayerController->GetWorld(),
+						&ItemEntry,
+						&BuildingSMActorLocation,
+						nullptr,
+						nullptr,
+						nullptr,
+						true,
+						(uint32)EFortPickupSourceTypeFlag::Destruction);
+
+					if (Pickup)
+					{
+						FVector ConeDir = { 0, 0, 0 };
+						FVector VectorInCone = UKismetMathLibrary::RandomUnitVectorInConeInRadians(ConeDir, 1.0f);
+
+						float FlyTime = Globals::GenFlyTime();
+						Pickup->SetPickupTarget(PlayerPawn, (FlyTime + i * 0.30000001192092896f), VectorInCone, true);
+					}
+
+					ItemEntry.FreeItemEntry();
 				}
 			}
+		}
+		
+		if (ResourceDropAmount > 0)
+		{
+			FFortItemEntry ItemEntry;
+			ItemEntry.CreateDefaultItemEntry(ResourceItemDefinition, ResourceDropAmount, 0);
 
-			if (PotentialResourceCount > 0)
+			FVector BuildingSMActorLocation = BuildingSMActor->K2_GetActorLocation();
+			FVector RandomDirection = UKismetMathLibrary::RandomUnitVector();
+
+			BuildingSMActorLocation.X += RandomDirection.X * 200.0f;
+			BuildingSMActorLocation.Y += RandomDirection.Y * 200.0f;
+			BuildingSMActorLocation.Z += RandomDirection.Z * 200.0f;
+
+			ItemEntry.SetStateValue(EFortItemEntryState::DoNotShowSpawnParticles, 1);
+			ItemEntry.SetStateValue(EFortItemEntryState::ShouldShowItemToast, 1);
+
+			if (BuildingSMActor->OwnerPersistentID == -1)
 			{
-				FFortItemEntry ItemEntry;
-				Inventory::CreateDefaultItemEntry(&ItemEntry, ResourceItemDefinition, PotentialResourceCount, 0);
-
-				Inventory::SetStateValue(&ItemEntry, EFortItemEntryState::DoNotShowSpawnParticles, 1);
-
-				FVector ComponentLocation = BuildingSMActor->RootComponent->K2_GetComponentLocation();
-				FVector RandomDirection = UKismetMathLibrary::RandomUnitVector();
-
-				ComponentLocation.X += RandomDirection.X * 200.0f;
-				ComponentLocation.Y += RandomDirection.Y * 200.0f;
-				ComponentLocation.Z += RandomDirection.Z * 200.0f;
-
-				/*AFortPickup* Pickup = Inventory::CreateSimplePickup(Globals::GetWorld(), &ItemEntry, ComponentLocation, FRotator());
-
-				if (Pickup)
-				{
-					if (BuildingSMActor->OwnerPersistentID == -1)
-					{
-
-					}
-
-					float FlyTime = GenFlyTime();
-					Pawn::SetPickupTarget(Pickup, PlayerPawn, FlyTime, RandomDirection, true);
-					PlayerController->ClientReportDamagedResourceBuilding(BuildingSMActor, BuildingSMActor->ResourceType, PotentialResourceCount, bDestroyed, bJustHitWeakspot);
-				}*/
-
-				Inventory::AddInventoryItem(PlayerController, ItemEntry, FGuid());
-				PlayerController->ClientReportDamagedResourceBuilding(BuildingSMActor, BuildingSMActor->ResourceType, PotentialResourceCount, bDestroyed, bJustHitWeakspot);
-
-				Inventory::FreeItemEntry(&ItemEntry);
+				// Idk what it does
+				// https://imgur.com/HC3hhbt
 			}
+
+			Inventory::AddInventoryItem(PlayerController, ItemEntry);
+			PlayerController->ClientReportDamagedResourceBuilding(BuildingSMActor, BuildingSMActor->ResourceType, ResourceDropAmount, bDestroyed, (Damage == 100.0f));
+
+			ItemEntry.FreeItemEntry();
 		}
 	}
 
 	void InitBuildingActor()
 	{
-        static auto BuildingContainerDefault = ABuildingContainer::GetDefaultObj();
+		ABuildingContainer* BuildingContainerDefault = ABuildingContainer::GetDefaultObj();
+		UClass* BuildingContainerClass = ABuildingContainer::StaticClass();
 
-        uintptr_t AddressPickLootTierGroupAthena = MinHook::FindPattern(Patterns::PickLootTierGroupAthena);
-		uintptr_t AddressSelectMeshSetByLootTier = MinHook::FindPattern(Patterns::SelectMeshSetByLootTier);
-		uintptr_t AddressSetMeshSet = MinHook::FindPattern(Patterns::SetMeshSet);
-		uintptr_t AddressOnSearchedContainer = MinHook::FindPattern(Patterns::OnSearchedContainer);
-		uintptr_t AddressDetermineMaxResourcesToSpawn = MinHook::FindPattern(Patterns::DetermineMaxResourcesToSpawn);
+		/* ------------------------------------- ABuildingContainer -------------------------------------- */
+		
+		UFunction* EditorOnlyRemoveInstanceMaterialScalarParameterFunc = BuildingContainerClass->GetFunction("BuildingSMActor", "EditorOnlyRemoveInstanceMaterialScalarParameter");
+		MinHook::HookFunctionExec(EditorOnlyRemoveInstanceMaterialScalarParameterFunc, SelectMeshSet, nullptr);
 
-        PickLootTierGroupAthena = decltype(PickLootTierGroupAthena)(AddressPickLootTierGroupAthena);
-		SelectMeshSetByLootTier = decltype(SelectMeshSetByLootTier)(AddressSelectMeshSetByLootTier);
-		SetMeshSet = decltype(SetMeshSet)(AddressSetMeshSet);
-		OnSearchedContainer = decltype(OnSearchedContainer)(AddressOnSearchedContainer);
-		DetermineMaxResourcesToSpawn = decltype(DetermineMaxResourcesToSpawn)(AddressDetermineMaxResourcesToSpawn);
+		MinHook::HookVTable(BuildingContainerDefault, 0xF5, ABuildingContainer_PostUpdate, (LPVOID*)(&ABuildingContainer_PostUpdateOG), "ABuildingContainer::PostUpdate");
+		MinHook::HookVTable(BuildingContainerDefault, 0x1B9, SpawnLoot, nullptr, "ABuildingContainer::SpawnLoot");
 
-        MinHook::HookVTable(BuildingContainerDefault, 0x1B9, SpawnLoot, nullptr, "ABuildingContainer::SpawnLoot");
-		MinHook::HookVTable(BuildingContainerDefault, 0xF5, ABuildingContainer_PostUpdate, nullptr, "ABuildingContainer::PostUpdate");
-		//MinHook::HookVTable(BuildingContainerDefault, 0x146, HarvestLoot, nullptr, "ABuildingSMActor::HarvestLoot");
-
+		/* -------------------------------------- ABuildingSMActor --------------------------------------- */
+		
 		uintptr_t AddressABuildingSMActor_PostUpdate = MinHook::FindPattern(Patterns::ABuildingSMActor_PostUpdate);
 
 		MH_CreateHook((LPVOID)(AddressABuildingSMActor_PostUpdate), ABuildingSMActor_PostUpdate, (LPVOID*)(&ABuildingSMActor_PostUpdateOG));
 		MH_EnableHook((LPVOID)(AddressABuildingSMActor_PostUpdate));
+
+		// MinHook::HookVTable(BuildingContainerDefault, 0x146, ResourceHarvesting, nullptr, "ABuildingSMActor::ResourceHarvesting");
+
+		/* --------------------------------------- ABuildingActor ---------------------------------------- */
+
+		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x1371CD0), OnDamageServer, (LPVOID*)(&OnDamageServerOG));
+		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x1371CD0));
+
+		/* ----------------------------------------------------------------------------------------------- */
 
 		FN_LOG(LogInit, Log, "InitBuildingActor Success!");
 	}

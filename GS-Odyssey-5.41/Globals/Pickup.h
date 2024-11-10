@@ -1,11 +1,16 @@
 #pragma once
 
+/*
+ * - The explanations were made with chatgpt (I was too lazy to do it)
+*/
+
 namespace Pickup
 {
 	/* ----------------------------------------- AFortPickupOG --------------------------------------- */
 
 	bool (*PickupAddInventoryOwnerInterfaceOG)(AFortPickup* Pickup, void* InventoryOwner);
 	void (*TossPickupOG)(AFortPickup* Pickup, const FVector& FinalLocation, class AFortPawn* ItemOwner, int32 OverrideMaxStackCount, bool bToss);
+	void (*OnServerStopCallbackOG)(AFortPickup* Pickup, const FHitResult& Hit);
 
 
 
@@ -68,22 +73,25 @@ namespace Pickup
 		if (Pickup->PickupSourceTypeFlags == 32)
 			return;
 
-		AFortPickup* ClosestPickup = Inventory::GetClosestPickup(Pickup, 300.0f);
+		Inventory::CombineNearestPickup(Pickup, 300.0f);
+	}
 
-		if (ClosestPickup)
-		{
-			Pickup->PickupLocationData.CombineTarget = ClosestPickup;
-			Pickup->PickupLocationData.FlyTime = 0.25f;
-			Pickup->PickupLocationData.LootFinalPosition = (FVector_NetQuantize10)ClosestPickup->K2_GetActorLocation();
-			Pickup->PickupLocationData.LootInitialPosition = (FVector_NetQuantize10)Pickup->K2_GetActorLocation();
-			Pickup->PickupLocationData.FinalTossRestLocation = (FVector_NetQuantize10)ClosestPickup->K2_GetActorLocation();
+	/*
+	 * OnServerStopCallback, the server detects that a pickup has stopped moving, allowing for additional actions like combining with nearby pickups.
+	 *
+	 * - Checks if the pickup is being destroyed or if combining is not enabled (`bCombinePickupsWhenTossCompletes`).
+	 *		- If either condition is true, exits the function.
+	 * - Calls `CombineNearestPickup` from the `Inventory` namespace, passing in the pickup and a radius of 500 units.
+	 *		- This attempts to find and combine the pickup with the nearest compatible pickup within the specified radius.
+	 */
+	void OnServerStopCallback(AFortPickup* Pickup, const FHitResult& Hit)
+	{
+		OnServerStopCallbackOG(Pickup, Hit);
 
-			Pickup->OnRep_PickupLocationData();
-			Pickup->FlushNetDormancy();
+		if (Pickup->bActorIsBeingDestroyed || !Pickup->bCombinePickupsWhenTossCompletes)
+			return;
 
-			// Use to call a CombinePickup function with delay
-			UKismetSystemLibrary::K2_SetTimer(Pickup, L"OnRep_ServerImpactSoundFlash", Pickup->PickupLocationData.FlyTime, false);
-		}
+		Inventory::CombineNearestPickup(Pickup, 500.0f);
 	}
 
 	/*
@@ -150,6 +158,7 @@ namespace Pickup
 	void InitPickup()
 	{
 		AFortPickupAthena* FortPickupAthenaDefault = AFortPickupAthena::GetDefaultObj();
+		UClass* FortPickupAthenaClass = AFortPickupAthena::StaticClass();
 
 		/* ------------------------------------------ AFortPickup ---------------------------------------- */
 
@@ -159,7 +168,9 @@ namespace Pickup
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0xFABF80), TossPickup, (LPVOID*)(&TossPickupOG));
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0xFABF80));
 
-		UFunction* OnRep_ServerImpactSoundFlashFunc = AFortPickupAthena::StaticClass()->GetFunction("FortPickup", "OnRep_ServerImpactSoundFlash");
+		MinHook::HookVTable(FortPickupAthenaDefault, 0x630 / 8, OnServerStopCallback, (LPVOID*)(&OnServerStopCallbackOG), "AFortPickup::OnServerStopCallback");
+
+		UFunction* OnRep_ServerImpactSoundFlashFunc = FortPickupAthenaClass->GetFunction("FortPickup", "OnRep_ServerImpactSoundFlash");
 		MinHook::HookFunctionExec(OnRep_ServerImpactSoundFlashFunc, CombinePickup, nullptr);
 
 		/* ----------------------------------------------------------------------------------------------- */

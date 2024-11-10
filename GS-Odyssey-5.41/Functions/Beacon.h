@@ -205,6 +205,11 @@ namespace Beacon
 
 					SetWorld(World->NetDriver, World);
 
+					if ((World->NetDriver->MaxInternetClientRate < World->NetDriver->MaxClientRate) && (World->NetDriver->MaxInternetClientRate > 2500))
+					{
+						World->NetDriver->MaxClientRate = World->NetDriver->MaxInternetClientRate;
+					}
+
 					static bool bHookTickFlush = false;
 
 					if (!bHookTickFlush)

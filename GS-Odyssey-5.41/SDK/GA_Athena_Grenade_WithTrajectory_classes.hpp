@@ -84,18 +84,18 @@ public:
 	void OnAbilityInputReleased();
 	void Server_SpawnProjectile(const struct FVector& Location, const struct FRotator& Direction);
 	void K2_ActivateAbility();
-	void OnFinish_D7F9D67243A9BA307AFBF7839EC5CA1C();
-	void OnFinish_C70D988C492A7EF3B105DC8DADDBD86D();
+	void OnFinish_D7F9D67243A9BA307AFBF7839EC5CA1C(); // 2
+	void OnFinish_C70D988C492A7EF3B105DC8DADDBD86D(); // -1
 	void OnCompleted_758AC809498064C01C71318E141D1E46();
 	void OnBlendOut_758AC809498064C01C71318E141D1E46();
-	void OnInterrupted_758AC809498064C01C71318E141D1E46();
+	void OnInterrupted_758AC809498064C01C71318E141D1E46(); // 0
 	void OnCancelled_758AC809498064C01C71318E141D1E46();
 	void OnFinish_4B1D92B7427697E6BD9D58ACA0F87155();
-	void OnFinish_E8F8DC5A465F19B633AF0E8888171F5A();
+	void OnFinish_E8F8DC5A465F19B633AF0E8888171F5A(); // 3
 	void Triggered_B08560984B3818F6EECB3C9A92E61ADC(const struct FGameplayAbilityTargetDataHandle& TargetData, const struct FGameplayTag& ApplicationTag);
 	void Cancelled_B08560984B3818F6EECB3C9A92E61ADC(const struct FGameplayAbilityTargetDataHandle& TargetData, const struct FGameplayTag& ApplicationTag);
 	void Completed_B08560984B3818F6EECB3C9A92E61ADC(const struct FGameplayAbilityTargetDataHandle& TargetData, const struct FGameplayTag& ApplicationTag);
-	void Created_40FE015D40E881984FE611B980B75D52(const struct FProjectileEventData& ProjectileData);
+	void Created_40FE015D40E881984FE611B980B75D52(const struct FProjectileEventData& ProjectileData); // 1
 	void Touched_40FE015D40E881984FE611B980B75D52(const struct FProjectileEventData& ProjectileData);
 	void Bounced_40FE015D40E881984FE611B980B75D52(const struct FProjectileEventData& ProjectileData);
 	void Stopped_40FE015D40E881984FE611B980B75D52(const struct FProjectileEventData& ProjectileData);

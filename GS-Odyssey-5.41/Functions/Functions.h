@@ -3,10 +3,6 @@
 
 namespace Functions
 {
-	AFortAthenaSupplyDrop* (*SpawnSupplyDrop)(AFortAthenaMapInfo* MapInfo, const FVector& Location, const FRotator& Rotation, UClass* SupplyDropClass, float TraceStartZ, float TraceEndZ);
-	FVector (*PickSupplyDropLocation)(AFortAthenaMapInfo* MapInfo, FVector* OutSpawnLocation, FVector* CenterLocation, float Radius);
-	UWorld* (*GetWorldFromContextObject)(UEngine* Engine, const UObject* Object, EGetWorldErrorMode ErrorMode);
-
 	bool IsPlayerBuildableClasse(UClass* BuildableClasse)
 	{
 		AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
@@ -85,6 +81,32 @@ namespace Functions
 		return nullptr;
 	}
 
+	UFortAbilitySet* LoadAbilitySet(TSoftObjectPtr<UFortAbilitySet> SoftAbilitySet)
+	{
+		UFortAbilitySet* AbilitySet = SoftAbilitySet.Get();
+
+		if (!AbilitySet)
+		{
+			const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(SoftAbilitySet.ObjectID.AssetPathName);
+			AbilitySet = StaticLoadObject<UFortAbilitySet>(AssetPathName.CStr());
+		}
+
+		return AbilitySet;
+	}
+
+	UFortGameplayModifierItemDefinition* LoadGameplayModifier(TSoftObjectPtr<UFortGameplayModifierItemDefinition> SoftGameplayModifier)
+	{
+		UFortGameplayModifierItemDefinition* GameplayModifier = SoftGameplayModifier.Get();
+
+		if (!GameplayModifier)
+		{
+			const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(SoftGameplayModifier.ObjectID.AssetPathName);
+			GameplayModifier = StaticLoadObject<UFortGameplayModifierItemDefinition>(AssetPathName.CStr());
+		}
+
+		return GameplayModifier;
+	}
+
 	int GetRandomRarity(const std::map<int32, float>& RarityAndWeight) 
 	{
 		std::random_device rd;
@@ -100,133 +122,6 @@ namespace Functions
 		std::discrete_distribution<> dist(weights.begin(), weights.end());
 
 		return dist(gen);
-	}
-
-	void SpawnLootOnFloorLoot(ABuildingContainer* BuildingContainer)
-	{
-		if (!BuildingContainer->bAlreadySearched)
-		{
-			int32 LootLevel = UFortKismetLibrary::GetLootLevel(BuildingContainer);
-
-			TArray<FFortItemEntry> LootToDrops;
-			Loots::PickLootDrops(&LootToDrops, LootLevel, BuildingContainer->ContainerLootTierKey, 0, 0, BuildingContainer->StaticGameplayTags, true, false);
-
-			BuildingContainer->HighestRarity = EFortRarity::Handmade;
-
-			if (LootToDrops.Num() > 0)
-			{
-				for (int32 i = 0; i < LootToDrops.Num(); i++)
-				{
-					FFortItemEntry LootToDrop = LootToDrops[i];
-					UFortWorldItemDefinition* WorldItemDefinition = Cast<UFortWorldItemDefinition>(LootToDrop.ItemDefinition);
-
-					if (!WorldItemDefinition)
-					{
-						UFortItemDefinition* ItemDefinition = LootToDrop.ItemDefinition;
-						FN_LOG(LogBuildingActor, Warning, "Attempted to spawn non-world item %s!", ItemDefinition->GetName().c_str());
-						continue;
-					}
-
-					EFortRarity Rarity = BuildingContainer->HighestRarity;
-
-					if (WorldItemDefinition->bCalculateRarityFromQualityAndTier)
-					{
-						unsigned __int8 Tier = (unsigned __int8)WorldItemDefinition->Tier;
-						unsigned __int8 Quality = (unsigned __int8)WorldItemDefinition->Quality;
-
-						if (Tier > 0)
-							Quality += (Tier - 1) / 2;
-
-						Rarity = EFortRarity::Legendary;
-
-						if (Quality <= 9)
-							Rarity = (EFortRarity)Quality;
-					}
-					else
-					{
-						Rarity = WorldItemDefinition->Rarity;
-					}
-
-					EFortRarity HighestRarity = BuildingContainer->HighestRarity;
-
-					if (HighestRarity < Rarity)
-						BuildingContainer->HighestRarity = Rarity;
-
-					if (WorldItemDefinition->ItemType == EFortItemType::WeaponMelee || WorldItemDefinition->ItemType == EFortItemType::WeaponRanged)
-					{
-						int32 ItemLevel = LootToDrop.Level;
-
-						float NewDurability = 1.0f * BuildingContainer->LootedWeaponsDurabilityModifier;
-
-						Inventory::SetDurability(&LootToDrop, NewDurability);
-						Inventory::SetStateValue(&LootToDrop, EFortItemEntryState::DurabilityInitialized, 1);
-					}
-
-					FVector SpawnLocation = BuildingContainer->K2_GetActorLocation();
-
-					SpawnLocation.Z += 45;
-
-					AFortPickup* Pickup = AFortPickup::CreatePickup(
-						BuildingContainer->GetWorld(),
-						&LootToDrop,
-						&SpawnLocation,
-						nullptr,
-						nullptr,
-						nullptr,
-						true,
-						(uint32)EFortPickupSourceTypeFlag::FloorLoot);
-
-					if (Pickup)
-						Pickup->TossPickup(SpawnLocation, nullptr, 0, true);
-				}
-			}
-
-			BuildingContainer->K2_DestroyActor();
-		}
-	}
-
-	FVector GetLootSpawnLocation(AFortAthenaSupplyDrop* AthenaSupplyDrop)
-	{
-		if (!AthenaSupplyDrop)
-			return FVector();
-
-		UFunction* GetLootSpawnLocationFunc = nullptr;
-
-		if (GetLootSpawnLocationFunc == nullptr)
-			GetLootSpawnLocationFunc = AthenaSupplyDrop->Class->GetFunction("AthenaSupplyDrop_Llama_C", "GetLootSpawnLocation");
-
-		struct AthenaSupplyDrop_Llama_C_GetLootSpawnLocation final
-		{
-		public:
-			FVector LootSpawnLocation;
-			uint8 Pad_01[0x40];
-		};
-
-		AthenaSupplyDrop_Llama_C_GetLootSpawnLocation GetLootSpawnLocationParms{};
-
-		if (GetLootSpawnLocationFunc)
-			AthenaSupplyDrop->ProcessEvent(GetLootSpawnLocationFunc, &GetLootSpawnLocationParms);
-
-		return std::move(GetLootSpawnLocationParms.LootSpawnLocation);
-	}
-
-	FName GetLootTableName(AFortAthenaSupplyDrop* AthenaSupplyDrop)
-	{
-		if (!AthenaSupplyDrop)
-			return FName(0);
-
-		const UStruct* Clss = AthenaSupplyDrop->Class;
-
-		for (UField* Field = Clss->Children; Field; Field = Field->Next)
-		{
-			if (Field->HasTypeFlag(EClassCastFlags::NameProperty) && Field->GetName() == "LootTableName")
-			{
-				int32 LootTableNameOffset = ((UProperty*)Field)->Offset;
-				return *(FName*)(__int64(AthenaSupplyDrop) + LootTableNameOffset);
-			}
-		}
-
-		return FName(0);
 	}
 
 	void VendingMachinePlayVendFX(ABuildingItemCollectorActor* ItemCollectorActor)
@@ -378,29 +273,85 @@ namespace Functions
 		}
 	}
 
+	ABuildingGameplayActorConsumable* SpawnGameplayActorConsumable(ABGAConsumableSpawner* ConsumableSpawner, UBGAConsumableWrapperItemDefinition* ConsumableWrapperItemDefinition)
+	{
+		if (!ConsumableSpawner || !ConsumableWrapperItemDefinition)
+			return nullptr;
+
+		UClass* ConsumableClass = ConsumableWrapperItemDefinition->ConsumableClass.Get();
+
+		if (!ConsumableClass)
+		{
+			const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(ConsumableWrapperItemDefinition->ConsumableClass.ObjectID.AssetPathName);
+			ConsumableClass = StaticLoadObject<UClass>(AssetPathName.CStr());
+		}
+
+		if (!ConsumableClass)
+			return nullptr;
+
+		FVector SpawnLocation = ConsumableSpawner->K2_GetActorLocation();
+
+		UBlueprintGeneratedClass* BGA_RiftPortal_Athena_Spawner = FindObjectFast<UBlueprintGeneratedClass>("/Game/Athena/Items/ForagedItems/Rift/BGA_RiftPortal_Athena_Spawner.BGA_RiftPortal_Athena_Spawner_C");
+
+		if (!BGA_RiftPortal_Athena_Spawner)
+			BGA_RiftPortal_Athena_Spawner = StaticLoadObject<UBlueprintGeneratedClass>(L"/Game/Athena/Items/ForagedItems/Rift/BGA_RiftPortal_Athena_Spawner.BGA_RiftPortal_Athena_Spawner_C");
+
+		if (ConsumableClass != BGA_RiftPortal_Athena_Spawner)
+		{
+			FVector RandomDirection = UKismetMathLibrary::RandomUnitVector();
+
+			SpawnLocation.X += RandomDirection.X * 500.0f;
+			SpawnLocation.Y += RandomDirection.Y * 500.0f;
+
+			const FVector& End = SpawnLocation - FVector({ 0, 0, 1000 });
+
+			FHitResult HitResult;
+			bool bHit = UKismetSystemLibrary::LineTraceSingle(
+				ConsumableSpawner,
+				SpawnLocation,
+				End,
+				ETraceTypeQuery::TraceTypeQuery1,
+				false,
+				TArray<AActor*>(),
+				EDrawDebugTrace::ForDuration,
+				&HitResult,
+				true,
+				FLinearColor(),
+				FLinearColor(),
+				0.0f);
+
+			if (bHit)
+				SpawnLocation = HitResult.Location;
+		}
+
+		FTransform SpawnTransform = UKismetMathLibrary::MakeTransform(SpawnLocation, ConsumableSpawner->K2_GetActorRotation(), FVector({ 1, 1, 1 }));
+
+		ABuildingGameplayActorConsumable* GameplayActorConsumable = Util::SpawnActorTransfrom<ABuildingGameplayActorConsumable>(ConsumableClass, SpawnTransform);
+
+		if (GameplayActorConsumable)
+			UGameplayStatics::FinishSpawningActor(GameplayActorConsumable, SpawnTransform);
+
+		return GameplayActorConsumable;
+	}
+
 	void InitializeTreasureChests()
 	{
-		AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
+		AFortGameStateAthena* GameStateAthena = Cast<AFortGameStateAthena>(Globals::GetGameState());
+		bool bSpawnAllLoot = FParse::Param(FCommandLine::Get(), TEXT("SpawnAllLoot"));
 
-		if (GameState && GameState->MapInfo)
+		if (GameStateAthena && GameStateAthena->MapInfo && !bSpawnAllLoot)
 		{
-			AFortAthenaMapInfo* MapInfo = GameState->MapInfo;
+			AFortAthenaMapInfo* MapInfo = GameStateAthena->MapInfo;
 
-			EEvaluateCurveTableResult OutResult;
-			FString ContextString;
-
-			float MinSpawnPercentXY; // 50%
-			UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->TreasureChestMinSpawnPercent.Curve.CurveTable, MapInfo->TreasureChestMinSpawnPercent.Curve.RowName, 0.f, &OutResult, &MinSpawnPercentXY, ContextString);
-
-			float MaxSpawnPercentXY; // 70%
-			UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->TreasureChestMaxSpawnPercent.Curve.CurveTable, MapInfo->TreasureChestMaxSpawnPercent.Curve.RowName, 0.f, &OutResult, &MaxSpawnPercentXY, ContextString);
+			float TreasureChestMinSpawnPercent = MapInfo->TreasureChestMinSpawnPercent.GetValueAtLevel(0); // 50%
+			float TreasureChestMaxSpawnPercent = MapInfo->TreasureChestMaxSpawnPercent.GetValueAtLevel(0); // 70%
 
 			TArray<AActor*> TreasureChests;
 			UGameplayStatics::GetAllActorsOfClass(MapInfo, MapInfo->TreasureChestClass, &TreasureChests);
 
 			int32 TotalTreasureChests = TreasureChests.Num();
-			int32 MinTreasureChestsToKeep = UKismetMathLibrary::FFloor((TotalTreasureChests * (MinSpawnPercentXY / 100.f)) * MapInfo->TreasureChestMinSpawnPercent.Value);
-			int32 MaxTreasureChestsToKeep = UKismetMathLibrary::FFloor((TotalTreasureChests * (MaxSpawnPercentXY / 100.f)) * MapInfo->TreasureChestMaxSpawnPercent.Value);
+			int32 MinTreasureChestsToKeep = std::floor(TotalTreasureChests * (TreasureChestMinSpawnPercent / 100.0f));
+			int32 MaxTreasureChestsToKeep = std::floor(TotalTreasureChests * (TreasureChestMaxSpawnPercent / 100.0f));
 
 			int32 NumTreasureChestsToKeep = UKismetMathLibrary::RandomIntegerInRange(MinTreasureChestsToKeep, MaxTreasureChestsToKeep);
 
@@ -419,27 +370,22 @@ namespace Functions
 
 	void InitializeAmmoBoxs()
 	{
-		AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
+		AFortGameStateAthena* GameStateAthena = Cast<AFortGameStateAthena>(Globals::GetGameState());
+		bool bSpawnAllLoot = FParse::Param(FCommandLine::Get(), TEXT("SpawnAllLoot"));
 
-		if (GameState && GameState->MapInfo)
+		if (GameStateAthena && GameStateAthena->MapInfo && !bSpawnAllLoot)
 		{
-			AFortAthenaMapInfo* MapInfo = GameState->MapInfo;
+			AFortAthenaMapInfo* MapInfo = GameStateAthena->MapInfo;
 
-			EEvaluateCurveTableResult OutResult;
-			FString ContextString;
-
-			float MinSpawnPercentXY; // 65%
-			UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->AmmoBoxMinSpawnPercent.Curve.CurveTable, MapInfo->AmmoBoxMinSpawnPercent.Curve.RowName, 0.f, &OutResult, &MinSpawnPercentXY, ContextString);
-
-			float MaxSpawnPercentXY; // 80%
-			UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->AmmoBoxMaxSpawnPercent.Curve.CurveTable, MapInfo->AmmoBoxMaxSpawnPercent.Curve.RowName, 0.f, &OutResult, &MaxSpawnPercentXY, ContextString);
+			float AmmoBoxMinSpawnPercent = MapInfo->AmmoBoxMinSpawnPercent.GetValueAtLevel(0); // 65%
+			float AmmoBoxMaxSpawnPercent = MapInfo->AmmoBoxMaxSpawnPercent.GetValueAtLevel(0); // 80%
 
 			TArray<AActor*> AmmoBoxs;
 			UGameplayStatics::GetAllActorsOfClass(MapInfo, MapInfo->AmmoBoxClass, &AmmoBoxs);
 
 			int32 TotalAmmoBoxs = AmmoBoxs.Num();
-			int32 MinAmmoBoxsToKeep = UKismetMathLibrary::FFloor((TotalAmmoBoxs * (MinSpawnPercentXY / 100.f)) * MapInfo->AmmoBoxMinSpawnPercent.Value);
-			int32 MaxAmmoBoxsToKeep = UKismetMathLibrary::FFloor((TotalAmmoBoxs * (MaxSpawnPercentXY / 100.f)) * MapInfo->AmmoBoxMaxSpawnPercent.Value);
+			int32 MinAmmoBoxsToKeep = std::floor(TotalAmmoBoxs * (AmmoBoxMinSpawnPercent / 100.0f));
+			int32 MaxAmmoBoxsToKeep = std::floor(TotalAmmoBoxs * (AmmoBoxMaxSpawnPercent / 100.0f));
 
 			int32 NumAmmoBoxsToKeep = UKismetMathLibrary::RandomIntegerInRange(MinAmmoBoxsToKeep, MaxAmmoBoxsToKeep);
 
@@ -458,66 +404,81 @@ namespace Functions
 
 	void InitializeLlamas()
 	{
-		return;
+		AFortGameStateAthena* GameStateAthena = Cast<AFortGameStateAthena>(Globals::GetGameState());
+		AFortGameModeAthena* GameModeAthena = Cast<AFortGameModeAthena>(Globals::GetGameMode());
 
-		AFortGameStateAthena* GameState = Cast<AFortGameStateAthena>(Globals::GetGameState());
-
-		if (GameState && GameState->MapInfo)
+		if (GameStateAthena && GameModeAthena && GameStateAthena->MapInfo)
 		{
-			AFortAthenaMapInfo* MapInfo = GameState->MapInfo;
+			AFortAthenaMapInfo* MapInfo = GameStateAthena->MapInfo;
 
-			EEvaluateCurveTableResult OutResult;
-			FString ContextString;
+			float LlamaQuantityMin = MapInfo->LlamaQuantityMin.GetValueAtLevel(0); // 3
+			float LlamaQuantityMax = MapInfo->LlamaQuantityMax.GetValueAtLevel(0); // 3
 
-			float QuantityMinXY; // 3
-			UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->LlamaQuantityMin.Curve.CurveTable, MapInfo->LlamaQuantityMin.Curve.RowName, 0.f, &OutResult, &QuantityMinXY, ContextString);
+			int32 LlamaQuantityToSpawn = UKismetMathLibrary::RandomIntegerInRange(LlamaQuantityMin, LlamaQuantityMax);
 
-			float QuantityMaxXY; // 3
-			UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->LlamaQuantityMax.Curve.CurveTable, MapInfo->LlamaQuantityMax.Curve.RowName, 0.f, &OutResult, &QuantityMaxXY, ContextString);
+			float SupplyDropMinPlacementHeight = MapInfo->SupplyDropMinPlacementHeight.GetValueAtLevel(0);
+			float SupplyDropMaxPlacementHeight = MapInfo->SupplyDropMaxPlacementHeight.GetValueAtLevel(0);
 
-			const int32 QuantityMinToSpawn = UKismetMathLibrary::FFloor(QuantityMinXY * MapInfo->LlamaQuantityMin.Value);
-			const int32 QuantityMaxToSpawn = UKismetMathLibrary::FFloor(QuantityMaxXY * MapInfo->LlamaQuantityMax.Value);
-			
-			int32 QuantityNumToSpawn = UKismetMathLibrary::RandomIntegerInRange(QuantityMinToSpawn, QuantityMaxToSpawn);
+			float SafeZoneStartingRadius = MapInfo->SafeZoneStartingRadius.GetValueAtLevel(0);
 
-			// or try AFortAthenaSupplyDrop::GetSupplyDropSpawnData(float* MinSpawnHeight, float* MaxSpawnHeight);
+			FVector SafeZoneLocation = GameModeAthena->SafeZoneLocations[0];
+			SafeZoneLocation.Z = 15000;
 
-			float MinPlacementHeightXY;
-			UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->SupplyDropMinPlacementHeight.Curve.CurveTable, MapInfo->SupplyDropMinPlacementHeight.Curve.RowName, 0, &OutResult, &MinPlacementHeightXY, ContextString);
-
-			float MaxPlacementHeightXY;
-			UDataTableFunctionLibrary::EvaluateCurveTableRow(MapInfo->SupplyDropMaxPlacementHeight.Curve.CurveTable, MapInfo->SupplyDropMaxPlacementHeight.Curve.RowName, 0, &OutResult, &MaxPlacementHeightXY, ContextString);
-
-			const float MinPlacementHeight = MinPlacementHeightXY * MapInfo->SupplyDropMinPlacementHeight.Value;
-			const float MaxPlacementHeight = MaxPlacementHeightXY * MapInfo->SupplyDropMaxPlacementHeight.Value;
-
-			TSubclassOf<AFortAthenaSupplyDrop> LlamaClass = MapInfo->LlamaClass;
-
-			QuantityNumToSpawn = 1000;
-
-			int32 Recurcives = 0;
-			for (int32 i = 0; i < QuantityNumToSpawn; i++)
+			for (int32 i = 0; i < LlamaQuantityToSpawn; i++)
 			{
-				FVector SpawnCenter = FVector(1, 1, 10000);
-
 				FVector SpawnLocation = FVector(0, 0, 0);
-				PickSupplyDropLocation(MapInfo, &SpawnLocation, &SpawnCenter, 100000.0f);
-
-				FN_LOG(LogFunctions, Log, "%i - PickSupplyDropLocation - SpawnLocation: [X: %.2f, Y: %.2f, Z: %.2f]", i, SpawnLocation.X, SpawnLocation.Y, SpawnLocation.Z);
+				MapInfo->PickSupplyDropLocation(&SpawnLocation, &SafeZoneLocation, SafeZoneStartingRadius);
 
 				if (SpawnLocation.IsZero())
-				{
-					if (Recurcives >= 100)
-						break;
-
-					QuantityNumToSpawn++;
-					Recurcives++;
-				}
+					continue;
 
 				FRotator SpawnRotation = FRotator(0, 0, 0);
-				SpawnRotation.Yaw = UKismetMathLibrary::RandomFloatInRange(0.0f, 360.0f);
+				SpawnRotation.Yaw = (float)rand() * 0.010986663f;
 
-				SpawnSupplyDrop(MapInfo, SpawnLocation, SpawnRotation, LlamaClass, MaxPlacementHeight, MinPlacementHeight);
+				MapInfo->SpawnSupplyDrop(&SpawnLocation, &SpawnRotation, MapInfo->LlamaClass, SupplyDropMaxPlacementHeight, SupplyDropMinPlacementHeight);
+			}
+		}
+	}
+
+	void InitializeConsumableBGAs()
+	{
+		AFortGameStateAthena* GameStateAthena = Cast<AFortGameStateAthena>(Globals::GetGameState());
+
+		if (GameStateAthena)
+		{
+			UBlueprintGeneratedClass* GameplayActorConsumableClass = StaticLoadObject<UBlueprintGeneratedClass>(L"/Game/Athena/BuildingActors/ConsumableBGAs/Spawner/BP_BGACSpawner.BP_BGACSpawner_C");
+
+			TArray<AActor*> Actors;
+			UGameplayStatics::GetAllActorsOfClass(GameStateAthena, GameplayActorConsumableClass, &Actors);
+
+			for (int32 i = 0; i < Actors.Num(); i++)
+			{
+				ABGAConsumableSpawner* ConsumableSpawner = Cast<ABGAConsumableSpawner>(Actors[i]);
+				if (!ConsumableSpawner) continue;
+
+				int32 LootLevel = UFortKismetLibrary::GetLootLevel(GameStateAthena);
+
+				TArray<FFortItemEntry> LootToDrops;
+				UFortKismetLibrary::PickLootDrops(GameStateAthena, &LootToDrops, ConsumableSpawner->SpawnLootTierGroup, LootLevel, -1);
+
+				FVector SpawnerLocation = ConsumableSpawner->K2_GetActorLocation();
+
+				for (int32 j = 0; j < LootToDrops.Num(); j++)
+				{
+					FFortItemEntry LootToDrop = LootToDrops[j];
+
+					UBGAConsumableWrapperItemDefinition* ConsumableWrapperItemDefinition = Cast<UBGAConsumableWrapperItemDefinition>(LootToDrop.ItemDefinition);
+					if (!ConsumableWrapperItemDefinition) continue;
+
+					ABuildingGameplayActorConsumable* GameplayActorConsumable = SpawnGameplayActorConsumable(ConsumableSpawner, ConsumableWrapperItemDefinition);
+
+					FVector ConsumableLocation = GameplayActorConsumable->K2_GetActorLocation();
+
+					FN_LOG(LogFunctions, Debug, "[%i/%i] - GameplayActorConsumable: %s, ConsumableLocation: [X: %.2f, Y: %.2f, Z: %.2f]",
+						(j + 1), LootToDrops.Num(), GameplayActorConsumable->GetFullName().c_str(), ConsumableLocation.X, ConsumableLocation.Y, ConsumableLocation.Z);
+
+					ConsumableSpawner->ConsumablesToSpawn.Add(LootToDrop);
+				}
 			}
 		}
 	}
@@ -531,15 +492,15 @@ namespace Functions
 
 		if (GameStateAthena)
 		{
-			// 7FF66F2504C0
-			void (*SetCurrentPlaylistId)(AFortGameModeAthena* GameModeAthena, int32 NewPlaylistId) = decltype(SetCurrentPlaylistId)(0xC004C0 + uintptr_t(GetModuleHandle(0)));
-			SetCurrentPlaylistId(GameModeAthena, PlaylistAthena->PlaylistId);
+			GameModeAthena->SetCurrentPlaylistId(PlaylistAthena->PlaylistId);
 
 			GameStateAthena->CurrentPlaylistData = PlaylistAthena;
 			GameStateAthena->OnRep_CurrentPlaylistData();
 
 			GameStateAthena->AirCraftBehavior = PlaylistAthena->AirCraftBehavior;
+			GameStateAthena->bIsLargeTeamGame = PlaylistAthena->bIsLargeTeamGame;
 
+			GameModeAthena->NumTeams = PlaylistAthena->MaxTeamCount / PlaylistAthena->MaxTeamSize;
 			GameModeAthena->AISettings = PlaylistAthena->AISettings;
 
 			AFortGameSession* GameSession = GameModeAthena->FortGameSession;
@@ -961,14 +922,6 @@ namespace Functions
 
 	void InitFunctions()
 	{
-		uintptr_t AddressGetWorldFromContextObject = MinHook::FindPattern(Patterns::GetWorldFromContextObject);
-		uintptr_t AddressSpawnSupplyDrop = MinHook::FindPattern(Patterns::SpawnSupplyDrop);
-		uintptr_t AddressPickSupplyDropLocation = MinHook::FindPattern(Patterns::PickSupplyDropLocation);
-
-		GetWorldFromContextObject = decltype(GetWorldFromContextObject)(AddressGetWorldFromContextObject);
-		SpawnSupplyDrop = decltype(SpawnSupplyDrop)(AddressSpawnSupplyDrop);
-		PickSupplyDropLocation = decltype(PickSupplyDropLocation)(AddressPickSupplyDropLocation);
-
 		FN_LOG(LogInit, Log, "InitFunctions Success!");
 	}
 }

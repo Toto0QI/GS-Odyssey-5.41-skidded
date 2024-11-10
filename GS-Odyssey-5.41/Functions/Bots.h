@@ -118,7 +118,7 @@ public:
 		AFortGameModeAthena* GameModeAthena = Cast<AFortGameModeAthena>(Globals::GetGameMode());
 
 		if (FortAIPlayerControllerAthena && GameModeAthena)
-			GameMode::AddFromAlivePlayers(GameModeAthena, FortAIPlayerControllerAthena);
+			GameModeAthena->AddFromAlivePlayers(FortAIPlayerControllerAthena);
 	}
 
 	AFortPlayerStateAthena* InitPlayerState() const

@@ -110,6 +110,7 @@
     <ClCompile Include="SDK\AthenaSupplyDrop_functions.cpp" />
     <ClCompile Include="SDK\Basic.cpp" />
     <ClCompile Include="SDK\B_PlayerSpawnedBall_functions.cpp" />
+    <ClCompile Include="SDK\B_Prj_Athena_SuperTowerGrenade_functions.cpp" />
     <ClCompile Include="SDK\CoreUObject_functions.cpp" />
     <ClCompile Include="SDK\CUBE_functions.cpp" />
     <ClCompile Include="SDK\Engine_functions.cpp" />
@@ -124,15 +125,16 @@
     <ClInclude Include="Functions\AntiCheatOdyssey.h" />
     <ClInclude Include="Functions\Beacon.h" />
     <ClInclude Include="Functions\Bots.h" />
-    <ClInclude Include="Functions\Cheats.h" />
     <ClInclude Include="Functions\Functions.h" />
     <ClInclude Include="Functions\Loots.h" />
     <ClInclude Include="Functions\NewInventory.h" />
     <ClInclude Include="Globals.h" />
     <ClInclude Include="Globals\BuildingActor.h" />
+    <ClInclude Include="Globals\BuildingProp.h" />
     <ClInclude Include="Globals\FortAthenaSupplyDrop.h" />
     <ClInclude Include="Globals\FortKismetLibrary.h" />
     <ClInclude Include="Globals\GameMode.h" />
+    <ClInclude Include="Globals\GameState.h" />
     <ClInclude Include="Globals\Pawn.h" />
     <ClInclude Include="Globals\Pickup.h" />
     <ClInclude Include="Globals\PlayerController.h" />

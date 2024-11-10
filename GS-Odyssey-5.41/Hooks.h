@@ -106,9 +106,7 @@ namespace Hooks
 
 		bool bCallOG = true;
 
-		GameMode::ProcessEventHook(Object, Function, Parms, &bCallOG);
-		Cheats::ProcessEventHook(Object, Function, Parms);
-		BuildingActor::ProcessEventHook(Object, Function, Parms);
+		// Cheats::ProcessEventHook(Object, Function, Parms);
 
 #ifdef ANTICHEAT
 		AntiCheatOdyssey::ProcessEventHook(Object, Function, Parms);
@@ -227,17 +225,130 @@ namespace Hooks
 
 			if (GetAsyncKeyState(VK_F4) & 0x1)
 			{
-				AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
+				/*AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
 
 				if (!PlayerController)
 					return;
 
-				PlayerController->ServerDropAllItems(nullptr);
+				PlayerController->ServerDropAllItems(nullptr);*/
+
+				/*AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
+
+				if (!PlayerController)
+					return;
+
+				UKismetSystemLibrary::ExecuteConsoleCommand(PlayerController, L"SPAWNEXITCRAFTFAST", PlayerController);*/
+
+				UFortBuildingInstructions* BuildingInstructions = StaticLoadObject<UFortBuildingInstructions>(TEXT("/Game/Athena/Items/Consumables/SuperTowerGrenade/Levels/PortAFort_A/FortBuildingInstructions_PortAFort_A.FortBuildingInstructions_PortAFort_A"));
+
+				if (BuildingInstructions)
+				{
+					UWorld* TemplateMap = BuildingInstructions->TemplateMap.Get();
+
+					if (!TemplateMap)
+					{
+						const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(BuildingInstructions->TemplateMap.ObjectID.AssetPathName);
+						TemplateMap = StaticLoadObject<UWorld>(AssetPathName.CStr());
+					}
+
+					// ClearedCells_Normal
+
+					// AB_Prj_Athena_SuperTowerGrenade_A_C;
+
+					for (int32 i = 0; i < TemplateMap->PersistentLevel->Actors.Num(); i++)
+					{
+						AActor* Actor = TemplateMap->PersistentLevel->Actors[i];
+						if (!Actor) continue;
+
+						FVector Location = Actor->K2_GetActorLocation();
+
+						FN_LOG(LogTemp, Log, "Actor: %s, Location: [X: %.2f, Y: %.2f, Z: %.2f]", 
+							Actor->GetFullName().c_str(), Location.X, Location.Y, Location.Z);
+					}
+
+					/*bool Success;
+					ULevelStreamingDynamic* StreamingLevel = ULevelStreamingDynamic::LoadLevelInstanceBySoftObjectPtr(
+						Globals::GetWorld(), 
+						BuildingInstructions->TemplateMap, 
+						FVector({0, 0, 10000}),
+						FRotator(),
+						&Success
+					);
+
+					if (StreamingLevel && Success)
+					{
+						StreamingLevel->SetShouldBeVisible(true);
+
+						FN_LOG(LogTemp, Log, "Niveau chargé et spawné devant le joueur !");
+					}
+					else
+					{
+						FN_LOG(LogTemp, Warning, "Impossible de faire spawn le niveau.");
+					}*/
+				}
+
+				/*for (int32 i = 0; i < UObject::GObjects->Num(); i++)
+				{
+					UObject* GObject = UObject::GObjects->GetByIndex(i);
+
+					if (!GObject)
+						continue;
+
+					if (GObject->IsA(AFortAthenaMutator::StaticClass()))
+					{
+						AFortAthenaMutator* AthenaMutator = Cast<AFortAthenaMutator>(GObject);
+						if (!AthenaMutator) continue;
+
+						FN_LOG(LogHooks, Log, "AthenaMutator: %s", AthenaMutator->GetFullName().c_str());
+					}
+				}*/
 			}
 
 			if (GetAsyncKeyState(VK_F5) & 0x1)
 			{
 				AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
+
+				if (!PlayerController)
+					return;
+				
+				UFortPlaylistAthena* PlaylistAthena = Globals::GetPlaylist();
+				AFortGameModeAthena* GameModeAthena = Cast<AFortGameModeAthena>(Globals::GetGameMode());
+				AFortGameStateAthena* GameStateAthena = Cast<AFortGameStateAthena>(Globals::GetGameState());
+
+				if (!PlaylistAthena || !GameModeAthena || !GameStateAthena)
+					return;
+
+				for (int32 i = 0; i < GameModeAthena->GameplayMutators.Num(); i++)
+				{
+					auto GameplayMutator = GameModeAthena->GameplayMutators[i];
+					if (!GameplayMutator) continue;
+
+					FN_LOG(LogHooks, Log, "GameplayMutator: %s", GameplayMutator->GetFullName().c_str());
+				}
+
+				// UKismetSystemLibrary::ExecuteConsoleCommand(PlayerController, L"SPAWNEXITCRAFT", PlayerController);
+
+				/*ABGAConsumableSpawner;
+
+				UBGAConsumableWrapperItemDefinition* WrapperItemDefinition = StaticLoadObject<UBGAConsumableWrapperItemDefinition>(L"/Game/Athena/Items/ForagedItems/LowGravity/Athena_Foraged_LowGravity.Athena_Foraged_LowGravity");
+
+				if (!WrapperItemDefinition)
+				{
+					FN_LOG(LogHooks, Log, "Not Found!");
+					return;
+				}
+
+				UClass* ConsumableClass = WrapperItemDefinition->ConsumableClass.Get();
+
+				if (!ConsumableClass)
+				{
+					const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(WrapperItemDefinition->ConsumableClass.ObjectID.AssetPathName);
+					ConsumableClass = StaticLoadObject<UClass>(AssetPathName.CStr());
+				}
+
+				Util::SpawnActor<ABuildingGameplayActorConsumable>(ConsumableClass, PlayerPawn->K2_GetActorLocation());*/
+
+				/*AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
 
 				if (!PlayerController)
 					return;
@@ -262,7 +373,7 @@ namespace Hooks
 						QuestManager->SendCustomStatEvent(QuestObjectiveInfo->ObjectiveStatHandle, 1, true);
 						QuestManager->ForceTriggerQuestsUpdated();
 					}
-				}
+				}*/
 
 				/*
 					OdysseyLog: LogHook: Debug: Index not found: 0x0, Offset: 0xc17a88, IdaAddress [00007FF66F267A88] - Pleins de Free Memory
@@ -375,7 +486,7 @@ namespace Hooks
 					void (*ChoosePlayerTeam)(AFortGameModeAthena* GameModeAthena, AFortPlayerControllerAthena* PlayerController) = decltype(ChoosePlayerTeam)(0xBF7000 + uintptr_t(GetModuleHandle(0)));
 					ChoosePlayerTeam(GameModeAthena, PlayerControllerAthena);
 
-					GameMode::AddFromAlivePlayers(GameModeAthena, PlayerControllerAthena);
+					GameModeAthena->AddFromAlivePlayers(PlayerControllerAthena);
 
 					AFortInventory* WorldInventory = PlayerControllerAthena->WorldInventory;
 
@@ -431,10 +542,8 @@ namespace Hooks
 						Abilities::GrantGameplayEffect(DefaultAbilities, AbilitySystemComponent);
 						Abilities::GrantModifierAbilityFromPlaylist(AbilitySystemComponent);
 
-						GameMode::ApplyCustomizationToCharacter(PlayerState, PlayerControllerAthena, PlayerPawn);
+						PlayerState->ApplyCharacterCustomization(PlayerPawn);
 					}
-
-					
 				}
 			}
 
@@ -545,61 +654,35 @@ namespace Hooks
 					GameStateAthena->OnRep_AdditionalPlaylistLevelsStreamed();
 				}
 
+				AFortAthenaMutator* AthenaMutator = Util::SpawnActor<AFortAthenaMutator>(AFortAthenaMutator::StaticClass());
+
+				if (AthenaMutator)
+				{
+					AthenaMutator->CachedGameMode = GameModeAthena;
+					AthenaMutator->CachedGameState = GameStateAthena;
+
+					GameModeAthena->GameplayMutators.Add(AthenaMutator);
+					GameStateAthena->GameplayMutators.Add(AthenaMutator);
+				}
+
+				/*
+					OdysseyLog: LogHooks: Info: Function: Function FortniteGame.FortLevelScriptActor.OnWorldReady
+					OdysseyLog: LogHooks: Info: Object: Athena_Terrain_C Athena_Terrain.Athena_Terrain.PersistentLevel.Athena_Terrain_C_1
+				*/
+
+				FN_LOG(LogHooks, Log, "Function: %s", Function->GetFullName().c_str());
+				FN_LOG(LogHooks, Log, "Object: %s", Object->GetFullName().c_str());
+
 				FN_LOG(LogHooks, Log, "OnWorldReady called!");
 				GameModeAthena->bWorldIsReady = true;
 			}
 		}
-		else if (FunctionName.contains("K2_OnEndAbility") && false)
-		{
-			UFortGameplayAbility* GameplayAbility = Cast<UFortGameplayAbility>(Object);
 
-			if (GameplayAbility)
-			{
-				AFortPawn* ActivatingPawn = GameplayAbility->GetActivatingPawn();
-				if (!ActivatingPawn) return;
-
-				AFortPlayerController* PlayerController = Cast<AFortPlayerController>(ActivatingPawn->Controller);
-				if (!PlayerController) return;
-
-				UBlueprintGeneratedClass* C4DetonateClass = FindObjectFast<UBlueprintGeneratedClass>("/Game/Athena/Items/Consumables/C4/GAT_Athena_c4_Detonate.GAT_Athena_c4_Detonate_C");
-				UBlueprintGeneratedClass* HookGunDestroyClass = FindObjectFast<UBlueprintGeneratedClass>("/Game/Athena/Items/Weapons/Abilities/HookGun/GA_Athena_HookDestroy.GA_Athena_HookDestroy_C");
-
-				if (GameplayAbility->IsA(C4DetonateClass))
-				{
-					AFortWeapon* CurrentWeapon = ActivatingPawn->CurrentWeapon;
-
-					if (CurrentWeapon)
-					{
-						UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_GetInventoryItemWithGuid(CurrentWeapon->ItemEntryGuid));
-						if (!WorldItem) return;
-
-						int32 ItemQuantity = UFortKismetLibrary::K2_GetItemQuantityOnPlayer(PlayerController, WorldItem->ItemEntry.ItemDefinition);
-
-						if (ItemQuantity == 0)
-							Inventory::RemoveItem(PlayerController->WorldInventory, WorldItem->ItemEntry.ItemGuid);
-					}
-				}
-				else if (GameplayAbility->IsA(HookGunDestroyClass))
-				{
-					AFortWeapon* CurrentWeapon = ActivatingPawn->CurrentWeapon;
-
-					if (CurrentWeapon)
-					{
-						UFortWorldItem* WorldItem = Cast<UFortWorldItem>(PlayerController->K2_GetInventoryItemWithGuid(CurrentWeapon->ItemEntryGuid));
-						if (!WorldItem) return;
-
-						if (WorldItem->ItemEntry.LoadedAmmo <= 0)
-							Inventory::RemoveItem(PlayerController->WorldInventory, WorldItem->ItemEntry.ItemGuid);
-					}
-				}
-				else if (GameplayAbility->IsA(UGAB_Emote_Generic_C::StaticClass()))
-				{
-					ActivatingPawn->bMovingEmote = false;
-				}
-
-				// FN_LOG(LogHooks, Log, "GameplayAbility: %s", GameplayAbility->GetFullName().c_str());
-			}
-		}
+		/*
+			- ServerUpdateCamera
+			- ClientAckGoodMove
+			- 
+		*/
 
 		if (bLogs)
 		{
@@ -750,10 +833,7 @@ namespace Hooks
 				!FunctionName.contains("HandleMinimizeFinished") &&
 				!FunctionName.contains("ServerUpdateLevelVisibility") &&
 				!FunctionName.contains("OnDayPhaseChanged") &&
-				!FunctionName.contains("ServerLoadingScreenDropped") &&
 				!FunctionName.contains("On Game Phase Step Changed") &&
-				!FunctionName.contains("HandleGamePhaseStepChanged") &&
-				!FunctionName.contains("GamePhaseStepChanged") &&
 				!FunctionName.contains("SetColorAndOpacity") &&
 				!FunctionName.contains("OnAnimationStarted") &&
 				!FunctionName.contains("UpdateMessaging") &&
@@ -830,7 +910,6 @@ namespace Hooks
 				!FunctionName.contains("OnRep_DefaultMetadata") &&
 				!FunctionName.contains("GetDataTableRowNames") &&
 				!FunctionName.contains("GetMaxDurability") &&
-				!FunctionName.contains("BeginDeferredActorSpawnFromClass") &&
 				!FunctionName.contains("OnRep_PickupLocationData") &&
 				!FunctionName.contains("GetControlRotation") &&
 				!FunctionName.contains("OnVisibilitySetEvent") &&
@@ -852,7 +931,7 @@ namespace Hooks
 				!FunctionName.contains("OnHitCrack") &&
 				!FunctionName.contains("EvaluateGraphExposedInputs_ExecuteUbergraph_Fortnite_M_Avg_Player_AnimBlueprint_AnimGraphNode_"))
 			{
-				FN_LOG(Logs, Log, "FunctionName: [%s]", FunctionName.c_str());
+				FN_LOG(Logs, Log, "FunctionName: [%s], Object: [%s]", Function->GetFullName().c_str(), Object->GetName().c_str());
 			}
 		}
 
@@ -961,6 +1040,29 @@ namespace Hooks
 	}
 #endif // ANTICHEAT
 
+	void (*sub_7FF66F2D4970OG)(UObject* a1);
+	void sub_7FF66F2D4970(UObject* a1)
+	{
+		uintptr_t Offset = (uintptr_t)_ReturnAddress() - InSDKUtils::GetImageBase();
+		uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
+
+		FN_LOG(LogHook, Log, "Function Call [sub_7FF66F2D4970] successfully get with Offset [0x%llx], IdaAddress [%p]", (unsigned long long)Offset, IdaAddress);
+
+		UGA_Athena_Grenade_WithTrajectory_C;
+		AB_Prj_Athena_SuperTowerGrenade_C;
+		AFortGameplayEffectDeliveryActor;
+
+		sub_7FF66F2D4970OG(a1);
+	}
+
+	void (*OnExplodedOG)(AB_Prj_Athena_SuperTowerGrenade_C* SuperTowerGrenade, FFrame& Stack, void* Ret);
+	void OnExploded(AB_Prj_Athena_SuperTowerGrenade_C* SuperTowerGrenade, FFrame& Stack, void* Ret)
+	{
+		FN_LOG(LogHook, Log, "Function Call [OnExploded] SuperTowerGrenade [%s]", SuperTowerGrenade->GetName().c_str());
+
+		OnExplodedOG(SuperTowerGrenade, Stack, Ret);
+	}
+
 	void InitHook()
 	{
 		static auto FortPickupAthenaDefault = AFortPickupAthena::GetDefaultObj();
@@ -1006,6 +1108,9 @@ namespace Hooks
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0xC56D70));
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x10194B0), RestartHook, (LPVOID*)(&Restart));
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x10194B0));
+
+		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0xC84970), sub_7FF66F2D4970, (LPVOID*)(&sub_7FF66F2D4970OG));
+		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0xC84970));
 
 #ifdef ANTICHEAT
 		/*MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x66AF00), NetSerializeHook, (LPVOID*)(&NetSerialize));

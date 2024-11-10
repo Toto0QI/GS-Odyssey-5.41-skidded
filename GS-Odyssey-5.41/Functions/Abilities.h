@@ -2,12 +2,7 @@
 
 namespace Abilities
 {
-	FGameplayAbilitySpecHandle(*GiveAbilityAndActivateOnce)(UAbilitySystemComponent* AbilitySystemComponent, FGameplayAbilitySpecHandle* OutHandle, const FGameplayAbilitySpec& Spec);
-	FGameplayAbilitySpecHandle(*GiveAbility)(UAbilitySystemComponent* AbilitySystemComponent, FGameplayAbilitySpecHandle* Handle, FGameplayAbilitySpec Spec);
 	char (*InternalTryActivateAbility)(UAbilitySystemComponent* AbilitySystemComponent, FGameplayAbilitySpecHandle Handle, FPredictionKey InPredictionKey, UGameplayAbility** OutInstancedAbility, void* OnGameplayAbilityEndedDelegate, const FGameplayEventData* TriggerEventData);
-	UObject* (*CreateDefaultObject)(UClass* Class);
-	FGameplayAbilitySpec* (*CreateDefaultAbilitySpec)(FGameplayAbilitySpec* AbilitySpec, UGameplayAbility* Ability, int32 Level, int32 InputID, UObject* SourceObject);
-	FGameplayAbilitySpec* (*CopyAbilitySpec)(FGameplayAbilitySpec* PrimaryAbilitySpec, FGameplayAbilitySpec* AbilitySpec);
 
 	FGameplayAbilitySpec* FindAbilitySpecFromHandle(UAbilitySystemComponent* AbilitySystemComponent, FGameplayAbilitySpecHandle& Ability)
 	{
@@ -84,13 +79,7 @@ namespace Abilities
 
 			for (int32 j = 0; j < PersistentAbilitySets->AbilitySets.Num(); j++)
 			{
-				UFortAbilitySet* AbilitySet = PersistentAbilitySets->AbilitySets[j].Get();
-
-				if (!AbilitySet)
-				{
-					const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(PersistentAbilitySets->AbilitySets[j].ObjectID.AssetPathName); // ToString doesn't work idk
-					AbilitySet = StaticLoadObject<UFortAbilitySet>(AssetPathName.CStr());
-				}
+				UFortAbilitySet* AbilitySet = Functions::LoadAbilitySet(PersistentAbilitySets->AbilitySets[j]);
 
 				GrantGameplayAbility(AbilitySet, AbilitySystemComponent);
 				GrantGameplayEffect(AbilitySet, AbilitySystemComponent);
@@ -106,13 +95,7 @@ namespace Abilities
 		{
 			for (int32 i = 0; i < PlaylistAthena->ModifierList.Num(); i++)
 			{
-				UFortGameplayModifierItemDefinition* ModifierItemDefinition = PlaylistAthena->ModifierList[i].Get();
-
-				if (!ModifierItemDefinition)
-				{
-					const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(PlaylistAthena->ModifierList[i].ObjectID.AssetPathName); // ToString doesn't work idk
-					ModifierItemDefinition = StaticLoadObject<UFortGameplayModifierItemDefinition>(AssetPathName.CStr());
-				}
+				UFortGameplayModifierItemDefinition* ModifierItemDefinition = Functions::LoadGameplayModifier(PlaylistAthena->ModifierList[i]);
 
 				if (!ModifierItemDefinition)
 					continue;
@@ -148,19 +131,9 @@ namespace Abilities
 	{
 		static auto FortAbilitySystemComponentAthenaDefault = UFortAbilitySystemComponentAthena::GetDefaultObj();
 
-		uintptr_t AddressGiveAbility = MinHook::FindPattern(Patterns::GiveAbility);
 		uintptr_t AddressInternalTryActivateAbility = MinHook::FindPattern(Patterns::InternalTryActivateAbility);
-		uintptr_t AddressCreateDefaultObject = MinHook::FindPattern(Patterns::CreateDefaultObject);
-		uintptr_t AddressGiveAbilityAndActivateOnce = MinHook::FindPattern(Patterns::GiveAbilityAndActivateOnce);
-		uintptr_t AddressCreateDefaultAbilitySpec = MinHook::FindPattern(Patterns::CreateDefaultAbilitySpec);
-		uintptr_t AddressCopyAbilitySpec = MinHook::FindPattern(Patterns::CopyAbilitySpec);
 
-		GiveAbility = decltype(GiveAbility)(AddressGiveAbility);
 		InternalTryActivateAbility = decltype(InternalTryActivateAbility)(AddressInternalTryActivateAbility);
-		CreateDefaultObject = decltype(CreateDefaultObject)(AddressCreateDefaultObject);
-		GiveAbilityAndActivateOnce = decltype(GiveAbilityAndActivateOnce)(AddressGiveAbilityAndActivateOnce);
-		CreateDefaultAbilitySpec = decltype(CreateDefaultAbilitySpec)(AddressCreateDefaultAbilitySpec);
-		CopyAbilitySpec = decltype(CopyAbilitySpec)(AddressCopyAbilitySpec);
 
 		MinHook::HookVTable(FortAbilitySystemComponentAthenaDefault, 0xF3, InternalServerTryActiveAbilityHook, nullptr, "InternalServerTryActiveAbility");
 

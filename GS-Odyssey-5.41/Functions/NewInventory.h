@@ -451,9 +451,6 @@ namespace Inventory
 				if (Pickup == PickupToCombine)
 					continue;
 
-				//if (Pickup->PickupLocationData.TossState != EFortPickupTossState::AtRest)
-					//continue;
-
 				const float Distance = PickupToCombine->GetDistanceTo(Pickup);
 
 				if (Distance > MaxDistance)
@@ -487,35 +484,26 @@ namespace Inventory
 		return nullptr;
 	}
 
-	bool CombineNearestPickup(AFortPickup* PickupToCombine)
+	bool CombineNearestPickup(AFortPickup* PickupToCombine, float MaxDistance)
 	{
-		if (!PickupToCombine || !PickupToCombine->bCombinePickupsWhenTossCompletes)
+		if (!PickupToCombine)
 			return false;
 
-		return false;
-
-		AFortPickup* ClosestPickup = GetClosestPickup(PickupToCombine, 300.0f);
+		AFortPickup* ClosestPickup = Inventory::GetClosestPickup(PickupToCombine, MaxDistance);
 
 		if (ClosestPickup)
 		{
-			FFortPickupLocationData* PickupLocationData = &PickupToCombine->PickupLocationData;
-			if (!PickupLocationData) return false;
+			PickupToCombine->PickupLocationData.CombineTarget = ClosestPickup;
+			PickupToCombine->PickupLocationData.FlyTime = 0.25f;
+			PickupToCombine->PickupLocationData.LootFinalPosition = (FVector_NetQuantize10)ClosestPickup->K2_GetActorLocation();
+			PickupToCombine->PickupLocationData.LootInitialPosition = (FVector_NetQuantize10)PickupToCombine->K2_GetActorLocation();
+			PickupToCombine->PickupLocationData.FinalTossRestLocation = (FVector_NetQuantize10)ClosestPickup->K2_GetActorLocation();
 
-			PickupLocationData->CombineTarget = ClosestPickup;
-			PickupLocationData->FlyTime = 0.25f;
-			PickupLocationData->LootFinalPosition = (FVector_NetQuantize10)ClosestPickup->K2_GetActorLocation();
-			PickupLocationData->LootInitialPosition = (FVector_NetQuantize10)PickupToCombine->K2_GetActorLocation();
-			PickupLocationData->FinalTossRestLocation = (FVector_NetQuantize10)ClosestPickup->K2_GetActorLocation();
-			
 			PickupToCombine->OnRep_PickupLocationData();
-			ClosestPickup->OnRep_PickupLocationData();
+			PickupToCombine->FlushNetDormancy();
 
-			PickupToCombine->ForceNetUpdate();
-			ClosestPickup->ForceNetUpdate();
-
-			const float Distance = ClosestPickup->GetDistanceTo(PickupToCombine);
-
-			UKismetSystemLibrary::K2_SetTimer(PickupToCombine, L"OnRep_ServerImpactSoundFlash", PickupLocationData->FlyTime, false); // Func OnRep_ServerImpactSoundFlash use for combine
+			// Use to call a CombinePickup function with delay
+			UKismetSystemLibrary::K2_SetTimer(PickupToCombine, L"OnRep_ServerImpactSoundFlash", PickupToCombine->PickupLocationData.FlyTime, false);
 
 			return true;
 		}
@@ -550,9 +538,6 @@ namespace Inventory
 				Pickup->PawnWhoDroppedPickup = ItemOwner;
 
 			Pickup->bCombinePickupsWhenTossCompletes = bCombinePickup;
-
-			if (CombineNearestPickup(Pickup))
-				return Pickup;
 
 			Pickup->TossPickup(FinalLocation, ItemOwner, OverrideMaxStackCount, bToss);
 		}

@@ -2073,7 +2073,7 @@ public:
 	void BlueprintOnStructurallyUnstable();
 	void ClearRequestedBuildingAnimation();
 	void DetachBuildingActorFromMe(class ABuildingSMActor* ActorToAttach, bool bBeingDestroyed);
-	void EditorOnlyRemoveInstanceMaterialScalarParameter(class FName ParamName);
+	// void EditorOnlyRemoveInstanceMaterialScalarParameter(class FName ParamName);
 	void EditorOnlyRemoveInstanceMaterialTextureParameter(class FName ParamName);
 	void EditorOnlyRemoveInstanceMaterialVectorParameter(class FName ParamName);
 	void EditorOnlySetInstanceMaterialScalarParameter(class FName ParamName, float Value);
@@ -2135,10 +2135,40 @@ public:
 	bool IsUnderConstruction() const;
 	bool WillRegisterWithStructuralGrid() const;
 
+	void SelectMeshSet(class FName LootTierKey);
+
+	void SelectMeshSet(int32 LootTier)
+	{
+		// 7FF66F326570
+		void (*SelectMeshSet)(ABuildingSMActor* BuildingSMActor, int32 LootTier) = decltype(SelectMeshSet)(0xCD6570 + uintptr_t(GetModuleHandle(0)));
+		SelectMeshSet(this, LootTier);
+	}
+
+	ABuildingSMActor* SetMeshSet(const struct FMeshSet& MeshSet)
+	{
+		// 7FF66F3083A0
+		ABuildingSMActor* (*SetMeshSet)(ABuildingSMActor * BuildingSMActor, const struct FMeshSet& MeshSet) = decltype(SetMeshSet)(0xCB83A0 + uintptr_t(GetModuleHandle(0)));
+		return SetMeshSet(this, MeshSet);
+	}
+
+	void PostUpdate()
+	{
+		// 7FF66F323E70
+		void (*PostUpdate)(ABuildingSMActor* BuildingSMActor) = decltype(PostUpdate)(0xCD3E70 + uintptr_t(GetModuleHandle(0)));
+		return PostUpdate(this);
+	}
+
+	int32 DetermineMaxResourcesToSpawn()
+	{
+		// 7FF66F30E660
+		int32 (*DetermineMaxResourcesToSpawn)(ABuildingSMActor* BuildingSMActor, char a2) = decltype(DetermineMaxResourcesToSpawn)(0xCBE660 + uintptr_t(GetModuleHandle(0)));
+		return DetermineMaxResourcesToSpawn(this, 1);
+	}
+
 	int32 GetRepairResourceAmount(class AFortPlayerController* PlayerController)
 	{
 		// 7FF66F312E20
-		int32(*GetRepairResourceAmount)(ABuildingSMActor* BuildingSMActor, class AFortPlayerController* PlayerController) = decltype(GetRepairResourceAmount)(0xCC2E20 + uintptr_t(GetModuleHandle(0)));
+		int32 (*GetRepairResourceAmount)(ABuildingSMActor* BuildingSMActor, class AFortPlayerController* PlayerController) = decltype(GetRepairResourceAmount)(0xCC2E20 + uintptr_t(GetModuleHandle(0)));
 		return GetRepairResourceAmount(this, PlayerController);
 	}
 
@@ -2156,7 +2186,7 @@ public:
 		return ReplaceBuildingActor(this, 1, BuildingClass, BuildingLevel, RotationIterations, bMirrored, PlayerController);
 	}
 
-	void SetEditingPlayer(AFortPlayerStateZone* EditingPlayer)
+	void SetEditingPlayer(class AFortPlayerStateZone* EditingPlayer)
 	{
 		if (this->HasAuthority() && (!this->EditingPlayer || !EditingPlayer))
 		{
@@ -9730,6 +9760,13 @@ public:
 
 	void DumpReservations() const;
 
+	AFortPlayerPawn* SpawnDefaultPawnFor(AController* NewPlayer, AActor* StartSpot)
+	{
+		// 7FF66F49A3C0
+		AFortPlayerPawn* (*SpawnDefaultPawnFor)(AFortGameMode* GameMode, AController* NewPlayer, AActor* StartSpot) = decltype(SpawnDefaultPawnFor)(0xE4A3C0 + uintptr_t(GetModuleHandle(0)));
+		return SpawnDefaultPawnFor(this, NewPlayer, StartSpot);
+	}
+
 public:
 	static class UClass* StaticClass()
 	{
@@ -10878,6 +10915,32 @@ public:
 	void OnSearchInterrupted();
 	void OnSetSearched();
 	void RaiseTreasure();
+
+	class FName PickLootTierGroupAthena(class FName* OutLootTierGroup, class FName LootTierGroup)
+	{
+		// 7FF66F24B830
+		class FName (*PickLootTierGroupAthena)(ABuildingContainer* BuildingContainer, class FName* OutLootTierGroup, class FName LootTierGroup) = decltype(PickLootTierGroupAthena)(0xBFB830 + uintptr_t(GetModuleHandle(0)));
+		return PickLootTierGroupAthena(this, OutLootTierGroup, LootTierGroup);
+	}
+
+	void SetSearchedContainer(class AFortPlayerPawn* PlayerPawn)
+	{
+		// 7FF66F2FB160
+		void (*SetSearchedContainer)(class ABuildingContainer* BuildingContainer, class AFortPlayerPawn* PlayerPawn) = decltype(SetSearchedContainer)(0xCAB160 + uintptr_t(GetModuleHandle(0)));
+		SetSearchedContainer(this, PlayerPawn);
+	}
+
+	void PostUpdate(EFortBuildingPersistentState BuildingPersistentState)
+	{
+		void (*PostUpdate)(ABuildingContainer* BuildingContainer, EFortBuildingPersistentState BuildingPersistentState, __int64 a3) = decltype(PostUpdate)(this->VTable[0xF5]);
+		PostUpdate(this, BuildingPersistentState, 0);
+	}
+
+	bool SpawnLoot(class AFortPlayerPawn* PlayerPawn)
+	{
+		bool (*SpawnLoot)(ABuildingContainer* BuildingContainer, class AFortPlayerPawn* PlayerPawn) = decltype(SpawnLoot)(this->VTable[0x1B9]);
+		return SpawnLoot(this, PlayerPawn);
+	}
 
 public:
 	static class UClass* StaticClass()
@@ -22877,6 +22940,20 @@ public:
 	TArray<struct FFortSafeZoneVolumeDefinition>  SafeZoneVolumeDefinitions;                         // 0x0658(0x0010)(Edit, BlueprintVisible, BlueprintReadOnly, ZeroConstructor, Protected, NativeAccessSpecifierProtected)
 	TArray<struct FFortSafeZoneDefinition>        SafeZoneDefinitions;                               // 0x0668(0x0010)(Edit, BlueprintVisible, BlueprintReadOnly, ZeroConstructor, Protected, NativeAccessSpecifierProtected)
 
+	struct FVector* PickSupplyDropLocation(struct FVector* OutLocation, struct FVector* const CenterLocation, float Radius)
+	{
+		// 7FF66F213EF0
+		struct FVector* (*PickSupplyDropLocation)(AFortAthenaMapInfo* AthenaMapInfo, struct FVector* OutLocation, struct FVector* CenterLocation, float Radius) = decltype(PickSupplyDropLocation)(0xBC3EF0 + uintptr_t(GetModuleHandle(0)));
+		return PickSupplyDropLocation(this, OutLocation, CenterLocation, Radius);
+	}
+
+	class AFortAthenaSupplyDrop* SpawnSupplyDrop(struct FVector const* Location, struct FRotator const* Rotation, class UClass* SupplyDropClass, float TraceStartZ, float TraceEndZ)
+	{
+		// 7FF66F21BA90
+		class AFortAthenaSupplyDrop* (*SpawnSupplyDrop)(AFortAthenaMapInfo* AthenaMapInfo, struct FVector const* Location, struct FRotator const* Rotation, class UClass* SupplyDropClass, float TraceStartZ, float TraceEndZ) = decltype(SpawnSupplyDrop)(0xBCBA90 + uintptr_t(GetModuleHandle(0)));
+		return SpawnSupplyDrop(this, Location, Rotation, SupplyDropClass, TraceStartZ, TraceEndZ);
+	}
+
 public:
 	static class UClass* StaticClass()
 	{
@@ -28632,15 +28709,31 @@ public:
 	{
 		// 7FF66F22FCE0
 		void (*AddFromAlivePlayers)(AFortGameModeAthena* GameModeAthena, class AFortPlayerControllerAthena* PlayerControllerAthena) = decltype(AddFromAlivePlayers)(0xBDFCE0 + uintptr_t(GetModuleHandle(0)));
-		return AddFromAlivePlayers(this, PlayerControllerAthena);
+		AddFromAlivePlayers(this, PlayerControllerAthena);
 	}
 
 	void RemoveFromAlivePlayers(class AFortPlayerControllerAthena* PlayerControllerAthena, class AFortPlayerStateAthena* PlayerStateAthena, class AFortPlayerPawnAthena* PlayerPawnAthena, class UFortWeaponItemDefinition* WeaponItemDefinition, EDeathCause DeathCause)
 	{
 		// 7FF66F24C3E0
 		void (*RemoveFromAlivePlayers)(AFortGameModeAthena* GameModeAthena, class AFortPlayerControllerAthena* PlayerControllerAthena, class AFortPlayerStateAthena* PlayerStateAthena, class AFortPlayerPawnAthena* PlayerPawnAthena, class UFortWeaponItemDefinition* WeaponItemDefinition, EDeathCause DeathCause, char a7) = decltype(RemoveFromAlivePlayers)(0xBFC3E0 + uintptr_t(GetModuleHandle(0)));
-		return RemoveFromAlivePlayers(this, PlayerControllerAthena, PlayerStateAthena, PlayerPawnAthena, WeaponItemDefinition, DeathCause, 0);
+		RemoveFromAlivePlayers(this, PlayerControllerAthena, PlayerStateAthena, PlayerPawnAthena, WeaponItemDefinition, DeathCause, 0);
 	}
+
+	void HandleMatchHasStarted()
+	{
+		// 7FF66F23FBE0
+		void (*HandleMatchHasStarted)(AFortGameModeAthena* GameModeAthena) = decltype(HandleMatchHasStarted)(0xBEFBE0 + uintptr_t(GetModuleHandle(0)));
+		HandleMatchHasStarted(this);
+	}
+
+	void SetCurrentPlaylistId(int32 PlaylistId)
+	{
+		// 7FF66F2504C0
+		void (*SetCurrentPlaylistId)(AFortGameModeAthena* GameModeAthena, int32 PlaylistId) = decltype(SetCurrentPlaylistId)(0xC004C0 + uintptr_t(GetModuleHandle(0)));
+		SetCurrentPlaylistId(this, PlaylistId);
+	}
+
+	
 
 public:
 	static class UClass* StaticClass()
@@ -37031,6 +37124,13 @@ class UFortPlaylistManager : public UObject
 {
 public:
 	TArray<class UFortPlaylistAthena*>            AthenaPlaylists;                                   // 0x0028(0x0010)(BlueprintVisible, ZeroConstructor, Transient, Protected, NativeAccessSpecifierProtected)
+
+	UFortPlaylistAthena* GetPlaylistByPlaylistId(int32 PlaylistId)
+	{
+		// 7FF66F52DEC0
+		UFortPlaylistAthena* (*GetPlaylistByPlaylistId)(UFortPlaylistManager* PlaylistManager, int32 PlaylistId) = decltype(GetPlaylistByPlaylistId)(0xEDDEC0 + uintptr_t(GetModuleHandle(0)));
+		return GetPlaylistByPlaylistId(this, PlaylistId);
+	}
 
 public:
 	static class UClass* StaticClass()

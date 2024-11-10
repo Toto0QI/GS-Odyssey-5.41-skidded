@@ -19,16 +19,17 @@
 
 #include "Functions/AntiCheatOdyssey.h"
 
-#include "Functions/Abilities.h"
-
 #include "Functions/NewInventory.h"
 
 #include "Functions/Loots.h"
 #include "Functions/Functions.h"
 
+#include "Functions/Abilities.h"
+
 #include "Functions/Beacon.h"
 
 #include "Globals/GameMode.h"
+#include "Globals/GameState.h"
 
 #include "Functions/Bots.h"
 
@@ -37,9 +38,8 @@
 #include "Globals/FortKismetLibrary.h"
 #include "Globals/FortAthenaSupplyDrop.h"
 #include "Globals/BuildingActor.h"
+#include "Globals/BuildingProp.h"
 #include "Globals/Pickup.h"
-
-#include "Functions/Cheats.h"
 
 #include <fstream>
 #include "Hooks.h"
@@ -66,10 +66,10 @@ DWORD WINAPI MainThread(LPVOID)
         {
             InitFunc::InitializeAll();
 
-            UFortConsole* NewConsole = Cast<UFortConsole>(UGameplayStatics::SpawnObject(UFortConsole::StaticClass(), Globals::GetFortEngine()->GameViewport));
+            UFortConsole* NewConsole = Cast<UFortConsole>(UGameplayStatics::SpawnObject(UFortConsole::StaticClass(), GEngine->GameViewport));
 
             if (NewConsole)
-                Globals::GetFortEngine()->GameViewport->ViewportConsole = NewConsole;
+                GEngine->GameViewport->ViewportConsole = NewConsole;
 
             PlayerController->SwitchLevel(L"Athena_Terrain");
             //PlayerController->SwitchLevel(L"Athena_Faceoff");

@@ -249,14 +249,27 @@ namespace FortKismetLibrary
 
 		if (bNotifyPlayer && PlayerPawn)
 		{
-			FVector SpawnLocation = PlayerPawn->K2_GetActorLocation();
+			const FVector& SpawnLocation = PlayerPawn->K2_GetActorLocation();
 
-			AFortPickup* Pickup = AFortPickup::CreatePickup(World, &ItemEntry, &SpawnLocation);
+			int32 MaxStackSize = ItemDefinition->MaxStackSize;
+			int32 RemainingToGive = NumberToGive;
+			int32 PickupIndex = 0;
 
-			if (Pickup)
+			while (RemainingToGive > 0)
 			{
-				const FVector& StartDirection = FVector({ 0, 0, 0 });
-				Pickup->SetPickupTarget(PlayerPawn, -1.0f, StartDirection);
+				int32 StackSize = UKismetMathLibrary::Min(RemainingToGive, MaxStackSize);
+				Inventory::MakeItemEntry(&ItemEntry, ItemDefinition, StackSize, -1, -1, -1.0f);
+				AFortPickup* Pickup = AFortPickup::CreatePickup(World, &ItemEntry, &SpawnLocation);
+
+				if (Pickup)
+				{
+					const FVector& StartDirection = FVector({ 0, 0, 0 });
+					float FlyTime = Globals::GenFlyTime();
+					Pickup->SetPickupTarget(PlayerPawn, (FlyTime + PickupIndex * 0.30000001192092896f), StartDirection);
+				}
+
+				RemainingToGive -= StackSize;
+				PickupIndex++;
 			}
 		}
 		else
@@ -383,14 +396,27 @@ namespace FortKismetLibrary
 
 		if (bNotifyPlayer && PlayerPawn)
 		{
-			FVector SpawnLocation = PlayerPawn->K2_GetActorLocation();
+			const FVector& SpawnLocation = PlayerPawn->K2_GetActorLocation();
 
-			AFortPickup* Pickup = AFortPickup::CreatePickup(World, &ItemEntry, &SpawnLocation);
+			int32 MaxStackSize = ItemDefinition->MaxStackSize;
+			int32 RemainingToGive = NumberToGive;
+			int32 PickupIndex = 0;
 
-			if (Pickup)
+			while (RemainingToGive > 0)
 			{
-				const FVector& StartDirection = FVector({ 0, 0, 0 });
-				Pickup->SetPickupTarget(PlayerPawn, -1.0f, StartDirection);
+				int32 StackSize = UKismetMathLibrary::Min(RemainingToGive, MaxStackSize);
+				Inventory::MakeItemEntry(&ItemEntry, ItemDefinition, StackSize, -1, -1, -1.0f);
+				AFortPickup* Pickup = AFortPickup::CreatePickup(World, &ItemEntry, &SpawnLocation);
+
+				if (Pickup)
+				{
+					const FVector& StartDirection = FVector({ 0, 0, 0 });
+					float FlyTime = Globals::GenFlyTime();
+					Pickup->SetPickupTarget(PlayerPawn, (FlyTime + PickupIndex * 0.30000001192092896f), StartDirection);
+				}
+
+				RemainingToGive -= StackSize;
+				PickupIndex++;
 			}
 		}
 		else
@@ -505,33 +531,36 @@ namespace FortKismetLibrary
 
 	void InitFortKismetLibrary()
 	{
+		UFortKismetLibrary* FortKismetLibraryDefault = UFortKismetLibrary::GetDefaultObj();
+		UClass* FortKismetLibraryClass = UFortKismetLibrary::StaticClass();
+
 		/* -------------------------------------- UFortKismetLibrary ------------------------------------- */
 
-		UFunction* GetAIDirectorFunc = UFortKismetLibrary::StaticClass()->GetFunction("FortKismetLibrary", "GetAIDirector");
+		UFunction* GetAIDirectorFunc = FortKismetLibraryClass->GetFunction("FortKismetLibrary", "GetAIDirector");
 		MinHook::HookFunctionExec(GetAIDirectorFunc, GetAIDirector, nullptr);
 
-		UFunction* GetAIGoalManagerFunc = UFortKismetLibrary::StaticClass()->GetFunction("FortKismetLibrary", "GetAIGoalManager");
+		UFunction* GetAIGoalManagerFunc = FortKismetLibraryClass->GetFunction("FortKismetLibrary", "GetAIGoalManager");
 		MinHook::HookFunctionExec(GetAIGoalManagerFunc, GetAIGoalManager, nullptr);
 
-		UFunction* PickLootDropsFunc = UFortKismetLibrary::StaticClass()->GetFunction("FortKismetLibrary", "PickLootDrops");
+		UFunction* PickLootDropsFunc = FortKismetLibraryClass->GetFunction("FortKismetLibrary", "PickLootDrops");
 		MinHook::HookFunctionExec(PickLootDropsFunc, PickLootDrops, nullptr);
 
-		UFunction* K2_SpawnPickupInWorldFunc = UFortKismetLibrary::StaticClass()->GetFunction("FortKismetLibrary", "K2_SpawnPickupInWorld");
+		UFunction* K2_SpawnPickupInWorldFunc = FortKismetLibraryClass->GetFunction("FortKismetLibrary", "K2_SpawnPickupInWorld");
 		MinHook::HookFunctionExec(K2_SpawnPickupInWorldFunc, K2_SpawnPickupInWorld, nullptr);
 
-		UFunction* GiveItemToInventoryOwnerFunc = UFortKismetLibrary::StaticClass()->GetFunction("FortKismetLibrary", "GiveItemToInventoryOwner");
+		UFunction* GiveItemToInventoryOwnerFunc = FortKismetLibraryClass->GetFunction("FortKismetLibrary", "GiveItemToInventoryOwner");
 		MinHook::HookFunctionExec(GiveItemToInventoryOwnerFunc, GiveItemToInventoryOwner, nullptr);
 
-		UFunction* K2_GiveBuildingResourceFunc = UFortKismetLibrary::StaticClass()->GetFunction("FortKismetLibrary", "K2_GiveBuildingResource");
+		UFunction* K2_GiveBuildingResourceFunc = FortKismetLibraryClass->GetFunction("FortKismetLibrary", "K2_GiveBuildingResource");
 		MinHook::HookFunctionExec(K2_GiveBuildingResourceFunc, K2_GiveBuildingResource, nullptr);
 
-		UFunction* K2_GiveItemToAllPlayersFunc = UFortKismetLibrary::StaticClass()->GetFunction("FortKismetLibrary", "K2_GiveItemToAllPlayers");
+		UFunction* K2_GiveItemToAllPlayersFunc = FortKismetLibraryClass->GetFunction("FortKismetLibrary", "K2_GiveItemToAllPlayers");
 		MinHook::HookFunctionExec(K2_GiveItemToAllPlayersFunc, K2_GiveItemToAllPlayers, nullptr);
 
-		UFunction* K2_GiveItemToPlayerFunc = UFortKismetLibrary::StaticClass()->GetFunction("FortKismetLibrary", "K2_GiveItemToPlayer");
+		UFunction* K2_GiveItemToPlayerFunc = FortKismetLibraryClass->GetFunction("FortKismetLibrary", "K2_GiveItemToPlayer");
 		MinHook::HookFunctionExec(K2_GiveItemToPlayerFunc, K2_GiveItemToPlayer, nullptr);
 
-		UFunction* K2_RemoveItemFromAllPlayersFunc = UFortKismetLibrary::StaticClass()->GetFunction("FortKismetLibrary", "K2_RemoveItemFromAllPlayers");
+		UFunction* K2_RemoveItemFromAllPlayersFunc = FortKismetLibraryClass->GetFunction("FortKismetLibrary", "K2_RemoveItemFromAllPlayers");
 		MinHook::HookFunctionExec(K2_RemoveItemFromAllPlayersFunc, K2_RemoveItemFromAllPlayers, nullptr);
 
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0xEBE880), K2_RemoveItemFromPlayer, nullptr);

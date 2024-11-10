@@ -1,5 +1,9 @@
 #pragma once
 
+/*
+ * - The explanations were made with chatgpt (I was too lazy to do it)
+*/
+
 namespace FortAthenaSupplyDrop
 {
 	/* ----------------------------------- AFortAthenaSupplyDropOG ----------------------------------- */
@@ -8,6 +12,23 @@ namespace FortAthenaSupplyDrop
 
 	/* ------------------------------------ AFortAthenaSupplyDrop ------------------------------------ */
 
+	/*
+	 * SpawnPickup spawns a pickup item in the game world, typically from a supply drop, and tosses it to a random nearby location
+	 *
+	 * - Retrieves parameters from the stack:
+	 *		- `ItemDefinition`: Specifies the type of item to spawn.
+	 *		- `NumberToSpawn`: Quantity of the item.
+	 *		- `TriggeringPawn`: The pawn that triggered the spawn, if applicable.
+	 *		- `Position` and `Direction`: The spawn location and direction.
+	 * - Validates the world context, item definition, and quantity; if invalid, returns null.
+	 * - Creates an `FFortItemEntry` with the specified item data to represent the spawned item.
+	 * - Configures `FFortCreatePickupData` with world context, item entry, spawn location, and a flag for random rotation.
+	 * - Calls `CreatePickupFromData` to create the pickup in the world.
+	 * - If the pickup is created successfully:
+	 *		- Randomizes the final location using a random rotation and distance, making the toss visually varied.
+	 *		- Tosses the pickup to the calculated location.
+	 * - Frees the item entry memory and assigns the created pickup to the return pointer.
+	 */
 	AFortPickup* SpawnPickup(AFortAthenaSupplyDrop* SupplyDrop, FFrame& Stack, AFortPickup** Ret)
 	{
 		UFortWorldItemDefinition* ItemDefinition = nullptr;
@@ -70,10 +91,11 @@ namespace FortAthenaSupplyDrop
 	void InitFortAthenaSupplyDrop()
 	{
 		AFortAthenaSupplyDrop* FortAthenaSupplyDropDefault = AFortAthenaSupplyDrop::GetDefaultObj();
+		UClass* FortAthenaSupplyDropClass = AFortAthenaSupplyDrop::StaticClass();
 
 		/* ------------------------------------ AFortAthenaSupplyDrop ------------------------------------ */
 
-		UFunction* SpawnPickupFunc = AFortAthenaSupplyDrop::StaticClass()->GetFunction("FortAthenaSupplyDrop", "SpawnPickup");
+		UFunction* SpawnPickupFunc = FortAthenaSupplyDropClass->GetFunction("FortAthenaSupplyDrop", "SpawnPickup");
 		MinHook::HookFunctionExec(SpawnPickupFunc, SpawnPickup, nullptr);
 
 		/* ----------------------------------------------------------------------------------------------- */

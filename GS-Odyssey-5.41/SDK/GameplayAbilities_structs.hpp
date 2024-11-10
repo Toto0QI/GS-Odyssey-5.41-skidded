@@ -375,6 +375,13 @@ public:
 	uint8                                         Pad_F4B[0x4];                                      // 0x0004(0x0004)(Fixing Size After Last Property [ Dumper-7 ])
 	struct FCurveTableRowHandle                   Curve;                                             // 0x0008(0x0010)(Edit, BlueprintVisible, NoDestructor, HasGetValueTypeHash, NativeAccessSpecifierPublic)
 	uint8                                         Pad_F4C[0x10];                                     // 0x0018(0x0010)(Fixing Struct Size After Last Property [ Dumper-7 ])
+
+	float GetValueAtLevel(float Level, const class FString* ContextString = nullptr)
+	{
+		// 7FF66ECB2EB0
+		float (*GetValueAtLevel)(FScalableFloat* ScalableFloat, float Level, const class FString* ContextString) = decltype(GetValueAtLevel)(0x662EB0 + uintptr_t(GetModuleHandle(0)));
+		return GetValueAtLevel(this, Level, ContextString);
+	}
 };
 
 // ScriptStruct GameplayAbilities.GameplayAbilitySpecHandle
