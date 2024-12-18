@@ -21,7 +21,6 @@
 1. Make the quests
 2. Fix Bling playlist
 3. Make the teams
-4. Bug with the pickup combine
 5. The ability of the Gadget when removed does not remove well
 
 ---
