@@ -65,6 +65,19 @@ namespace Functions
 		}
 	}
 
+	UClass* LoadClass(TSoftClassPtr<UClass> SoftClass)
+	{
+		UClass* Class = SoftClass.Get();
+
+		if (!Class)
+		{
+			const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(SoftClass.ObjectID.AssetPathName);
+			Class = StaticLoadObject<UClass>(AssetPathName.CStr());
+		}
+
+		return Class;
+	}
+
 	UFortGameplayAbility* LoadGameplayAbility(TSoftClassPtr<UClass> SoftGameplayAbility)
 	{
 		UClass* GameplayAbilityClass = SoftGameplayAbility.Get();
@@ -238,9 +251,6 @@ namespace Functions
 			TArray<AActor*> VendingMachines;
 			UGameplayStatics::GetAllActorsOfClass(MapInfo, MapInfo->VendingMachineClass, &VendingMachines);
 
-			FString ContextString;
-			EEvaluateCurveTableResult Result;
-
 			FScalableFloat VendingMachineRarityCount = MapInfo->VendingMachineRarityCount;
 
 			std::map<int32, float> RarityAndWeight;
@@ -254,10 +264,8 @@ namespace Functions
 
 			for (int32 i = 0; i < 6; i++)
 			{
-				float RarityCountXY;
-				UDataTableFunctionLibrary::EvaluateCurveTableRow(VendingMachineRarityCount.Curve.CurveTable, VendingMachineRarityCount.Curve.RowName, i, &Result, &RarityCountXY, ContextString);
-
-				RarityAndWeight[i] = (RarityCountXY * VendingMachineRarityCount.Value);
+				float RarityCount = MapInfo->VendingMachineRarityCount.GetValueAtLevel(i);
+				RarityAndWeight[i] = RarityCount;
 			}
 
 			for (int32 i = 0; i < VendingMachines.Num(); i++)
@@ -474,7 +482,7 @@ namespace Functions
 
 					FVector ConsumableLocation = GameplayActorConsumable->K2_GetActorLocation();
 
-					FN_LOG(LogFunctions, Debug, "[%i/%i] - GameplayActorConsumable: %s, ConsumableLocation: [X: %.2f, Y: %.2f, Z: %.2f]",
+					FN_LOG(LogFunctions, Debug, L"[%i/%i] - GameplayActorConsumable: %s, ConsumableLocation: [X: %.2f, Y: %.2f, Z: %.2f]",
 						(j + 1), LootToDrops.Num(), GameplayActorConsumable->GetFullName().c_str(), ConsumableLocation.X, ConsumableLocation.Y, ConsumableLocation.Z);
 
 					ConsumableSpawner->ConsumablesToSpawn.Add(LootToDrop);
@@ -500,8 +508,9 @@ namespace Functions
 			GameStateAthena->AirCraftBehavior = PlaylistAthena->AirCraftBehavior;
 			GameStateAthena->bIsLargeTeamGame = PlaylistAthena->bIsLargeTeamGame;
 
-			GameModeAthena->NumTeams = PlaylistAthena->MaxTeamCount / PlaylistAthena->MaxTeamSize;
 			GameModeAthena->AISettings = PlaylistAthena->AISettings;
+
+			GameModeAthena->WarmupRequiredPlayerCount = 1;
 
 			AFortGameSession* GameSession = GameModeAthena->FortGameSession;
 
@@ -922,6 +931,6 @@ namespace Functions
 
 	void InitFunctions()
 	{
-		FN_LOG(LogInit, Log, "InitFunctions Success!");
+		FN_LOG(LogInit, Log, L"InitFunctions Success!");
 	}
 }

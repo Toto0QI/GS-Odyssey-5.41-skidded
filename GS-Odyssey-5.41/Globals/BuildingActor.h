@@ -12,6 +12,7 @@ namespace BuildingActor
 	void (*ABuildingSMActor_PostUpdateOG)(ABuildingSMActor* BuildingSMActor);
 	/* -------------------------------------- ABuildingActorOG --------------------------------------- */
 	void (*OnDamageServerOG)(ABuildingActor* BuildingActor, float Damage, const FGameplayTagContainer& DamageTags, const FVector& Momentum, const FHitResult& HitInfo, AController* InstigatedBy, AActor* DamageCauser, const FGameplayEffectContextHandle& EffectContext);
+	void (*OnDeathServerOG)(ABuildingActor* BuildingActor, float Damage, const FGameplayTagContainer& DamageTags, const FVector& Momentum, const FHitResult& HitInfo, AController* InstigatedBy, AActor* DamageCauser, const FGameplayEffectContextHandle& EffectContext);
 
 
 
@@ -189,7 +190,7 @@ namespace BuildingActor
 				BuildingContainer->SetSearchedContainer(nullptr);
 		}
 
-		FN_LOG(LogBuildingActor, Debug, "ABuildingContainer::PostUpdate() on existing container Container: %s, ContainerLootTierKey: %s, AltMeshIdx: %d",
+		FN_LOG(LogBuildingActor, Debug, L"ABuildingContainer::PostUpdate() on existing container Container: %s, ContainerLootTierKey: %s, AltMeshIdx: %d",
 			BuildingContainer->GetName().c_str(), BuildingContainer->ContainerLootTierKey.ToString().c_str(), BuildingContainer->AltMeshIdx);
 	}
 
@@ -253,7 +254,7 @@ namespace BuildingActor
 					float NewDurability = 1.0f * BuildingContainer->LootedWeaponsDurabilityModifier;
 
 					ItemEntry.SetDurability(NewDurability);
-					ItemEntry.SetStateValue(EFortItemEntryState::DurabilityInitialized, 1);
+					Inventory::SetStateValue(&ItemEntry, EFortItemEntryState::DurabilityInitialized, 1);
 				}
 
 				AFortPickup* Pickup = AFortPickup::CreatePickup(
@@ -294,7 +295,7 @@ namespace BuildingActor
 					if (!WorldItemDefinition)
 					{
 						UFortItemDefinition* ItemDefinition = LootToDrop.ItemDefinition;
-						FN_LOG(LogBuildingContainer, Error, "Attempted to spawn non-world item %s!", ItemDefinition->GetName().c_str());
+						FN_LOG(LogBuildingContainer, Error, L"Attempted to spawn non-world item %s!", ItemDefinition->GetName().c_str());
 						continue;
 					}
 
@@ -415,7 +416,7 @@ namespace BuildingActor
 				{
 					if (AlternateMeshe->MeshSets.Num() <= 0)
 					{
-						FN_LOG(LogBuildingSMActor, Warning, "No Alternative Mesh available for Building: %s at LootTier: %d", BuildingSMActor->GetName().c_str(), Tier);
+						FN_LOG(LogBuildingSMActor, Warning, L"No Alternative Mesh available for Building: %s at LootTier: %d", BuildingSMActor->GetName().c_str(), Tier);
 					}
 					else
 					{
@@ -435,7 +436,7 @@ namespace BuildingActor
 			}
 		}
 
-		FN_LOG(LogBuildingSMActor, Debug, "ABuildingSMActor::SelectMeshSet(FName LootTierKey) Building: %s, AltMeshIdx: %d", BuildingSMActor->GetName().c_str(), BuildingSMActor->AltMeshIdx);
+		FN_LOG(LogBuildingSMActor, Debug, L"ABuildingSMActor::SelectMeshSet(FName LootTierKey) Building: %s, AltMeshIdx: %d", BuildingSMActor->GetName().c_str(), BuildingSMActor->AltMeshIdx);
 	}
 
 
@@ -510,7 +511,7 @@ namespace BuildingActor
 			}
 		}
 
-		FN_LOG(LogBuildingSMActor, Debug, "ABuildingSMActor::PostUpdate() Building: %s, AltMeshIdx: %d", BuildingSMActor->GetName().c_str(), BuildingSMActor->AltMeshIdx);
+		FN_LOG(LogBuildingSMActor, Debug, L"ABuildingSMActor::PostUpdate() Building: %s, AltMeshIdx: %d", BuildingSMActor->GetPathName().CStr(), BuildingSMActor->AltMeshIdx);
 
 		ABuildingSMActor_PostUpdateOG(BuildingSMActor);
 	}
@@ -537,7 +538,8 @@ namespace BuildingActor
 		const FHitResult& HitInfo, 
 		AController* InstigatedBy, 
 		AActor* DamageCauser, 
-		const FGameplayEffectContextHandle& EffectContext)
+		const FGameplayEffectContextHandle& EffectContext
+	)
 	{
 		OnDamageServerOG(
 			BuildingActor,
@@ -610,7 +612,7 @@ namespace BuildingActor
 
 					if (!WorldItemDefinition)
 					{
-						FN_LOG(LogBuildingSMActor, Error, "Loot tier %s dropped entry with no item data!", BuildingSMActor->DestructionLootTierGroup.ToString().c_str());
+						FN_LOG(LogBuildingSMActor, Error, L"Loot tier %s dropped entry with no item data!", BuildingSMActor->DestructionLootTierGroup.ToString().c_str());
 						continue;
 					}
 
@@ -623,7 +625,7 @@ namespace BuildingActor
 
 					FFortItemEntry ItemEntry;
 					Inventory::MakeItemEntry(&ItemEntry, WorldItemDefinition, LootToDrop.Count, LootToDrop.Level, LootToDrop.LoadedAmmo, LootToDrop.Durability);
-					ItemEntry.SetStateValue(EFortItemEntryState::DoNotShowSpawnParticles, 1);
+					Inventory::SetStateValue(&ItemEntry, EFortItemEntryState::DoNotShowSpawnParticles, 1);
 
 					AFortPickup* Pickup = AFortPickup::CreatePickup(
 						PlayerController->GetWorld(),
@@ -661,8 +663,8 @@ namespace BuildingActor
 			BuildingSMActorLocation.Y += RandomDirection.Y * 200.0f;
 			BuildingSMActorLocation.Z += RandomDirection.Z * 200.0f;
 
-			ItemEntry.SetStateValue(EFortItemEntryState::DoNotShowSpawnParticles, 1);
-			ItemEntry.SetStateValue(EFortItemEntryState::ShouldShowItemToast, 1);
+			Inventory::SetStateValue(&ItemEntry, EFortItemEntryState::DoNotShowSpawnParticles, 1);
+			Inventory::SetStateValue(&ItemEntry, EFortItemEntryState::ShouldShowItemToast, 1);
 
 			if (BuildingSMActor->OwnerPersistentID == -1)
 			{
@@ -675,6 +677,37 @@ namespace BuildingActor
 
 			ItemEntry.FreeItemEntry();
 		}
+	}
+
+	void OnDeathServer(
+		ABuildingActor* BuildingActor,
+		float Damage,
+		const FGameplayTagContainer& DamageTags,
+		const FVector& Momentum,
+		const FHitResult& HitInfo,
+		AController* InstigatedBy,
+		AActor* DamageCauser,
+		const FGameplayEffectContextHandle& EffectContext
+	)
+	{
+		OnDeathServerOG(
+			BuildingActor,
+			Damage,
+			DamageTags,
+			Momentum,
+			HitInfo,
+			InstigatedBy,
+			DamageCauser,
+			EffectContext
+		);
+
+		ABuildingContainer* BuildingContainer = Cast<ABuildingContainer>(BuildingActor);
+
+		if (!BuildingContainer)
+			return;
+
+		/*if (!BuildingContainer->bAlreadySearched)
+			BuildingContainer->SpawnLoot(nullptr);*/
 	}
 
 	void InitBuildingActor()
@@ -704,8 +737,11 @@ namespace BuildingActor
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x1371CD0), OnDamageServer, (LPVOID*)(&OnDamageServerOG));
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x1371CD0));
 
+		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x1372290), OnDeathServer, (LPVOID*)(&OnDeathServerOG));
+		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x1372290));
+
 		/* ----------------------------------------------------------------------------------------------- */
 
-		FN_LOG(LogInit, Log, "InitBuildingActor Success!");
+		FN_LOG(LogInit, Log, L"InitBuildingActor Success!");
 	}
 }

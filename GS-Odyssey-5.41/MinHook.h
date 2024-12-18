@@ -7,7 +7,7 @@ namespace MinHook
     {
         if (!Class)
         {
-            FN_LOG(LogMinHook, Log, "Class not found!");
+            FN_LOG(LogMinHook, Log, L"Class not found!");
             return -1;
         }
 
@@ -21,14 +21,14 @@ namespace MinHook
             // Index Found!
             if (Offset == FuncOffset)
             {
-                FN_LOG(LogHook, Debug, "Index Found: 0x%llx", (unsigned long long)Index);
+                FN_LOG(LogHook, Debug, L"Index Found: 0x%llx", (unsigned long long)Index);
 
                 return Index;
             }
 
             uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
 
-            FN_LOG(LogHook, Debug, "Index not found: 0x%llx, Offset: 0x%llx, IdaAddress [%p]", (unsigned long long)Index, (unsigned long long)Offset, IdaAddress);
+            FN_LOG(LogHook, Debug, L"Index not found: 0x%llx, Offset: 0x%llx, IdaAddress [%p]", (unsigned long long)Index, (unsigned long long)Offset, IdaAddress);
 
             Index++;
         }
@@ -40,7 +40,7 @@ namespace MinHook
     {
         if (!Class)
         {
-            FN_LOG(LogMinHook, Log, "Class not found!");
+            FN_LOG(LogMinHook, Log, L"Class not found!");
             return;
         }
 
@@ -60,14 +60,14 @@ namespace MinHook
         uintptr_t Offset = Address - InSDKUtils::GetImageBase();
         uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
 
-        FN_LOG(LogMinHook, Log, "Function VTable [%s] successfully hooked with Offset [0x%llx], IdaAddress [%p]", FuncName.c_str(), (unsigned long long)Offset, IdaAddress);
+        FN_LOG(LogMinHook, Log, L"Function VTable [%s] successfully hooked with Offset [0x%llx], IdaAddress [%p]", FuncName.c_str(), (unsigned long long)Offset, IdaAddress);
     }
 
     static void HookFunctionExec(UFunction* Function, void* FuncHook, void** FuncOG)
     {
         if (!Function)
         {
-            FN_LOG(LogMinHook, Log, "Function not found!");
+            FN_LOG(LogMinHook, Log, L"Function not found!");
             return;
         }
 
@@ -76,7 +76,7 @@ namespace MinHook
         uintptr_t Offset = uintptr_t(ExecFunction) - InSDKUtils::GetImageBase();
         uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
 
-        FN_LOG(LogMinHook, Log, "Function Exec [%s] successfully hooked with Offset [0x%llx], IdaAddress [%p]", Function->GetName().c_str(), (unsigned long long)Offset, IdaAddress);
+        FN_LOG(LogMinHook, Log, L"Function Exec [%s] successfully hooked with Offset [0x%llx], IdaAddress [%p]", Function->GetName().c_str(), (unsigned long long)Offset, IdaAddress);
 
         if (FuncOG)
             *FuncOG = ExecFunction;

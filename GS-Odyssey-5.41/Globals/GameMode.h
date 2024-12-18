@@ -17,11 +17,9 @@ namespace GameMode
 
 	bool ReadyToStartMatch(AFortGameModeAthena* GameModeAthena)
 	{
-		ReadyToStartMatchOG(GameModeAthena);
-
 		AFortGameStateAthena* GameStateAthena = Cast<AFortGameStateAthena>(GameModeAthena->GameState);
 
-		if (GameStateAthena && !GameStateAthena->CurrentPlaylistData)
+		if (GameStateAthena && !GameStateAthena->bPlaylistDataIsLoaded)
 		{
 			FURL URL;
 			URL.Port = 7777;
@@ -42,45 +40,17 @@ namespace GameMode
 			{
 				Functions::SetPlaylistData(GameModeAthena, PlaylistAthena);
 
-				FN_LOG(LogGameMode, Log, "[AGameMode::ReadyToStartMatch] AISettings: %s", GameModeAthena->AISettings->GetName().c_str());
-				FN_LOG(LogGameMode, Log, "[AGameMode::ReadyToStartMatch] AIDirector: %s", GameModeAthena->AIDirector->GetName().c_str());
-				FN_LOG(LogGameMode, Log, "[AGameMode::ReadyToStartMatch] AIGoalManager: %s", GameModeAthena->AIGoalManager->GetName().c_str());
-				FN_LOG(LogGameMode, Log, "[AGameMode::ReadyToStartMatch] PlaylistAthena: %s", PlaylistAthena->GetName().c_str());
-				FN_LOG(LogGameMode, Log, "[AGameMode::ReadyToStartMatch] Choose Playlist Finish!");
+				FN_LOG(LogGameMode, Log, L"[AGameMode::ReadyToStartMatch] AISettings: %s", GameModeAthena->AISettings->GetName().c_str());
+				FN_LOG(LogGameMode, Log, L"[AGameMode::ReadyToStartMatch] AIDirector: %s", GameModeAthena->AIDirector->GetName().c_str());
+				FN_LOG(LogGameMode, Log, L"[AGameMode::ReadyToStartMatch] AIGoalManager: %s", GameModeAthena->AIGoalManager->GetName().c_str());
+				FN_LOG(LogGameMode, Log, L"[AGameMode::ReadyToStartMatch] PlaylistAthena: %s", PlaylistAthena->GetName().c_str());
+				FN_LOG(LogGameMode, Log, L"[AGameMode::ReadyToStartMatch] Choose Playlist Finish!");
+
+				GameStateAthena->bPlaylistDataIsLoaded = true;
 			}
 		}
 
-		if (GameModeAthena->bWorldIsReady)
-		{
-			const FName& MatchState = GameStateAthena->MatchState;
-
-			if (GameModeAthena->NumPlayers + GameModeAthena->NumBots > 0 &&
-				MatchState.ToString() == "WaitingToStart")
-			{
-				const FName& InProgress = UKismetStringLibrary::Conv_StringToName(L"InProgress");
-
-				GameModeAthena->MatchState = InProgress;
-				GameModeAthena->K2_OnSetMatchState(InProgress);
-
-				Functions::InitializeTreasureChests();
-				Functions::InitializeAmmoBoxs();
-				Functions::InitializeLlamas();
-				Functions::InitializeConsumableBGAs();
-
-				Functions::FillVendingMachines();
-
-				GameModeAthena->HandleMatchHasStarted();
-
-				FN_LOG(LogGameMode, Log, "[AGameMode::ReadyToStartMatch] GameSession: %s", GameModeAthena->GameSession->GetName().c_str());
-				FN_LOG(LogGameMode, Log, "[AGameMode::ReadyToStartMatch] GameMode: %s", GameModeAthena->GetName().c_str());
-				FN_LOG(LogGameMode, Log, "[AGameMode::ReadyToStartMatch] GameState: %s", GameModeAthena->GameState->GetName().c_str());
-				FN_LOG(LogGameMode, Log, "[AGameMode::ReadyToStartMatch] ReadyToStartMatch Finish!");
-
-				return true;
-			}
-		}
-
-		return false;
+		return ReadyToStartMatchOG(GameModeAthena);
 	}
 
 	AFortPlayerPawn* SpawnDefaultPawnFor(AFortGameModeAthena* GameModeAthena, AController* NewPlayer, AActor* StartSpot)
@@ -141,8 +111,8 @@ namespace GameMode
 
 	void HandlePostSafeZonePhaseChanged(AFortGameModeAthena* GameModeAthena)
 	{
-		FN_LOG(LogGameMode, Log, "[AFortGameModeAthena::HandlePostSafeZonePhaseChanged] GameModeAthena: %s", GameModeAthena->GetName().c_str());
-		FN_LOG(LogGameMode, Log, "[AFortGameModeAthena::HandlePostSafeZonePhaseChanged] called!");
+		FN_LOG(LogGameMode, Log, L"[AFortGameModeAthena::HandlePostSafeZonePhaseChanged] GameModeAthena: %s", GameModeAthena->GetName().c_str());
+		FN_LOG(LogGameMode, Log, L"[AFortGameModeAthena::HandlePostSafeZonePhaseChanged] called!");
 
 		HandlePostSafeZonePhaseChangedOG(GameModeAthena);
 	}
@@ -183,6 +153,6 @@ namespace GameMode
 
 		/* ----------------------------------------------------------------------------------------------- */
 
-		FN_LOG(LogInit, Log, "InitGameMode Success!");
+		FN_LOG(LogInit, Log, L"InitGameMode Success!");
 	}
 }

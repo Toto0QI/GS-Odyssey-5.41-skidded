@@ -71,13 +71,14 @@ namespace FortAthenaSupplyDrop
 
 		if (Pickup)
 		{
-			FRotator PlayerRotation = SupplyDrop->K2_GetActorRotation();
-			PlayerRotation.Yaw += UKismetMathLibrary::RandomFloatInRange(-180.0f, 180.0f);
+			FVector FinalLocation = Position;
+			FVector RandomDirection = UKismetMathLibrary::RandomUnitVector();
 
-			float RandomDistance = UKismetMathLibrary::RandomFloatInRange(350.0f, 700.0f);
-			FVector FinalDirection = UKismetMathLibrary::GetForwardVector(PlayerRotation);
+			FinalLocation.X += RandomDirection.X * 700.0f;
+			FinalLocation.Y += RandomDirection.Y * 700.0f;
 
-			FVector FinalLocation = Position + FinalDirection * RandomDistance;
+			Pickup->bTossedFromContainer = true;
+			Pickup->OnRep_TossedFromContainer();
 
 			Pickup->TossPickup(FinalLocation, nullptr, 0, true);
 		}
@@ -100,6 +101,6 @@ namespace FortAthenaSupplyDrop
 
 		/* ----------------------------------------------------------------------------------------------- */
 
-		FN_LOG(LogInit, Log, "FortAthenaSupplyDrop Success!");
+		FN_LOG(LogInit, Log, L"FortAthenaSupplyDrop Success!");
 	}
 }

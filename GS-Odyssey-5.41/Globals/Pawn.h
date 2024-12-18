@@ -84,13 +84,7 @@ namespace Pawn
 		AFortPickup* Pickup = Cast<AFortPickup>(OtherActor);
 		if (!Pickup) return;
 
-		float RepickupDelayXY = 0.0f;
-
-		FString ContextString;
-		EEvaluateCurveTableResult Result;
-		UDataTableFunctionLibrary::EvaluateCurveTableRow(PlayerPawn->AutoPickupDropRepickupDelay.Curve.CurveTable, PlayerPawn->AutoPickupDropRepickupDelay.Curve.RowName, 0, &Result, &RepickupDelayXY, ContextString);
-
-		float RepickupDelay = (RepickupDelayXY * PlayerPawn->AutoPickupDropRepickupDelay.Value);
+		float RepickupDelay = PlayerPawn->AutoPickupDropRepickupDelay.GetValueAtLevel(0);
 
 		if (!GAutoResourceGathering)
 			return;
@@ -194,6 +188,6 @@ namespace Pawn
 
 		/* ----------------------------------------------------------------------------------------------- */
 
-		FN_LOG(LogInit, Log, "InitPawn Success!");
+		FN_LOG(LogInit, Log, L"InitPawn Success!");
 	}
 }

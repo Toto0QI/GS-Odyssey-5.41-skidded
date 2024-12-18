@@ -121,6 +121,9 @@
     <ClInclude Include="Globals\BuildingProp.h">
       <Filter>Headers\Globals</Filter>
     </ClInclude>
+    <ClInclude Include="Globals\CheatManager.h">
+      <Filter>Headers\Globals</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

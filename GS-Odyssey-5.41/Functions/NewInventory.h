@@ -862,7 +862,7 @@ namespace Inventory
 		}
 		else
 		{
-			FN_LOG(LogInventory, Error, "Zgueg au max");
+			FN_LOG(LogInventory, Error, L"Zgueg au max");
 		}
 	}
 
@@ -1011,6 +1011,6 @@ namespace Inventory
 		AddWorldItem = decltype(AddWorldItem)(AddressAddWorldItem);
 		FreeItemEntry = decltype(FreeItemEntry)(AddressFreeItemEntry);
 
-		FN_LOG(LogInit, Log, "InitInventory Success!");
+		FN_LOG(LogInit, Log, L"InitInventory Success!");
 	}
 }

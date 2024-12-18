@@ -11,11 +11,11 @@
 uintptr_t InventoryOwnerOffset = 0x680;
 
 #define CHEATS
-#define DEBUGS
+//#define DEBUGS
 #define SIPHON
 #define QUESTS
 #define ANTICHEAT
-// #define LATEGAME
+//#define LATEGAME
 #define BOTS
 
 template<typename T = UObject>

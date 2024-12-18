@@ -14,7 +14,7 @@ namespace Hooks
 	ABuildingTrap* (*ServerSpawnDeco)(AFortDecoTool* DecoTool, UClass* Class, const FVector& Location, const FRotator& Rotation, ABuildingSMActor* AttachedActor, EBuildingAttachmentType InBuildingAttachmentType);
 	void (*GetPlayerViewPoint)(APlayerController* PlayerController, FVector& out_Location, FRotator& out_Rotation);
 	void (*ProcessEvent)(UObject* Object, UFunction* Function, void* Parms);
-	void (*DispatchRequest)(__int64 a1, __int64* a2);
+	void (*DispatchRequest)(UMcpProfileGroup* McpProfileGroup, FProfileHttpRequest* ProfileHttpRequest);
 	void (*PickupCombine)(AFortPickup* Pickup);
 	void (*PickupDelay)(AFortPickup* Pickup);
 
@@ -53,11 +53,11 @@ namespace Hooks
 		return 0;
 	}
 
-	void DispatchRequestHook(__int64 a1, __int64* a2)
+	void DispatchRequestHook(UMcpProfileGroup* McpProfileGroup, FProfileHttpRequest* ProfileHttpRequest)
 	{
-		*(int32*)(__int64(a2) + 0x28) = 3;
+		*(int32*)(__int64(ProfileHttpRequest) + 0x28) = 3;
 
-		DispatchRequest(a1, a2);
+		DispatchRequest(McpProfileGroup, ProfileHttpRequest);
 	}
 
 	FVector GetPawnViewLocation(APawn* Pawn)
@@ -106,15 +106,13 @@ namespace Hooks
 
 		bool bCallOG = true;
 
-		// Cheats::ProcessEventHook(Object, Function, Parms);
-
 #ifdef ANTICHEAT
 		AntiCheatOdyssey::ProcessEventHook(Object, Function, Parms);
 #endif // ANTICHEAT
 
 #ifdef BOTS
 		BotOdyssey::ProcessEventHook(Object, Function, Parms);
-#endif // BOTS
+#endif // BOTS-
 
 		const std::string& FunctionName = Function->GetName();
 
@@ -170,138 +168,14 @@ namespace Hooks
 				if (!PlayerPawn || !PlayerState)
 					return;
 
-				// 7FF66FE971B0
-				void* (*GetInterfaceAddress)(UObject* Object, UClass* InterfaceClass) = decltype(GetInterfaceAddress)(0x18471B0 + uintptr_t(GetModuleHandle(0)));
-				void* InventoryOwnerInterfaceAddress = GetInterfaceAddress(PlayerController, IFortInventoryOwnerInterface::StaticClass());
-
-				// 7FF66F5C1B60
-				int32 (*GetInventoryCapacity)(void* InventoryOwnerInterfaceAddress, EFortInventoryType InventoryType) = decltype(GetInventoryCapacity)(0xF71B60 + uintptr_t(GetModuleHandle(0)));
-				int32 InventoryCapacity = GetInventoryCapacity(InventoryOwnerInterfaceAddress, PlayerController->WorldInventory->InventoryType);
-
-				// 7FF66F5C21C0
-				int32 (*GetInventorySize)(void* InventoryOwnerInterfaceAddress, EFortInventoryType InventoryType) = decltype(GetInventorySize)(0xF721C0 + uintptr_t(GetModuleHandle(0)));
-				int32 InventorySize = GetInventorySize(InventoryOwnerInterfaceAddress, PlayerController->WorldInventory->InventoryType);
-
-				FFortItemEntry ItemEntry;
-				Inventory::MakeItemEntry(&ItemEntry, Globals::GetGameData()->WoodItemDefinition, 999, 0, 0, 0.0f);
-
-				// 7FF66F5C4A40
-				int32 (*GetOverflowCountIfItemWasAddedToInventory)(AFortInventory* Inventory, FFortItemEntry* ItemEntry) = decltype(GetOverflowCountIfItemWasAddedToInventory)(0xF74A40 + uintptr_t(GetModuleHandle(0)));
-				int32 OverflowCountIfItemWasAddedToInventory = GetOverflowCountIfItemWasAddedToInventory(PlayerController->WorldInventory, &ItemEntry);
-
-				Inventory::FreeItemEntry(&ItemEntry);
-
-				FN_LOG(LogHooks, Log, "InventoryCapacity: %i, InventorySize: %i, OverflowCountIfItemWasAddedToInventory: %i", InventoryCapacity, InventorySize, OverflowCountIfItemWasAddedToInventory);
-
-				UFortInventoryContext;
-				AFortPlayerController;
-
-				/*  
-					------ A TESTER ------
-					- int32 K2_GetOverflowCountIfItemWasAddedToInventory(TScriptInterface<class IFortInventoryOwnerInterface> InventoryOwner, struct FFortItemEntry& ItemEntry); 7FF66F5C4A40
-					- bool sub_7FF66F7EB8A0(AFortPlayerController* PlayerController, const FGuid& ItemGuid)
-					- __int64 sub_7FF66F5C4AA0(__int64 ItemEntry, __int64 InventoryOwner, unsigned int a3, int a4) // a3, a4 = 0 - Return = BackpackOverflowFromAddingItem
-					-
-					-
-					-
-					----------------------
-				*/
-
-				/*TArray<AActor*> OutActors;
-				UGameplayStatics::GetAllActorsOfClass(Globals::GetWorld(), ACUBE_C::StaticClass(), &OutActors);
-
-				for (int32 i = 0; i < OutActors.Num(); i++)
-				{
-					ACUBE_C* CUBE = (ACUBE_C*)OutActors[i];
-					if (!CUBE) continue;
-
-					CUBE->Next(CubeIndex);
-
-					CubeIndex++;
-
-					FN_LOG(LogHooks, Log, "CubeIndex: %i", CubeIndex);
-				}*/
 			}
 
 			if (GetAsyncKeyState(VK_F4) & 0x1)
 			{
-				/*AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
+				AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
 
-				if (!PlayerController)
+				if (!PlayerController || !PlayerController->Pawn)
 					return;
-
-				PlayerController->ServerDropAllItems(nullptr);*/
-
-				/*AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
-
-				if (!PlayerController)
-					return;
-
-				UKismetSystemLibrary::ExecuteConsoleCommand(PlayerController, L"SPAWNEXITCRAFTFAST", PlayerController);*/
-
-				UFortBuildingInstructions* BuildingInstructions = StaticLoadObject<UFortBuildingInstructions>(TEXT("/Game/Athena/Items/Consumables/SuperTowerGrenade/Levels/PortAFort_A/FortBuildingInstructions_PortAFort_A.FortBuildingInstructions_PortAFort_A"));
-
-				if (BuildingInstructions)
-				{
-					UWorld* TemplateMap = BuildingInstructions->TemplateMap.Get();
-
-					if (!TemplateMap)
-					{
-						const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(BuildingInstructions->TemplateMap.ObjectID.AssetPathName);
-						TemplateMap = StaticLoadObject<UWorld>(AssetPathName.CStr());
-					}
-
-					// ClearedCells_Normal
-
-					// AB_Prj_Athena_SuperTowerGrenade_A_C;
-
-					for (int32 i = 0; i < TemplateMap->PersistentLevel->Actors.Num(); i++)
-					{
-						AActor* Actor = TemplateMap->PersistentLevel->Actors[i];
-						if (!Actor) continue;
-
-						FVector Location = Actor->K2_GetActorLocation();
-
-						FN_LOG(LogTemp, Log, "Actor: %s, Location: [X: %.2f, Y: %.2f, Z: %.2f]", 
-							Actor->GetFullName().c_str(), Location.X, Location.Y, Location.Z);
-					}
-
-					/*bool Success;
-					ULevelStreamingDynamic* StreamingLevel = ULevelStreamingDynamic::LoadLevelInstanceBySoftObjectPtr(
-						Globals::GetWorld(), 
-						BuildingInstructions->TemplateMap, 
-						FVector({0, 0, 10000}),
-						FRotator(),
-						&Success
-					);
-
-					if (StreamingLevel && Success)
-					{
-						StreamingLevel->SetShouldBeVisible(true);
-
-						FN_LOG(LogTemp, Log, "Niveau chargé et spawné devant le joueur !");
-					}
-					else
-					{
-						FN_LOG(LogTemp, Warning, "Impossible de faire spawn le niveau.");
-					}*/
-				}
-
-				/*for (int32 i = 0; i < UObject::GObjects->Num(); i++)
-				{
-					UObject* GObject = UObject::GObjects->GetByIndex(i);
-
-					if (!GObject)
-						continue;
-
-					if (GObject->IsA(AFortAthenaMutator::StaticClass()))
-					{
-						AFortAthenaMutator* AthenaMutator = Cast<AFortAthenaMutator>(GObject);
-						if (!AthenaMutator) continue;
-
-						FN_LOG(LogHooks, Log, "AthenaMutator: %s", AthenaMutator->GetFullName().c_str());
-					}
-				}*/
 			}
 
 			if (GetAsyncKeyState(VK_F5) & 0x1)
@@ -310,70 +184,6 @@ namespace Hooks
 
 				if (!PlayerController)
 					return;
-				
-				UFortPlaylistAthena* PlaylistAthena = Globals::GetPlaylist();
-				AFortGameModeAthena* GameModeAthena = Cast<AFortGameModeAthena>(Globals::GetGameMode());
-				AFortGameStateAthena* GameStateAthena = Cast<AFortGameStateAthena>(Globals::GetGameState());
-
-				if (!PlaylistAthena || !GameModeAthena || !GameStateAthena)
-					return;
-
-				for (int32 i = 0; i < GameModeAthena->GameplayMutators.Num(); i++)
-				{
-					auto GameplayMutator = GameModeAthena->GameplayMutators[i];
-					if (!GameplayMutator) continue;
-
-					FN_LOG(LogHooks, Log, "GameplayMutator: %s", GameplayMutator->GetFullName().c_str());
-				}
-
-				// UKismetSystemLibrary::ExecuteConsoleCommand(PlayerController, L"SPAWNEXITCRAFT", PlayerController);
-
-				/*ABGAConsumableSpawner;
-
-				UBGAConsumableWrapperItemDefinition* WrapperItemDefinition = StaticLoadObject<UBGAConsumableWrapperItemDefinition>(L"/Game/Athena/Items/ForagedItems/LowGravity/Athena_Foraged_LowGravity.Athena_Foraged_LowGravity");
-
-				if (!WrapperItemDefinition)
-				{
-					FN_LOG(LogHooks, Log, "Not Found!");
-					return;
-				}
-
-				UClass* ConsumableClass = WrapperItemDefinition->ConsumableClass.Get();
-
-				if (!ConsumableClass)
-				{
-					const FString& AssetPathName = UKismetStringLibrary::Conv_NameToString(WrapperItemDefinition->ConsumableClass.ObjectID.AssetPathName);
-					ConsumableClass = StaticLoadObject<UClass>(AssetPathName.CStr());
-				}
-
-				Util::SpawnActor<ABuildingGameplayActorConsumable>(ConsumableClass, PlayerPawn->K2_GetActorLocation());*/
-
-				/*AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
-
-				if (!PlayerController)
-					return;
-
-				AFortPlayerPawn* PlayerPawn = PlayerController->MyFortPawn;
-
-				if (!PlayerPawn)
-					return;
-
-				auto QuestManager = PlayerController->GetQuestManager(ESubGame::Athena);
-				UFortQuestItemDefinition* QuestItemDefinition = StaticLoadObject<UFortQuestItemDefinition>(L"/Game/Athena/Items/Quests/BattlePass/Quest_BR_Interact_Chests_Location_RetailRow.Quest_BR_Interact_Chests_Location_RetailRow");
-
-				if (QuestManager && QuestItemDefinition)
-				{
-					TArray<FFortMcpQuestObjectiveInfo> Objectives = QuestItemDefinition->Objectives;
-
-					for (int32 i = 0; i < Objectives.Num(); i++)
-					{
-						FFortMcpQuestObjectiveInfo* QuestObjectiveInfo = &Objectives[i];
-						if (!QuestObjectiveInfo) continue;
-
-						QuestManager->SendCustomStatEvent(QuestObjectiveInfo->ObjectiveStatHandle, 1, true);
-						QuestManager->ForceTriggerQuestsUpdated();
-					}
-				}*/
 
 				/*
 					OdysseyLog: LogHook: Debug: Index not found: 0x0, Offset: 0xc17a88, IdaAddress [00007FF66F267A88] - Pleins de Free Memory
@@ -425,43 +235,21 @@ namespace Hooks
 				if (!PlayerPawn)
 					return;
 
+#ifdef BOTS
 				AAIBotOdyssey* BotOdyssey = CreateBotOdyssey();
 
 				if (BotOdyssey)
 				{
 					BotOdyssey->SetTargetActor(PlayerPawn);
 				}
+#endif // BOTS
 			}
 
 			if (GetAsyncKeyState(VK_F7) & 0x1)
 			{
 				bLogs = bLogs ? false : true;
-				FN_LOG(LogHooks, Log, "bLogs set to %i", bLogs);
+				FN_LOG(LogHooks, Log, L"bLogs set to %i", bLogs);
 				return;
-
-				TArray<AFortPlayerController*> PlayerControllers = UFortKismetLibrary::GetAllFortPlayerControllers(Globals::GetWorld(), true, true);
-
-				for (int32 i = 0; i < PlayerControllers.Num(); i++)
-				{
-					AFortPlayerController* PlayerController = PlayerControllers[i];
-					if (!PlayerController) continue;
-
-					AFortPlayerState* PlayerState = Cast<AFortPlayerState>(PlayerController->PlayerState);
-
-					if (PlayerState)
-					{
-						// 7FF66EC68170
-						void (*ClearAllAbilities)(UAbilitySystemComponent* AbilitySystemComponent) = decltype(ClearAllAbilities)(0x618170 + uintptr_t(GetModuleHandle(0)));
-						ClearAllAbilities(PlayerState->AbilitySystemComponent);
-					}
-				}
-
-				/*AFortPlayerController* PlayerController = (AFortPlayerController*)UGameplayStatics::GetPlayerController(Globals::GetWorld(), 0);
-
-				if (!PlayerController)
-					return;
-
-				UKismetSystemLibrary::ExecuteConsoleCommand(PlayerController, L"SPAWNLLAMA", PlayerController);*/
 			}
 
 			if (GetAsyncKeyState(VK_F9) & 0x1)
@@ -562,7 +350,7 @@ namespace Hooks
 
 				UFortKismetLibrary::GiveItemToInventoryOwner(ScriptInterface, Globals::GetGameData()->WoodItemDefinition, 10, true);
 
-				FN_LOG(LogHooks, Log, "GiveItemToInventoryOwner");
+				FN_LOG(LogHooks, Log, L"GiveItemToInventoryOwner");
 			}
 
 			if (GetAsyncKeyState(VK_F12) & 0x1)
@@ -626,11 +414,11 @@ namespace Hooks
 
 				if (PlaylistAthena && GameStateAthena)
 				{
-					GameStateAthena->WarmupCountdownStartTime = Duration;
+					/*GameStateAthena->WarmupCountdownStartTime = Duration;
 					GameStateAthena->WarmupCountdownEndTime = ServerWorldTimeSeconds + Duration;
 
 					GameModeAthena->WarmupEarlyCountdownDuration = ServerWorldTimeSeconds;
-					GameModeAthena->WarmupCountdownDuration = Duration;
+					GameModeAthena->WarmupCountdownDuration = Duration;*/
 
 					for (int32 i = 0; i < PlaylistAthena->AdditionalLevels.Num(); i++)
 					{
@@ -654,35 +442,17 @@ namespace Hooks
 					GameStateAthena->OnRep_AdditionalPlaylistLevelsStreamed();
 				}
 
-				AFortAthenaMutator* AthenaMutator = Util::SpawnActor<AFortAthenaMutator>(AFortAthenaMutator::StaticClass());
+				Functions::InitializeTreasureChests();
+				Functions::InitializeAmmoBoxs();
+				Functions::InitializeLlamas();
+				Functions::InitializeConsumableBGAs();
 
-				if (AthenaMutator)
-				{
-					AthenaMutator->CachedGameMode = GameModeAthena;
-					AthenaMutator->CachedGameState = GameStateAthena;
+				Functions::FillVendingMachines();
 
-					GameModeAthena->GameplayMutators.Add(AthenaMutator);
-					GameStateAthena->GameplayMutators.Add(AthenaMutator);
-				}
-
-				/*
-					OdysseyLog: LogHooks: Info: Function: Function FortniteGame.FortLevelScriptActor.OnWorldReady
-					OdysseyLog: LogHooks: Info: Object: Athena_Terrain_C Athena_Terrain.Athena_Terrain.PersistentLevel.Athena_Terrain_C_1
-				*/
-
-				FN_LOG(LogHooks, Log, "Function: %s", Function->GetFullName().c_str());
-				FN_LOG(LogHooks, Log, "Object: %s", Object->GetFullName().c_str());
-
-				FN_LOG(LogHooks, Log, "OnWorldReady called!");
+				FN_LOG(LogHooks, Log, L"OnWorldReady called!");
 				GameModeAthena->bWorldIsReady = true;
 			}
 		}
-
-		/*
-			- ServerUpdateCamera
-			- ClientAckGoodMove
-			- 
-		*/
 
 		if (bLogs)
 		{
@@ -931,7 +701,7 @@ namespace Hooks
 				!FunctionName.contains("OnHitCrack") &&
 				!FunctionName.contains("EvaluateGraphExposedInputs_ExecuteUbergraph_Fortnite_M_Avg_Player_AnimBlueprint_AnimGraphNode_"))
 			{
-				FN_LOG(Logs, Log, "FunctionName: [%s], Object: [%s]", Function->GetFullName().c_str(), Object->GetName().c_str());
+				FN_LOG(Logs, Log, L"FunctionName: [%s], Object: [%s]", Function->GetFullName().c_str(), Object->GetName().c_str());
 			}
 		}
 
@@ -951,7 +721,7 @@ namespace Hooks
 
 			if (!PlayerController)
 			{
-				FN_LOG(LogHooks, Error, "[AFortDecoTool::ServerSpawnDeco] Failed to get PlayerController!");
+				FN_LOG(LogHooks, Error, L"[AFortDecoTool::ServerSpawnDeco] Failed to get PlayerController!");
 				return Result;
 			}
 
@@ -959,7 +729,7 @@ namespace Hooks
 
 			if (!PlayerState)
 			{
-				FN_LOG(LogHooks, Error, "[AFortDecoTool::ServerSpawnDeco] Failed to get PlayerState!");
+				FN_LOG(LogHooks, Error, L"[AFortDecoTool::ServerSpawnDeco] Failed to get PlayerState!");
 				return Result;
 			}
 
@@ -984,7 +754,7 @@ namespace Hooks
 		uintptr_t Offset = uintptr_t(_ReturnAddress()) - InSDKUtils::GetImageBase();
 		uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
 
-		FN_LOG(LogMinHook, Log, "Function [InitalizePoiManager] successfully hooked with Offset [0x%llx], IdaAddress [%p], GameMode: [%s]", (unsigned long long)Offset, IdaAddress, PoiManager->GetName().c_str());
+		FN_LOG(LogMinHook, Log, L"Function [InitalizePoiManager] successfully hooked with Offset [0x%llx], IdaAddress [%p], GameMode: [%s]", (unsigned long long)Offset, IdaAddress, PoiManager->GetName().c_str());
 	}
 
 	// 7FF66F6694B0
@@ -996,7 +766,7 @@ namespace Hooks
 
 	void CollectGarbageHook()
 	{
-		FN_LOG(LogMinHook, Log, "CollectGarbageHook called!");
+		FN_LOG(LogMinHook, Log, L"CollectGarbageHook called!");
 	}
 
 #ifdef ANTICHEAT
@@ -1040,29 +810,6 @@ namespace Hooks
 	}
 #endif // ANTICHEAT
 
-	void (*sub_7FF66F2D4970OG)(UObject* a1);
-	void sub_7FF66F2D4970(UObject* a1)
-	{
-		uintptr_t Offset = (uintptr_t)_ReturnAddress() - InSDKUtils::GetImageBase();
-		uintptr_t IdaAddress = Offset + 0x7FF66E650000ULL;
-
-		FN_LOG(LogHook, Log, "Function Call [sub_7FF66F2D4970] successfully get with Offset [0x%llx], IdaAddress [%p]", (unsigned long long)Offset, IdaAddress);
-
-		UGA_Athena_Grenade_WithTrajectory_C;
-		AB_Prj_Athena_SuperTowerGrenade_C;
-		AFortGameplayEffectDeliveryActor;
-
-		sub_7FF66F2D4970OG(a1);
-	}
-
-	void (*OnExplodedOG)(AB_Prj_Athena_SuperTowerGrenade_C* SuperTowerGrenade, FFrame& Stack, void* Ret);
-	void OnExploded(AB_Prj_Athena_SuperTowerGrenade_C* SuperTowerGrenade, FFrame& Stack, void* Ret)
-	{
-		FN_LOG(LogHook, Log, "Function Call [OnExploded] SuperTowerGrenade [%s]", SuperTowerGrenade->GetName().c_str());
-
-		OnExplodedOG(SuperTowerGrenade, Stack, Ret);
-	}
-
 	void InitHook()
 	{
 		static auto FortPickupAthenaDefault = AFortPickupAthena::GetDefaultObj();
@@ -1095,9 +842,6 @@ namespace Hooks
 		MH_CreateHook((LPVOID)(AddressServerSpawnDeco), ServerSpawnDecoHook, (LPVOID*)(&ServerSpawnDeco));
 		MH_EnableHook((LPVOID)(AddressServerSpawnDeco));
 
-		/*MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8960), CollectGarbageInternalHook, nullptr);
-		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x17C8960));*/
-
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0xE31290), sub_7FF66F481290Hook, nullptr);
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0xE31290));
 
@@ -1109,9 +853,6 @@ namespace Hooks
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x10194B0), RestartHook, (LPVOID*)(&Restart));
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x10194B0));
 
-		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0xC84970), sub_7FF66F2D4970, (LPVOID*)(&sub_7FF66F2D4970OG));
-		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0xC84970));
-
 #ifdef ANTICHEAT
 		/*MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0x66AF00), NetSerializeHook, (LPVOID*)(&NetSerialize));
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0x66AF00));*/
@@ -1120,6 +861,6 @@ namespace Hooks
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + Offsets::ProcessEvent), ProcessEventHook, (LPVOID*)(&ProcessEvent));
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + Offsets::ProcessEvent));
 
-		FN_LOG(LogInit, Log, "InitHook Success!");
+		FN_LOG(LogInit, Log, L"InitHook Success!");
 	}
 }

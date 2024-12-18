@@ -152,7 +152,7 @@ namespace Loots
         }
 
         if (!SelectLootTierData)
-            FN_LOG(LogLoot, Warning, "UFortGameData::FindLootTierDataRow : TierGroupName %s with context %s not found!", LootTierKey.ToString().c_str(), ContextString.ToString().c_str());
+            FN_LOG(LogLoot, Warning, L"UFortGameData::FindLootTierDataRow : TierGroupName %s with context %s not found!", LootTierKey.ToString().c_str(), ContextString.ToString().c_str());
 
         return SelectLootTierData;
     }
@@ -763,7 +763,7 @@ namespace Loots
 
         if (TotalWeight == 0.0f)
         {
-            FN_LOG(LogLoot, Warning, "Loot Package %s has no valid weights with the following data:\nLootPackageCategory: %d\nWorldLevel: %d\nTags: ",
+            FN_LOG(LogLoot, Warning, L"Loot Package %s has no valid weights with the following data:\nLootPackageCategory: %d\nWorldLevel: %d\nTags: ",
                 LootPackageName.ToString().c_str(), LootPackageCategory, WorldLevel);
 
             for (int32 i = 0; i < StaticGameplayTags.GameplayTags.Num(); i++)
@@ -771,7 +771,7 @@ namespace Loots
                 FGameplayTag GameplayTag = StaticGameplayTags.GameplayTags[i];
                 if (!GameplayTag.TagName.IsValid()) continue;
 
-                FN_LOG(LogLoot, Warning, "%s", GameplayTag.TagName.ToString().c_str());
+                FN_LOG(LogLoot, Warning, L"%s", GameplayTag.TagName.ToString().c_str());
             }
 
             for (int32 i = 0; i < StaticGameplayTags.ParentTags.Num(); i++)
@@ -779,7 +779,7 @@ namespace Loots
                 FGameplayTag ParentTag = StaticGameplayTags.ParentTags[i];
                 if (!ParentTag.TagName.IsValid()) continue;
 
-                FN_LOG(LogLoot, Warning, "%s", ParentTag.TagName.ToString().c_str());
+                FN_LOG(LogLoot, Warning, L"%s", ParentTag.TagName.ToString().c_str());
             }
 
             return false;
@@ -805,7 +805,7 @@ namespace Loots
         if (!SelectLootPackageData)
             return false;
 
-        FN_LOG(LogLoot, Debug, "PickLootDropsFromLootPackage selected package %s", SelectLootPackageData->LootPackageID.ToString().c_str());
+        FN_LOG(LogLoot, Debug, L"PickLootDropsFromLootPackage selected package %s", SelectLootPackageData->LootPackageID.ToString().c_str());
 
         if (SelectLootPackageData->LootPackageCall.IsValid())
         {
@@ -836,7 +836,7 @@ namespace Loots
 
             if (!AssetPathName.IsValid())
             {
-                FN_LOG(LogLoot, Warning, "Loot Package %s does not contain a LootPackageCall or ItemDefinition.", SelectLootPackageData->LootPackageID.ToString().c_str());
+                FN_LOG(LogLoot, Warning, L"Loot Package %s does not contain a LootPackageCall or ItemDefinition.", SelectLootPackageData->LootPackageID.ToString().c_str());
                 return false;
             }
         }
@@ -845,7 +845,7 @@ namespace Loots
 
         if (!ItemDefinition)
         {
-            FN_LOG(LogLoot, Warning, "Failed to load loot package %s.", SelectLootPackageData->LootPackageID.ToString().c_str());
+            FN_LOG(LogLoot, Warning, L"Failed to load loot package %s.", SelectLootPackageData->LootPackageID.ToString().c_str());
             return false;
         }
 
@@ -859,7 +859,7 @@ namespace Loots
 
         int32 CountMultiplier = 1;
 
-        FN_LOG(LogLoot, Debug, "Dropping %s (Count: %i, CountMultiplier: %i, ItemLevel: %i",
+        FN_LOG(LogLoot, Debug, L"Dropping %s (Count: %i, CountMultiplier: %i, ItemLevel: %i",
             ItemDefinition->DisplayName.ToString().c_str(), SelectLootPackageData->Count, CountMultiplier, ItemLevel);
 
         int32 TotalCount = CountMultiplier * SelectLootPackageData->Count;
@@ -945,7 +945,7 @@ namespace Loots
 
         if (MinimumOfLootDrops > NumberOfLootDrops)
         {
-            FN_LOG(LogLoot, Warning, "Requested %i loot drops but minimum drops is %i for loot package %s", NumberOfLootDrops, MinimumOfLootDrops, LootTierData->LootPackage.ToString().c_str());
+            FN_LOG(LogLoot, Warning, L"Requested %i loot drops but minimum drops is %i for loot package %s", NumberOfLootDrops, MinimumOfLootDrops, LootTierData->LootPackage.ToString().c_str());
             LootMaps->clear();
             return false;
         }
@@ -998,7 +998,7 @@ namespace Loots
 
                 if (MaxDropsForCategory >= 0 && NumDropsForCategory >= MaxDropsForCategory)
                 {
-                    FN_LOG(LogLoot, Warning, "We have dropped %i items of category %i but the max is %i for tier group %s at tier %i.",
+                    FN_LOG(LogLoot, Warning, L"We have dropped %i items of category %i but the max is %i for tier group %s at tier %i.",
                         NumDropsForCategory, SelectedDropCategory, MaxDropsForCategory, LootTierData->TierGroup.ToString().c_str(), LootTierData->LootTier);
 
                     CategoryWeightMap.erase(SelectedDropCategory);
@@ -1012,7 +1012,7 @@ namespace Loots
 
             if (MinimumOfLootDrops < NumberOfLootDrops)
             {
-                FN_LOG(LogLoot, Warning, "Requested %i loot drops but maximum drops is %i for loot package %s", NumberOfLootDrops, MinimumOfLootDrops, LootTierData->LootPackage.ToString().c_str());
+                FN_LOG(LogLoot, Warning, L"Requested %i loot drops but maximum drops is %i for loot package %s", NumberOfLootDrops, MinimumOfLootDrops, LootTierData->LootPackage.ToString().c_str());
                 LootMaps->clear();
                 return false;
             }
@@ -1059,7 +1059,7 @@ namespace Loots
                     }
                 }
 
-                FN_LOG(LogLoot, Debug, "Actual number of loot drops is: %i", NumberOfLootDrops);
+                FN_LOG(LogLoot, Debug, L"Actual number of loot drops is: %i", NumberOfLootDrops);
 
                 std::map<int32, int32> LootMap;
 
@@ -1078,7 +1078,7 @@ namespace Loots
 
                 for (const auto& [LootPackageCategory, DropCount] : LootMap)
                 {
-                    FN_LOG(LogLoot, Debug, "Dropping %i loot packages from drop category %i", DropCount, LootPackageCategory);
+                    FN_LOG(LogLoot, Debug, L"Dropping %i loot packages from drop category %i", DropCount, LootPackageCategory);
 
                     if (DropCount > 0)
                     {

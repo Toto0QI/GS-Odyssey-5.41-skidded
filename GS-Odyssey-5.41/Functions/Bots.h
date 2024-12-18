@@ -551,8 +551,16 @@ namespace BotOdyssey
 				case EAIBotAction::None:
 					break;
 				case EAIBotAction::Warmup:
+					/*AFortPlayerPawnAthena* FortAIPawn = BotOdyssey->GetFortAIPawn();
+
+					if (FortAIPawn)
+					{
+
+					}*/
 					break;
 				case EAIBotAction::Aircraft:
+					((AFortPlayerStateAthena*)FortAIPlayerController->PlayerState)->bThankedBusDriver;
+
 					if (FortAIPlayerController->IsInAircraft())
 					{
 

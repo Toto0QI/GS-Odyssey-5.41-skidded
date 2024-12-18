@@ -69,8 +69,7 @@ namespace Pickup
 	{
 		TossPickupOG(Pickup, FinalLocation, ItemOwner, OverrideMaxStackCount, bToss);
 
-		// FloorLoot
-		if (Pickup->PickupSourceTypeFlags == 32)
+		if (Pickup->bTossedFromContainer)
 			return;
 
 		Inventory::CombineNearestPickup(Pickup, 300.0f);
@@ -91,7 +90,7 @@ namespace Pickup
 		if (Pickup->bActorIsBeingDestroyed || !Pickup->bCombinePickupsWhenTossCompletes)
 			return;
 
-		Inventory::CombineNearestPickup(Pickup, 500.0f);
+		Inventory::CombineNearestPickup(Pickup, 400.0f);
 	}
 
 	/*
@@ -175,6 +174,6 @@ namespace Pickup
 
 		/* ----------------------------------------------------------------------------------------------- */
 
-		FN_LOG(LogInit, Log, "InitPawn Success!");
+		FN_LOG(LogInit, Log, L"InitPawn Success!");
 	}
 }

@@ -274,7 +274,7 @@ namespace FortKismetLibrary
 		}
 		else
 		{
-			ItemEntry.SetStateValue(EFortItemEntryState::ShouldShowItemToast, 1);
+			Inventory::SetStateValue(&ItemEntry, EFortItemEntryState::ShouldShowItemToast, 1);
 			Inventory::AddInventoryItem(PlayerController, ItemEntry);
 		}
 
@@ -421,7 +421,7 @@ namespace FortKismetLibrary
 		}
 		else
 		{
-			ItemEntry.SetStateValue(EFortItemEntryState::ShouldShowItemToast, 1);
+			Inventory::SetStateValue(&ItemEntry, EFortItemEntryState::ShouldShowItemToast, 1);
 			Inventory::AddInventoryItem(PlayerController, ItemEntry);
 		}
 
@@ -569,6 +569,6 @@ namespace FortKismetLibrary
 		MH_CreateHook((LPVOID)(InSDKUtils::GetImageBase() + 0xEBE8A0), K2_RemoveItemFromPlayerByGuid, nullptr);
 		MH_EnableHook((LPVOID)(InSDKUtils::GetImageBase() + 0xEBE8A0));
 
-		FN_LOG(LogInit, Log, "InitFortKismetLibrary Success!");
+		FN_LOG(LogInit, Log, L"InitFortKismetLibrary Success!");
 	}
 }

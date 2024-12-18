@@ -1,5 +1,9 @@
 #pragma once
 
+#include <locale>
+#include <codecvt>
+#include <string>
+
 inline bool bDebugLog = false;
 
 enum LogLevel {
@@ -9,32 +13,115 @@ enum LogLevel {
     Error
 };
 
-void WriteLog(const char* category, LogLevel level, const char* format, ...)
+namespace ELogVerbosity
 {
-    const char* levelStr;
+    enum Type : uint8
+    {
+        /** Not used */
+        NoLogging = 0,
+
+        /** Always prints a fatal error to console (and log file) and crashes (even if logging is disabled) */
+        Fatal,
+
+        /**
+         * Prints an error to console (and log file).
+         * Commandlets and the editor collect and report errors. Error messages result in commandlet failure.
+         */
+        Error,
+
+        /**
+         * Prints a warning to console (and log file).
+         * Commandlets and the editor collect and report warnings. Warnings can be treated as an error.
+         */
+        Warning,
+
+        /** Prints a message to console (and log file) */
+        Display,
+
+        /** Prints a message to a log file (does not print to console) */
+        Log,
+
+        /**
+         * Prints a verbose message to a log file (if Verbose logging is enabled for the given category,
+         * usually used for detailed logging)
+         */
+        Verbose,
+
+        /**
+         * Prints a verbose message to a log file (if VeryVerbose logging is enabled,
+         * usually used for detailed logging that would otherwise spam output)
+         */
+        VeryVerbose,
+
+        // Log masks and special Enum values
+
+        All = VeryVerbose,
+        NumVerbosity,
+        VerbosityMask = 0xf,
+        SetColor = 0x40, // not actually a verbosity, used to set the color of an output device 
+        BreakOnLog = 0x80
+    };
+}
+
+std::string TCHARToANSI(const TCHAR* tcharStr)
+{
+    // Détermine la longueur de la chaîne convertie
+    int size_needed = WideCharToMultiByte(CP_UTF8, 0, tcharStr, -1, NULL, 0, NULL, NULL);
+
+    // Crée une chaîne de caractères pour stocker le résultat
+    std::string result(size_needed, 0);
+
+    // Convertit la chaîne TCHAR en UTF-8
+    WideCharToMultiByte(CP_UTF8, 0, tcharStr, -1, &result[0], size_needed, NULL, NULL);
+
+    return result;
+}
+
+void WriteLog(const char* category, LogLevel level, const TCHAR* format, ...)
+{
+    const TCHAR* levelStr;
 
     if (!bDebugLog && level == LogLevel::Debug)
         return;
 
-    switch (level) {
-        case LogLevel::Log: levelStr = "Info"; break;
-        case LogLevel::Debug: levelStr = "Debug"; break;
-        case LogLevel::Warning: levelStr = "Warning"; break;
-        case LogLevel::Error: levelStr = "Error"; break;
-        default: levelStr = "Unknown"; break;
+    switch (level) 
+    {
+        case LogLevel::Log: levelStr = TEXT("Info"); break;
+        case LogLevel::Debug: levelStr = TEXT("Debug"); break;
+        case LogLevel::Warning: levelStr = TEXT("Warning"); break;
+        case LogLevel::Error: levelStr = TEXT("Error"); break;
+        default: levelStr = TEXT("Unknown"); break;
     }
 
-    printf("OdysseyLog: %s: %s: ", category, levelStr);
+    printf("OdysseyLog: %s: %s: ", category, TCHARToANSI(levelStr));
 
     va_list args;
     va_start(args, format);
-    vprintf(format, args);
+    vprintf(TCHARToANSI(format).c_str(), args);
     va_end(args);
 
     printf("\n");
 }
 
+/*void WriteLog(const char* File, int32 Line, const char* Caca, LogLevel level, const TCHAR* Fmt, ...)
+{
+    FName Category = UKismetStringLibrary::Conv_StringToName(TEXT("LogFort"));
+
+    va_list Args;
+    va_start(Args, Fmt);
+
+    void (*Logf_InternalImpl)(const char* File, int32 Line, const FName & Category, ELogVerbosity::Type Verbosity, const TCHAR* Fmt, ...) = decltype(Logf_InternalImpl)(0x15ff740 + uintptr_t(GetModuleHandle(0)));
+    Logf_InternalImpl(File, Line, Category, ELogVerbosity::Type::Log, Fmt, Args);
+
+    va_end(Args);
+}
+
+#define FN_LOG(CategoryName, Verbosity, Format, ...) \
+    WriteLog(__FILE__, __LINE__, #CategoryName, Verbosity, Format , ##__VA_ARGS__)*/
+
+
 #define FN_LOG(Category, Level, ...) WriteLog(#Category, Level, __VA_ARGS__)
+
 
 static auto StaticLoadObjectInternal = reinterpret_cast<UObject * (*)(UClass * InClass, UObject * InOuter, const TCHAR * Name, const TCHAR * FileName, uint32_t LoadFlags, UPackageMap * Sandbox, bool bAllowObjectReconciliation)>(uintptr_t(GetModuleHandle(NULL)) + 0x1856210);
 
@@ -250,7 +337,7 @@ public:
 
         if (!PlayerPawn)
         {
-            FN_LOG(LogPlayer, Error, "Failed to spawn PlayerPawn!");
+            FN_LOG(LogPlayer, Error, L"Failed to spawn PlayerPawn!");
             return nullptr;
         }
 
@@ -258,7 +345,7 @@ public:
 
         if (!World)
         {
-            FN_LOG(LogPlayer, Error, "Failed to get World!");
+            FN_LOG(LogPlayer, Error, L"Failed to get World!");
             return nullptr;
         }
 

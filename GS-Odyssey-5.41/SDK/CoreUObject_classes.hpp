@@ -48,6 +48,37 @@ public:
 		return GetInterfaceAddress(this, InterfaceClass);
 	}
 
+	/**
+	 * Returns the fully qualified pathname for this object, in the format:
+	 * 'Outermost.[Outer:]Name'
+	 *
+	 * @param	StopOuter	if specified, indicates that the output string should be relative to this object.  if StopOuter
+	 *						does not exist in this object's Outer chain, the result would be the same as passing NULL.
+	 *
+	 * @note	safe to call on NULL object pointers!
+	 */
+	FString GetPathName(const UObject* StopOuter = NULL)
+	{
+		// 7FF66FE98640
+		FString* (*GetPathName)(UObject* Object, FString* OutPathName, const UObject* StopOuter) = decltype(GetPathName)(0x1848640 + uintptr_t(GetModuleHandle(0)));
+
+		FString PathName;
+		GetPathName(this, &PathName, StopOuter);
+
+		return PathName;
+	}
+
+	/**
+	 * Internal version of GetPathName() that eliminates unnecessary copies.
+	 */
+	void GetPathName(const UObject* StopOuter, FString& ResultString)
+	{
+		// 7FF66FE984C0
+		void (*GetPathName)(UObject* Object, const UObject* StopOuter, FString& ResultString) = decltype(GetPathName)(0x18484c0 + uintptr_t(GetModuleHandle(0)));
+		GetPathName(this, StopOuter, ResultString);
+	}
+
+
 public:
 	static class UClass* FindClass(const std::string& ClassFullName)
 	{

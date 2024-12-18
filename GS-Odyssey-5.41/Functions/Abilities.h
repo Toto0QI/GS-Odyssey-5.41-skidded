@@ -137,6 +137,6 @@ namespace Abilities
 
 		MinHook::HookVTable(FortAbilitySystemComponentAthenaDefault, 0xF3, InternalServerTryActiveAbilityHook, nullptr, "InternalServerTryActiveAbility");
 
-		FN_LOG(LogInit, Log, "InitAbilities Success!");
+		FN_LOG(LogInit, Log, L"InitAbilities Success!");
 	}
 }

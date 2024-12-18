@@ -131,6 +131,7 @@
     <ClInclude Include="Globals.h" />
     <ClInclude Include="Globals\BuildingActor.h" />
     <ClInclude Include="Globals\BuildingProp.h" />
+    <ClInclude Include="Globals\CheatManager.h" />
     <ClInclude Include="Globals\FortAthenaSupplyDrop.h" />
     <ClInclude Include="Globals\FortKismetLibrary.h" />
     <ClInclude Include="Globals\GameMode.h" />

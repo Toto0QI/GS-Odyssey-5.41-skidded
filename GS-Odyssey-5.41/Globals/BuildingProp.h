@@ -17,7 +17,7 @@ namespace BuildingProp
 	{
 
 
-		FN_LOG(LogGameMode, Log, "[ABuildingProp::BlueprintCanInteract]");
+		FN_LOG(LogGameMode, Log, L"[ABuildingProp::BlueprintCanInteract]");
 	}
 
 	void InitBuildingProp()
@@ -35,6 +35,6 @@ namespace BuildingProp
 
 		/* ----------------------------------------------------------------------------------------------- */
 
-		FN_LOG(LogInit, Log, "InitBuildingActor Success!");
+		FN_LOG(LogInit, Log, L"InitBuildingActor Success!");
 	}
 }

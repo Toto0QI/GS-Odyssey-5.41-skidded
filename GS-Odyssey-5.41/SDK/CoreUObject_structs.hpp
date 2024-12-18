@@ -293,6 +293,11 @@ public:
 	float                                         Y;                                                 // 0x0004(0x0004)(Edit, BlueprintVisible, ZeroConstructor, SaveGame, IsPlainOldData, NoDestructor, HasGetValueTypeHash, NativeAccessSpecifierPublic)
 	float                                         Z;                                                 // 0x0008(0x0004)(Edit, BlueprintVisible, ZeroConstructor, SaveGame, IsPlainOldData, NoDestructor, HasGetValueTypeHash, NativeAccessSpecifierPublic)
 
+	void test()
+	{
+		alignof(FVector);
+	}
+
 public:
 	FVector& Normalize()
 	{
@@ -818,6 +823,11 @@ public:
 	uint8                                         Pad_17[0x4];                                       // 0x001C(0x0004)(Fixing Size After Last Property [ Dumper-7 ])
 	struct FVector                                Scale3D;                                           // 0x0020(0x000C)(Edit, BlueprintVisible, SaveGame, IsPlainOldData, NoDestructor, HasGetValueTypeHash, NativeAccessSpecifierPublic)
 	uint8                                         Pad_18[0x4];                                       // 0x002C(0x0004)(Fixing Struct Size After Last Property [ Dumper-7 ])
+
+	void test()
+	{
+		alignof(FTransform);
+	}
 };
 
 // ScriptStruct CoreUObject.RandomStream

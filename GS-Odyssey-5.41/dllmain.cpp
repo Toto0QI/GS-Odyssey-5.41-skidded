@@ -40,6 +40,7 @@
 #include "Globals/BuildingActor.h"
 #include "Globals/BuildingProp.h"
 #include "Globals/Pickup.h"
+#include "Globals/CheatManager.h"
 
 #include <fstream>
 #include "Hooks.h"
@@ -81,12 +82,12 @@ DWORD WINAPI MainThread(LPVOID)
         *(bool*)Hooks::GIsClient() = false;
         *(bool*)Hooks::GIsServer() = true;
 
-        FN_LOG(LogInitialize, Log, "ImageBase: [%p]", InSDKUtils::GetImageBase());
-        FN_LOG(LogInitialize, Log, "Init Success!");
+        FN_LOG(LogInitialize, Log, L"ImageBase: [%p]", InSDKUtils::GetImageBase());
+        FN_LOG(LogInitialize, Log, L"Init Success!");
     }
     else
     {
-        FN_LOG(LogInitialize, Log, "Init Failed!");
+        FN_LOG(LogInitialize, Log, L"Init Failed!");
     }
 
     return 0;

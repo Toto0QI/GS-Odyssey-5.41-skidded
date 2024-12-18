@@ -226,11 +226,11 @@ namespace PlayerController
 
 				if (!PlayerControllerAthena->MatchReport)
 				{
-					FN_LOG(LogPlayerController, Error, "[AFortPlayerController::ServerReadyToStartMatch] Failed to spawn MatchReport for PlayerController: %s", PlayerControllerAthena->GetName().c_str());
+					FN_LOG(LogPlayerController, Error, L"[AFortPlayerController::ServerReadyToStartMatch] Failed to spawn MatchReport for PlayerController: %s", PlayerControllerAthena->GetName().c_str());
 				}
 			}
 
-			ESubGame CurrentSubGame = UFortGlobals::GetCurrentSubGame();
+			/*ESubGame CurrentSubGame = UFortGlobals::GetCurrentSubGame();
 			UFortQuestManager* QuestManager = PlayerControllerAthena->GetQuestManager(CurrentSubGame);
 
 			if (QuestManager)
@@ -248,7 +248,7 @@ namespace PlayerController
 					FN_LOG(LogPlayerController, Log, "[%i/%i] - QuestItemDefinition: %s, bHasCompletedQuest: %i", 
 						(i + 1), QuestManager->CurrentQuests.Num(), QuestItemDefinition->GetName().c_str(), bHasCompletedQuest);
 				}
-			}
+			}*/
 
 #ifdef CHEATS
 			if (!PlayerController->CheatManager)
@@ -356,7 +356,7 @@ namespace PlayerController
 			if (WeaponRangedItemDefinition && WeaponRangedItemDefinition->bPersistInInventoryWhenFinalStackEmpty)
 				return;
 
-			FN_LOG(LogPlayerController, Warning, "[AFortPlayerController::ServerAttemptInventoryDrop] The item [%s] has a count of [%i] deletion of the item.", WorldItemDefinition->GetName().c_str(), WorldItem->ItemEntry.Count);
+			FN_LOG(LogPlayerController, Warning, L"[AFortPlayerController::ServerAttemptInventoryDrop] The item [%s] has a count of [%i] deletion of the item.", WorldItemDefinition->GetName().c_str(), WorldItem->ItemEntry.Count);
 
 			PlayerController->RemoveInventoryItem(ItemGuid, Count, true, true);
 			return;
@@ -376,7 +376,7 @@ namespace PlayerController
 			FFortItemEntry NewItemEntry;
 			Inventory::MakeItemEntry(&NewItemEntry, WorldItemDefinition, Count, WorldItem->ItemEntry.Level, WorldItem->ItemEntry.LoadedAmmo, WorldItem->ItemEntry.Durability);
 
-			AFortPickup* Pickup = Pickup = AFortPickup::CreatePickup(
+			AFortPickup* Pickup = AFortPickup::CreatePickup(
 				PlayerController->GetWorld(),
 				&NewItemEntry,
 				&SpawnLocation,
@@ -430,6 +430,23 @@ namespace PlayerController
 	{
 		if (!ReceivingActor)
 			return;
+
+		ESubGame CurrentSubGame = UFortGlobals::GetCurrentSubGame();
+		UFortQuestManager* QuestManager = PlayerController->GetQuestManager(CurrentSubGame);
+
+		if (QuestManager)
+		{
+			FGameplayTagContainer SourceTags;
+			FGameplayTagContainer ContextTags;
+			QuestManager->GetSourceAndContextTags(&SourceTags, &ContextTags);
+
+			void* GameplayTagAssetInterface = ReceivingActor->GetInterfaceAddress(IGameplayTagAssetInterface::StaticClass());
+
+			UFortRegisteredPlayerInfo* RegisteredPlayerInfo = Cast<UFortRegisteredPlayerInfo>(QuestManager->Outer);
+
+
+			// QuestManager->SendCustomStatEvent();
+		}
 
 		ABuildingItemCollectorActor* BuildingItemCollectorActor = Cast<ABuildingItemCollectorActor>(ReceivingActor);
 
@@ -801,21 +818,16 @@ namespace PlayerController
 			UFortWorldItem* WorldItemToDrop = WorldItemToDrops[i];
 			if (!WorldItemToDrop) continue;
 
-			FFortItemEntry* ItemEntry = &WorldItemToDrop->ItemEntry;
-			if (!ItemEntry) continue;
+			FVector FinalLocation = SpawnLocation;
+			FVector RandomDirection = UKismetMathLibrary::RandomUnitVector();
 
-			FRotator PlayerRotation = PlayerPawn->K2_GetActorRotation();
-			PlayerRotation.Yaw += UKismetMathLibrary::RandomFloatInRange(-180.0f, 180.0f);
-
-			float RandomDistance = UKismetMathLibrary::RandomFloatInRange(350.0f, 700.0f);
-			FVector FinalDirection = UKismetMathLibrary::GetForwardVector(PlayerRotation);
-
-			FVector FinalLocation = SpawnLocation + FinalDirection * RandomDistance;
+			FinalLocation.X += RandomDirection.X * 700.0f;
+			FinalLocation.Y += RandomDirection.Y * 700.0f;
 
 			FFortItemEntry NewItemEntry;
-			NewItemEntry.CopyItemEntryWithReset(ItemEntry);
+			NewItemEntry.CopyItemEntryWithReset(&WorldItemToDrop->ItemEntry);
 
-			if (PlayerController->RemoveInventoryItem(ItemEntry->ItemGuid, ItemEntry->Count, true, true))
+			if (PlayerController->RemoveInventoryItem(WorldItemToDrop->ItemEntry.ItemGuid, WorldItemToDrop->ItemEntry.Count, true, true))
 			{
 				AFortPickup* Pickup = AFortPickup::CreatePickup(
 					PlayerController->GetWorld(), 
@@ -919,6 +931,29 @@ namespace PlayerController
 			{
 				UFortGameplayAbility* ToySpawnAbility = Functions::LoadGameplayAbility(ToyItemDefinition->ToySpawnAbility);
 				GameplayAbility = ToySpawnAbility;
+
+				UClass* ToyActorClass = Functions::LoadClass(ToyItemDefinition->ToyActorClass);
+
+				if (ToyActorClass)
+				{
+					for (int32 i = 0; i < PlayerController->ActiveToyInstances.Num(); i++)
+					{
+						ABuildingGameplayActor* ActiveToyInstance = Cast<ABuildingGameplayActor>(PlayerController->ActiveToyInstances[i]);
+						if (!ActiveToyInstance) continue;
+
+						if (ActiveToyInstance->bActorIsBeingDestroyed)
+							continue;
+
+						if (ActiveToyInstance->IsA(ToyActorClass))
+						{
+							PlayerController->ActiveToyInstances.Remove(i);
+							ActiveToyInstance->FlushNetDormancy();
+							ActiveToyInstance->ForceNetUpdate();
+							ActiveToyInstance->SilentDie();
+							ActiveToyInstance->K2_DestroyActor();
+						}
+					}
+				}
 			}
 		}
 
@@ -1008,17 +1043,12 @@ namespace PlayerController
 				Message = L"null";
 			}
 		}
+
+#ifdef DEBUGS
+		
+#endif // DEBUGS
+
 #ifdef CHEATS
-		else if (Action == "buildfree")
-		{
-			PlayerController->bBuildFree = PlayerController->bBuildFree ? false : true;
-			Message = PlayerController->bBuildFree ? L"BuildFree on" : L"BuildFree off";
-		}
-		else if (Action == "infiniteammo")
-		{
-			PlayerController->bInfiniteAmmo = PlayerController->bInfiniteAmmo ? false : true;
-			Message = PlayerController->bInfiniteAmmo ? L"InfiniteAmmo on" : L"InfiniteAmmo off";
-		}
 		else if (Action == "pausesafezone")
 		{
 			UKismetSystemLibrary::ExecuteConsoleCommand(PlayerController, L"pausesafezone", nullptr);
@@ -1048,6 +1078,16 @@ namespace PlayerController
 		{
 			UKismetSystemLibrary::ExecuteConsoleCommand(PlayerController, L"startaircraft", nullptr);
 			Message = L"StartAirCraft command executed successfully!";
+		}
+		else if (Action == "buildfree")
+		{
+			PlayerController->bBuildFree = PlayerController->bBuildFree ? false : true;
+			Message = PlayerController->bBuildFree ? L"BuildFree on" : L"BuildFree off";
+		}
+		else if (Action == "infiniteammo")
+		{
+			PlayerController->bInfiniteAmmo = PlayerController->bInfiniteAmmo ? false : true;
+			Message = PlayerController->bInfiniteAmmo ? L"InfiniteAmmo on" : L"InfiniteAmmo off";
 		}
 		else if (Action == "sethealth" && ParsedCommand.size() >= 2)
 		{
@@ -1667,6 +1707,30 @@ namespace PlayerController
 			PlayerController->ClientMessage(Message, FName(), 1);
 	}
 
+	AActor* SpawnToyInstance(AFortPlayerController* PlayerController, FFrame& Stack, AActor** Ret)
+	{
+		TSubclassOf<AActor> ToyClass{};
+		FTransform SpawnPosition = FTransform();
+
+		Stack.StepCompiledIn(&ToyClass);
+		Stack.StepCompiledIn(&SpawnPosition);
+
+		Stack.Code += Stack.Code != nullptr;
+
+		ABuildingGameplayActor* ToyInstance = Util::SpawnActorTransfrom<ABuildingGameplayActor>(ToyClass, SpawnPosition);
+
+		if (ToyInstance)
+		{
+			ToyInstance->SetOwner(PlayerController);
+			ToyInstance->OnRep_Owner();
+
+			PlayerController->ActiveToyInstances.Add(ToyInstance);
+		}
+
+		*Ret = ToyInstance;
+		return *Ret;
+	}
+
 	/* -------------------------------------- PlayerController --------------------------------------- */
 
 	/*
@@ -1787,7 +1851,7 @@ namespace PlayerController
 				break;
 			}
 		}
-		AFortWeapon;
+
 		// I think that normally you don't need to modify the value here but for me it doesn't work idk
 		for (int32 i = 0; i < WorldInventory->Inventory.ReplicatedEntries.Num(); i++)
 		{
@@ -1845,6 +1909,9 @@ namespace PlayerController
 		MinHook::HookVTable(FortPlayerControllerAthenaDefault, 0x1258 / 8, ServerReturnToMainMenu, nullptr, "AFortPlayerController::ServerReturnToMainMenu");
 		MinHook::HookVTable(FortPlayerControllerAthenaDefault, 0xDA0 / 8, ServerCheat, nullptr, "AFortPlayerController::ServerCheat");
 
+		UFunction* SpawnToyInstanceFunc = FortPlayerControllerAthenaClass->GetFunction("FortPlayerController", "SpawnToyInstance");
+		MinHook::HookFunctionExec(SpawnToyInstanceFunc, SpawnToyInstance, nullptr);
+
 		/* -------------------------------------- PlayerController --------------------------------------- */
 
 		MinHook::HookVTable(FortPlayerControllerAthenaDefault, 0x828 / 8, ServerAcknowledgePossession, nullptr, "APlayerController::ServerAcknowledgePossession");
@@ -1860,6 +1927,6 @@ namespace PlayerController
 
 		/* ----------------------------------------------------------------------------------------------- */
 
-		FN_LOG(LogInit, Log, "InitPlayerController Success!");
+		FN_LOG(LogInit, Log, L"InitPlayerController Success!");
 	}
 }

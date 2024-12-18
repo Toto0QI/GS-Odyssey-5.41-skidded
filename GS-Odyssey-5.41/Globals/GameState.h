@@ -86,6 +86,6 @@ namespace GameState
 		/* ------------------------------------ AFortGameStateAthena ------------------------------------- */
         /* ----------------------------------------------------------------------------------------------- */
 
-		FN_LOG(LogInit, Log, "InitGameState Success!");
+		FN_LOG(LogInit, Log, L"InitGameState Success!");
 	}
 }

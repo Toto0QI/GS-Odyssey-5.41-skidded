@@ -22,6 +22,7 @@ namespace InitFunc
 		FortKismetLibrary::InitFortKismetLibrary();
 		FortAthenaSupplyDrop::InitFortAthenaSupplyDrop();
 		Pickup::InitPickup();
+		CheatManager::InitCheatManager();
 
 		// Functions
 		Beacon::InitBeacon();

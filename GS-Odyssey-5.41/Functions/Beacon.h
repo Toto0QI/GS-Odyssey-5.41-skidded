@@ -32,7 +32,7 @@ namespace Beacon
 
 		if (!OnlineBeaconHost || !World)
 		{
-			FN_LOG(LogBeacon, Error, "Failed to create OnlineBeaconHost or to get World!");
+			FN_LOG(LogBeacon, Error, L"Failed to create OnlineBeaconHost or to get World!");
 			return false;
 		}
 
@@ -40,18 +40,18 @@ namespace Beacon
 
 		if (World->NetDriver)
 		{
-			FN_LOG(LogBeacon, Warning, "OnlineBeaconHost already created!");
+			FN_LOG(LogBeacon, Warning, L"OnlineBeaconHost already created!");
 			return false;
 		}
 
 		if (InitHost(OnlineBeaconHost))
 		{
 			World->NetDriver = OnlineBeaconHost->NetDriver;
-			FN_LOG(LogBeacon, Log, "Beacon created successful!");
+			FN_LOG(LogBeacon, Log, L"Beacon created successful!");
 		}
 		else
 		{
-			FN_LOG(LogBeacon, Error, "Failed to InitHost!");
+			FN_LOG(LogBeacon, Error, L"Failed to InitHost!");
 			return false;
 		}
 
@@ -77,7 +77,7 @@ namespace Beacon
 			FString Error;
 			if (!InitListen(World->NetDriver, World, InURL, true, Error))
 			{
-				FN_LOG(LogBeacon, Debug, "Failed to listen: %s", Error.ToString().c_str());
+				FN_LOG(LogBeacon, Debug, L"Failed to listen: %s", Error.ToString().c_str());
 
 				SetWorld(World->NetDriver, NULL);
 				World->NetDriver = NULL;
@@ -112,11 +112,11 @@ namespace Beacon
 		}
 		else
 		{
-			FN_LOG(LogBeacon, Error, "Failed to listen!");
+			FN_LOG(LogBeacon, Error, L"Failed to listen!");
 			return false;
 		}
 
-		FN_LOG(LogBeacon, Debug, "Listen on port: %i", InURL.Port);
+		FN_LOG(LogBeacon, Debug, L"Listen on port: %i", InURL.Port);
 
 		return true;
 	}
@@ -139,7 +139,7 @@ namespace Beacon
 
 				if (!OnlineBeaconHost || !World)
 				{
-					FN_LOG(LogBeacon, Error, "Failed to create OnlineBeaconHost or to get World!");
+					FN_LOG(LogBeacon, Error, L"Failed to create OnlineBeaconHost or to get World!");
 					return false;
 				}
 
@@ -147,18 +147,18 @@ namespace Beacon
 
 				if (World->NetDriver)
 				{
-					FN_LOG(LogBeacon, Warning, "OnlineBeaconHost already created!");
+					FN_LOG(LogBeacon, Warning, L"OnlineBeaconHost already created!");
 					return false;
 				}
 
 				if (InitHost(OnlineBeaconHost))
 				{
 					World->NetDriver = OnlineBeaconHost->NetDriver;
-					FN_LOG(LogBeacon, Log, "Beacon created successful!");
+					FN_LOG(LogBeacon, Log, L"Beacon created successful!");
 				}
 				else
 				{
-					FN_LOG(LogBeacon, Error, "Failed to InitHost!");
+					FN_LOG(LogBeacon, Error, L"Failed to InitHost!");
 					return false;
 				}
 
@@ -184,7 +184,7 @@ namespace Beacon
 					FString Error;
 					if (!InitListen(World->NetDriver, World, InURL, true, Error))
 					{
-						FN_LOG(LogBeacon, Debug, "Failed to listen: %s", Error.ToString().c_str());
+						FN_LOG(LogBeacon, Debug, L"Failed to listen: %s", Error.ToString().c_str());
 
 						SetWorld(World->NetDriver, NULL);
 						World->NetDriver = NULL;
@@ -224,11 +224,11 @@ namespace Beacon
 				}
 				else
 				{
-					FN_LOG(LogBeacon, Error, "Failed to listen!");
+					FN_LOG(LogBeacon, Error, L"Failed to listen!");
 					return false;
 				}
 
-				FN_LOG(LogBeacon, Debug, "Listen on port: %i", InURL.Port);
+				FN_LOG(LogBeacon, Debug, L"Listen on port: %i", InURL.Port);
 
 				return true;
 			}
@@ -254,6 +254,6 @@ namespace Beacon
 		MH_CreateHook((LPVOID)(AddressListen), ListenHook, nullptr);
 		MH_EnableHook((LPVOID)(AddressListen));
 
-		FN_LOG(LogInit, Log, "InitBeacon Success!");
+		FN_LOG(LogInit, Log, L"InitBeacon Success!");
 	}
 }
